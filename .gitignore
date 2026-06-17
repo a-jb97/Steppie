@@ -1,0 +1,72 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode
+ios/**/DerivedData/
+ios/**/build/
+ios/**/*.xcuserstate
+ios/**/*.xcuserdata/
+ios/**/*.moved-aside
+ios/**/*.xccheckout
+ios/**/*.xcscmblueprint
+
+# Xcode SwiftPM
+ios/**/.build/
+ios/**/Package.resolved
+
+# CocoaPods, if used later
+ios/**/Pods/
+
+# Fastlane, if used later
+ios/**/fastlane/report.xml
+ios/**/fastlane/Preview.html
+ios/**/fastlane/screenshots/
+ios/**/fastlane/test_output/
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/**/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/**/*.iml
+
+# Android Studio captures
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/
+
+# Kotlin / Java
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+
+# Logs
+*.log
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Keystores / signing
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+*.certSigningRequest
+
+# Backup / generated artifacts
+*.tmp
+*.bak
+*.swp
+
+# Codex / local scratch
+work/
