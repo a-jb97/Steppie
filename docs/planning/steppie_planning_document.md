@@ -302,16 +302,21 @@ ios/ 디렉터리는 수정하지 마.
 
 ### 7-4. 병렬 개발 순서
 
-| 스프린트 | 공통 명세 | iOS | Android |
-|----------|----------|-----|---------|
-| 0 | 저장소 구조, 공통 계약 문서 작성 | 프로젝트 생성 | 프로젝트 생성 |
-| 1 | 데이터/백업 계약 확정 | SwiftData 모델 | Room Entity/DAO |
-| 2 | 디자인 토큰/샘플 데이터 확정 | 포커스 뷰 | 포커스 화면 |
-| 3 | 피드백 시나리오 확정 | TTS/햅틱/완료 흐름 | TTS/진동/완료 흐름 |
-| 4 | 알림 시나리오 확정 | UserNotifications | WorkManager 알림 |
-| 5 | 보호자 모드 계약 확정 | 루틴 편집/PIN | 루틴 편집/PIN |
-| 6 | 접근성 체크리스트 | VoiceOver 검증 | TalkBack 검증 |
-| 7 | 출시 체크리스트 | App Store 준비 | Google Play 준비 |
+초기 단계에서는 양 플랫폼의 구현 기준을 먼저 고정한다. 저장소와 개발 환경을 준비한 뒤 디자인 시스템과 재사용 컴포넌트를 구현하고, 그 위에 데이터 계층과 기능 화면을 순서대로 올린다. 각 단계는 iOS와 Android worktree에서 병렬로 진행하되, 공통 계약이 바뀌면 먼저 `docs/`를 수정하고 양쪽 브랜치에 반영한다.
+
+| 스프린트 | 공통 명세/준비 | iOS | Android |
+|----------|----------------|-----|---------|
+| 0 | 저장소 구조, 공통 계약 문서, Git worktree, AGENTS.md 확정 | Xcode 프로젝트 생성 및 빌드 확인 | Android Studio 프로젝트 생성 및 빌드 확인 |
+| 1 | 플랫폼별 최소 의존성, 아이콘/폰트 에셋, 지원 OS 범위 확정 | Apple 기본 프레임워크와 에셋 검증 | Compose/Room/DataStore 등 기반 의존성과 drawable 검증 |
+| 2 | Figma 연결, 디자인 토큰, 공통 컴포넌트 계약 확정 | Color/Typography/Spacing, Button, RoutineCard 구현 | Color/Typography/Spacing, Button, RoutineCard 구현 |
+| 3 | 데이터/백업 계약과 공통 샘플 데이터 확정 | SwiftData 모델, Repository, 인메모리 테스트 | Room Entity/DAO, Repository, 인메모리 테스트 |
+| 4 | 포커스 흐름과 휴대폰/태블릿 반응형 규칙 확정 | 루틴 목록/포커스 뷰, iPad 가로 레이아웃 | 루틴 목록/포커스 화면, 태블릿 가로 레이아웃 |
+| 5 | 피드백 및 완료/언두 시나리오 확정 | TTS/햅틱/효과음/완료 흐름 | TTS/진동/효과음/완료 흐름 |
+| 6 | 알림 권한, 예고 시각, 재예약 시나리오 확정 | UserNotifications 기반 로컬 알림 | Notification API와 AlarmManager 기반 로컬 알림 |
+| 7 | 보호자 모드 계약 확정 | 루틴 편집/정렬/PIN | 루틴 편집/정렬/PIN |
+| 8 | 백업/복원 및 스키마 버전 정책 확정 | iCloud/CloudKit 백업·복원 | Google Drive 백업·복원, 지연 작업은 WorkManager 사용 |
+| 9 | 접근성 체크리스트와 공통 테스트 시나리오 확정 | VoiceOver/Dynamic Type 검증 | TalkBack/Font Scale 검증 |
+| 10 | 출시 체크리스트 확정 | App Store 준비 | Google Play 준비 |
 
 ---
 
@@ -451,4 +456,3 @@ ios/ 디렉터리는 수정하지 마.
 | v1.1 | 사용자 피드백 반영, 버그 수정, 아이콘 추가 |
 | v1.5 | 일본어 현지화 검토 |
 | v2.0 | 온디바이스 AI 기능 검토 |
-
