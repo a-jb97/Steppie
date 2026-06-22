@@ -1,0 +1,13 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Color pictogram">
+<path id="Vector" d="M13 19C15.2091 19 17 17.2091 17 15C17 12.7909 15.2091 11 13 11C10.7909 11 9 12.7909 9 15C9 17.2091 10.7909 19 13 19Z" fill="#F7C7A9" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_2" d="M27 19C29.2091 19 31 17.2091 31 15C31 12.7909 29.2091 11 27 11C24.7909 11 23 12.7909 23 15C23 17.2091 24.7909 19 27 19Z" fill="#F7C7A9" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<g id="Vector_3">
+<path d="M7 32C8 26 11 23 16 23ZM33 32C32 26 29 23 24 23Z" fill="#9AC4E8"/>
+<path d="M7 32C8 26 11 23 16 23M33 32C32 26 29 23 24 23" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<path id="Vector_4" d="M16 25C19 28 21 28 24 25" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_5" d="M20 7C22 4 26 4 28 7" stroke="#2A1712" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_6" d="M28 7H32L30 10" stroke="#2A1712" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

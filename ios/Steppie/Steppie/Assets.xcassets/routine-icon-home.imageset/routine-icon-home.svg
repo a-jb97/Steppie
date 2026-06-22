@@ -1,0 +1,17 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Color pictogram">
+<g id="Vector">
+<path d="M6 18L20 7L34 18" fill="#C77A4A"/>
+<path d="M6 18L20 7L34 18" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g id="Vector_2">
+<path d="M10 17V34H30V17" fill="#F6DDBD"/>
+<path d="M10 17V34H30V17" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g id="Vector_3">
+<path d="M17 34V23H23V34" fill="#9AC4E8"/>
+<path d="M17 34V23H23V34" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<path id="Vector_4" d="M25 23H28" stroke="#2A1712" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

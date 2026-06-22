@@ -1,0 +1,8 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Color pictogram">
+<path id="Vector" d="M20 7H12C10.3431 7 9 8.34315 9 10V16C9 17.6569 10.3431 19 12 19H20C21.6569 19 23 17.6569 23 16V10C23 8.34315 21.6569 7 20 7Z" fill="#FFF6F1" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_2" d="M11 19H31V23C31 25.1217 30.1571 27.1566 28.6569 28.6569C27.1566 30.1571 25.1217 31 23 31H18C16.1435 31 14.363 30.2625 13.0503 28.9497C11.7375 27.637 11 25.8565 11 24V19Z" fill="#9AC4E8" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_3" d="M24 15H31V23M16 31V35H27" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_4" d="M13 11H17" stroke="#2A1712" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>
