@@ -1,0 +1,12 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Color pictogram">
+<path id="Vector" d="M7 10H18C19.0609 10 20.0783 10.4214 20.8284 11.1716C21.5786 11.9217 22 12.9391 22 14V34C22 32.9391 21.5786 31.9217 20.8284 31.1716C20.0783 30.4214 19.0609 30 18 30H7V10Z" fill="#FFF6F1" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<g id="Vector_2">
+<path d="M33 10H22C20.9391 10 19.9217 10.4214 19.1716 11.1716C18.4214 11.9217 18 12.9391 18 14" fill="#B8A0D8"/>
+<path d="M33 10H22C20.9391 10 19.9217 10.4214 19.1716 11.1716C18.4214 11.9217 18 12.9391 18 14" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<path id="Vector_3" d="M22 30H33V10" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_4" d="M14 16C13.4429 16.7428 13.1036 17.6262 13.0202 18.551C12.9368 19.4758 13.1126 20.4055 13.5279 21.2361C13.9431 22.0666 14.5815 22.7651 15.3713 23.2533C16.1612 23.7414 17.0714 24 18 24C17.1855 23.778 16.4271 23.3867 15.7742 22.8515C15.1213 22.3164 14.5887 21.6495 14.2111 20.8944C13.8336 20.1394 13.6197 19.3131 13.5833 18.4697C13.5469 17.6263 13.6889 16.7848 14 16Z" fill="#FFD866" stroke="#2A1712" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_5" d="M27 16L28 18L30 18.2L28.5 19.6L28.9 21.6L27 20.6L25.1 21.6L25.5 19.6L24 18.2L26 18L27 16Z" fill="#FFD866" stroke="#2A1712" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

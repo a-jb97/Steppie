@@ -1,0 +1,11 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Detailed pictogram">
+<path id="Vector" d="M68 4H28C14.7452 4 4 14.7452 4 28V68C4 81.2548 14.7452 92 28 92H68C81.2548 92 92 81.2548 92 68V28C92 14.7452 81.2548 4 68 4Z" fill="#F8F2FA"/>
+<path id="Vector_2" d="M15 44H81V59C81 72 70 83 57 83H39C26 83 15 72 15 59V44Z" fill="#9AC4E8" stroke="#2A1712" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_3" d="M22 44V22C22 14 28 9 36 9H41" stroke="#2A1712" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_4" d="M35 17H48" stroke="#2A1712" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_5" d="M60 35C63.3137 35 66 32.3137 66 29C66 25.6863 63.3137 23 60 23C56.6863 23 54 25.6863 54 29C54 32.3137 56.6863 35 60 35Z" fill="white" stroke="#2A1712" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_6" d="M73 28C75.2091 28 77 26.2091 77 24C77 21.7909 75.2091 20 73 20C70.7909 20 69 21.7909 69 24C69 26.2091 70.7909 28 73 28Z" fill="white" stroke="#2A1712" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_7" d="M24 83L19 90M72 83L77 90" stroke="#2A1712" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

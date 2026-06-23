@@ -1,0 +1,12 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Color pictogram">
+<path id="Vector" d="M28 20H10C8.34315 20 7 21.3431 7 23V26C7 27.6569 8.34315 29 10 29H28C29.6569 29 31 27.6569 31 26V23C31 21.3431 29.6569 20 28 20Z" fill="#9AC4E8" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<g id="Vector_2">
+<path d="M9 20V15C9 13.6739 9.52678 12.4021 10.4645 11.4645C11.4021 10.5268 12.6739 10 14 10H18C18.6566 10 19.3068 10.1293 19.9134 10.3806C20.52 10.6319 21.0712 11.0002 21.5355 11.4645C21.9998 11.9288 22.3681 12.48 22.6194 13.0866C22.8707 13.6932 23 14.3434 23 15V20" fill="#FFF6F1"/>
+<path d="M9 20V15C9 13.6739 9.52678 12.4021 10.4645 11.4645C11.4021 10.5268 12.6739 10 14 10H18C18.6566 10 19.3068 10.1293 19.9134 10.3806C20.52 10.6319 21.0712 11.0002 21.5355 11.4645C21.9998 11.9288 22.3681 12.48 22.6194 13.0866C22.8707 13.6932 23 14.3434 23 15V20" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<path id="Vector_3" d="M29 17C31.7614 17 34 14.7614 34 12C34 9.23858 31.7614 7 29 7C26.2386 7 24 9.23858 24 12C24 14.7614 26.2386 17 29 17Z" fill="#FFD866" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_4" d="M29 4V6M29 18V20M21 12H23M35 12H37" stroke="#2A1712" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_5" d="M7 29V33M31 29V33" stroke="#2A1712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

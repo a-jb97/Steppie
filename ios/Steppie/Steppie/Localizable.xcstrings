@@ -1,0 +1,42 @@
+{
+  "sourceLanguage" : "ko",
+  "strings" : {
+    "a11y.status.completed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "completed" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "완료됨" } }
+      }
+    },
+    "a11y.status.notCompleted" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "not completed" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "아직 안 함" } }
+      }
+    },
+    "component.button.loading" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "In progress" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "진행 중" } }
+      }
+    },
+    "component.button.loadingHint" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Please wait until the action finishes" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "작업이 끝날 때까지 기다려 주세요" } }
+      }
+    },
+    "component.focus.completeHint" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Double-tap to complete the routine" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "두 번 탭하여 루틴을 완료합니다" } }
+      }
+    },
+    "component.list.openHint" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Double-tap to open the routine" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "두 번 탭하여 루틴을 엽니다" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}
