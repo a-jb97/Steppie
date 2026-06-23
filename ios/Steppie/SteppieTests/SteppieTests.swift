@@ -148,6 +148,53 @@ struct SteppieTests {
             try IconRef.builtin(name: "unknown-icon")
         }
     }
+
+    @Test("유일한 활성 RoutineSet은 직접 비활성화할 수 없다")
+    func rejectsDeactivatingOnlyActiveRoutineSet() throws {
+        let fixture = try makeFixture(routineCount: 0)
+        let inactive = try RoutineSet(
+            id: fixture.routineSet.id,
+            name: fixture.routineSet.name,
+            isActive: false,
+            createdAt: fixture.routineSet.createdAt,
+            updatedAt: fixture.routineSet.updatedAt.addingTimeInterval(60)
+        )
+
+        #expect(
+            throws: RoutineRepositoryError.cannotDeactivateOnlyActiveRoutineSet(
+                fixture.routineSet.id
+            )
+        ) {
+            try fixture.repository.updateRoutineSet(inactive)
+        }
+        #expect(try fixture.repository.routineSet(id: fixture.routineSet.id)?.isActive == true)
+    }
+
+    @Test("다른 RoutineSet 활성화는 기존 세트를 비활성화하고 활성 세트를 하나로 유지한다")
+    func switchesActiveRoutineSet() throws {
+        let fixture = try makeFixture(routineCount: 0)
+        let createdAt = fixture.routineSet.createdAt.addingTimeInterval(60)
+        let second = try RoutineSet(
+            name: LocalizedText(["ko": "저녁 루틴"]),
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        try fixture.repository.createRoutineSet(second)
+
+        let activated = try RoutineSet(
+            id: second.id,
+            name: second.name,
+            isActive: true,
+            createdAt: second.createdAt,
+            updatedAt: second.updatedAt.addingTimeInterval(60)
+        )
+        try fixture.repository.updateRoutineSet(activated)
+
+        let activeSets = try fixture.repository.routineSets().filter(\.isActive)
+        #expect(activeSets.map(\.id) == [second.id])
+        #expect(try fixture.repository.routineSet(id: fixture.routineSet.id)?.isActive == false)
+    }
+
     @Test("활성 Routine의 중복 order를 거부한다")
     func rejectsDuplicateOrder() throws {
         let fixture = try makeFixture(routineCount: 1)

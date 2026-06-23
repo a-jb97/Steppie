@@ -42,6 +42,14 @@ final class SwiftDataRoutineRepository: RoutineRepository {
             throw RoutineRepositoryError.routineSetNotFound(routineSet.id)
         }
 
+        if record.isActive && !routineSet.isActive {
+            let hasOtherActiveSet = try routineSetRecords().contains {
+                $0.id != record.id && $0.isActive && $0.deletedAt == nil
+            }
+            guard hasOtherActiveSet else {
+                throw RoutineRepositoryError.cannotDeactivateOnlyActiveRoutineSet(record.id)
+            }
+        }
         if routineSet.isActive {
             try deactivateOtherRoutineSets(except: routineSet.id, at: routineSet.updatedAt)
         }
@@ -164,6 +172,10 @@ final class SwiftDataRoutineRepository: RoutineRepository {
         return try context.fetch(descriptor).first
     }
 
+    private func routineSetRecords() throws -> [RoutineSetRecord] {
+        try context.fetch(FetchDescriptor<RoutineSetRecord>())
+    }
+
     private func routineRecord(id: UUID) throws -> RoutineRecord? {
         let id = id
         let descriptor = FetchDescriptor<RoutineRecord>(
@@ -216,7 +228,7 @@ final class SwiftDataRoutineRepository: RoutineRepository {
     }
 
     private func deactivateOtherRoutineSets(except id: UUID, at date: Date) throws {
-        let records = try context.fetch(FetchDescriptor<RoutineSetRecord>())
+        let records = try routineSetRecords()
         for record in records where record.id != id && record.isActive && record.deletedAt == nil {
             record.isActive = false
             record.updatedAt = max(date, record.createdAt)

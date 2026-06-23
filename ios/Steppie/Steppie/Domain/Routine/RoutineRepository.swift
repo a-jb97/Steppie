@@ -6,6 +6,7 @@ nonisolated enum RoutineRepositoryError: Error, Equatable {
     case routineNotFound(UUID)
     case routineSetIsDeleted(UUID)
     case cannotDeleteActiveRoutineSet(UUID)
+    case cannotDeactivateOnlyActiveRoutineSet(UUID)
     case duplicateOrder(routineSetID: UUID, order: Int)
     case invalidNextOrder(expected: Int, actual: Int)
     case routineSetCannotChange(routineID: UUID)
