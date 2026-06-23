@@ -1,37 +1,6 @@
 import SwiftUI
 
-enum RoutineIconName: String, CaseIterable, Identifiable, Sendable {
-    case wakeUp = "wake-up"
-    case washFace = "wash-face"
-    case brushTeeth = "brush-teeth"
-    case getDressed = "get-dressed"
-    case breakfast
-    case packBag = "pack-bag"
-    case school
-    case book
-    case pencil
-    case lunch
-    case playground
-    case bus
-    case bath
-    case pajamas
-    case storyBook = "story-book"
-    case toilet
-    case sleep
-    case star
-    case home
-    case meal
-    case snack
-    case medicine
-    case walk
-    case therapy
-    case music
-    case art
-    case cleanUp = "clean-up"
-    case timer
-
-    var id: String { rawValue }
-
+extension RoutineIconName {
     fileprivate var category: RoutineIconCategory {
         switch self {
         case .wakeUp, .washFace, .brushTeeth, .getDressed, .breakfast, .packBag:

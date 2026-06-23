@@ -1,5 +1,38 @@
 import Foundation
 
+nonisolated enum RoutineIconName: String, CaseIterable, Identifiable, Sendable {
+    case wakeUp = "wake-up"
+    case washFace = "wash-face"
+    case brushTeeth = "brush-teeth"
+    case getDressed = "get-dressed"
+    case breakfast
+    case packBag = "pack-bag"
+    case school
+    case book
+    case pencil
+    case lunch
+    case playground
+    case bus
+    case bath
+    case pajamas
+    case storyBook = "story-book"
+    case toilet
+    case sleep
+    case star
+    case home
+    case meal
+    case snack
+    case medicine
+    case walk
+    case therapy
+    case music
+    case art
+    case cleanUp = "clean-up"
+    case timer
+
+    var id: String { rawValue }
+}
+
 nonisolated struct IconRef: Codable, Equatable, Sendable {
     nonisolated enum Kind: String, Codable, Sendable {
         case builtin
@@ -24,7 +57,7 @@ nonisolated struct IconRef: Codable, Equatable, Sendable {
     }
 
     static func builtin(name: String) throws -> IconRef {
-        guard isKebabCase(name) else {
+        guard RoutineIconName(rawValue: name) != nil else {
             throw RoutineDomainError.invalidBuiltinIconName(name)
         }
         return IconRef(type: .builtin, name: name, localAssetID: nil, backupAssetName: nil)
@@ -76,17 +109,6 @@ nonisolated struct IconRef: Codable, Equatable, Sendable {
         case name
         case localAssetID = "localAssetId"
         case backupAssetName
-    }
-
-    private static func isKebabCase(_ value: String) -> Bool {
-        guard !value.isEmpty,
-              value.first != "-",
-              value.last != "-" else {
-            return false
-        }
-        return value.allSatisfy { character in
-            character.isLowercase || character.isNumber || character == "-"
-        } && !value.contains("--")
     }
 
     private static func isValidBackupAssetName(_ value: String) -> Bool {

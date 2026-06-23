@@ -137,6 +137,17 @@ struct SteppieTests {
         }
     }
 
+    @Test("내장 아이콘은 공통 카탈로그에 등록된 이름만 허용한다")
+    func validatesBuiltinIconCatalog() throws {
+        for iconName in RoutineIconName.allCases {
+            let icon = try IconRef.builtin(name: iconName.rawValue)
+            #expect(icon.name == iconName.rawValue)
+        }
+
+        #expect(throws: RoutineDomainError.invalidBuiltinIconName("unknown-icon")) {
+            try IconRef.builtin(name: "unknown-icon")
+        }
+    }
     @Test("활성 Routine의 중복 order를 거부한다")
     func rejectsDuplicateOrder() throws {
         let fixture = try makeFixture(routineCount: 1)
