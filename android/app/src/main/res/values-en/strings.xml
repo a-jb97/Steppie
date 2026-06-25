@@ -26,4 +26,11 @@
     <string name="a11y_progress">%1$d of %2$d steps completed</string>
     <string name="a11y_show_list">Show today\'s steps</string>
     <string name="a11y_show_focus">Show the current step</string>
+    <string name="notification_routine_reminder_channel_name">Routine reminders</string>
+    <string name="notification_routine_reminder_channel_description">Reminds you before scheduled routines</string>
+    <string name="notification_routine_reminder_title">A routine is coming up</string>
+    <plurals name="notification_routine_reminder_body">
+        <item quantity="one">%1$d minute until %2$s</item>
+        <item quantity="other">%1$d minutes until %2$s</item>
+    </plurals>
 </resources>

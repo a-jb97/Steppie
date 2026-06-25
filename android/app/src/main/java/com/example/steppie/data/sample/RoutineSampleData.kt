@@ -5,8 +5,10 @@ import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.domain.repository.RoutineRepository
 import java.time.Instant
 import java.time.LocalTime
+import kotlinx.coroutines.flow.first
 
 object RoutineSampleData {
     private val createdAt = Instant.parse("2026-01-01T00:00:00Z")
@@ -52,6 +54,11 @@ object RoutineSampleData {
     val routineSets: List<RoutineSet> = listOf(morning, school, bedtime)
 
     fun inMemoryRepository(): InMemoryRoutineRepository = InMemoryRoutineRepository(routineSets)
+
+    suspend fun seedRepositoryIfEmpty(repository: RoutineRepository) {
+        if (repository.observeRoutineSets().first().isNotEmpty()) return
+        routineSets.forEach { repository.createRoutineSet(it) }
+    }
 
     private fun routineSet(
         id: String,

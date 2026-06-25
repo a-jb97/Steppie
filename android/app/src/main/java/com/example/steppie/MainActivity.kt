@@ -1,6 +1,8 @@
 package com.example.steppie
 
+import android.Manifest
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -8,27 +10,52 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.steppie.data.local.SteppieDatabase
+import com.example.steppie.data.repository.DataStoreAppSettingsRepository
+import com.example.steppie.data.repository.RoomRoutineRepository
 import com.example.steppie.data.sample.RoutineSampleData
+import com.example.steppie.domain.model.AppSettings
+import com.example.steppie.notifications.ACTION_OPEN_ROUTINE
+import com.example.steppie.notifications.AndroidRoutineNotificationScheduler
+import com.example.steppie.notifications.EXTRA_ROUTINE_ID
 import com.example.steppie.ui.child.ChildRoutineFeedbackEvent
 import com.example.steppie.ui.child.ChildRoutineScreen
 import com.example.steppie.ui.child.ChildRoutineViewModel
 import com.example.steppie.ui.theme.SteppieTheme
 import java.util.Locale
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    private val routineRepository by lazy { RoutineSampleData.inMemoryRepository() }
+    private val routineRepository by lazy {
+        RoomRoutineRepository(SteppieDatabase.getInstance(this))
+    }
+    private val appSettingsRepository by lazy { DataStoreAppSettingsRepository(this) }
+    private val notificationScheduler by lazy { AndroidRoutineNotificationScheduler(this) }
+    private val notificationRoutineId = MutableStateFlow<String?>(null)
     private lateinit var feedbackController: AndroidFeedbackController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enforceSupportedOrientation()
         super.onCreate(savedInstanceState)
+        notificationRoutineId.value = intent.notificationRoutineId()
         feedbackController = AndroidFeedbackController(this)
+        lifecycleScope.launch {
+            RoutineSampleData.seedRepositoryIfEmpty(routineRepository)
+        }
         enableEdgeToEdge()
         setContent {
             SteppieTheme {
@@ -36,8 +63,42 @@ class MainActivity : ComponentActivity() {
                     factory = ChildRoutineViewModel.factory(routineRepository),
                 )
                 val state by childViewModel.uiState.collectAsStateWithLifecycle()
+                val settings by appSettingsRepository.observeAppSettings()
+                    .collectAsStateWithLifecycle(initialValue = AppSettings())
+                val targetRoutineId by notificationRoutineId.collectAsStateWithLifecycle()
+                var notificationPermissionRefresh by remember { mutableIntStateOf(0) }
+                val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission(),
+                ) {
+                    notificationPermissionRefresh += 1
+                }
+
+                LaunchedEffect(Unit) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.POST_NOTIFICATIONS,
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
                 LaunchedEffect(childViewModel) {
                     childViewModel.feedbackEvents.collect(feedbackController::play)
+                }
+                LaunchedEffect(state.routines, state.completedRoutineIds, settings, notificationPermissionRefresh) {
+                    notificationScheduler.reconcileToday(
+                        routines = state.routines,
+                        completedRoutineIds = state.completedRoutineIds,
+                        settings = settings,
+                    )
+                }
+                LaunchedEffect(targetRoutineId, state.routines) {
+                    val routineId = targetRoutineId ?: return@LaunchedEffect
+                    if (state.routines.any { it.id == routineId }) {
+                        childViewModel.selectRoutine(routineId)
+                        notificationRoutineId.value = null
+                    }
                 }
                 ChildRoutineScreen(
                     state = state,
@@ -50,6 +111,12 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        notificationRoutineId.value = intent.notificationRoutineId()
     }
 
     override fun onDestroy() {
@@ -65,6 +132,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+private fun android.content.Intent?.notificationRoutineId(): String? =
+    this?.takeIf { it.action == ACTION_OPEN_ROUTINE }?.getStringExtra(EXTRA_ROUTINE_ID)
 
 private class AndroidFeedbackController(
     private val activity: ComponentActivity,
