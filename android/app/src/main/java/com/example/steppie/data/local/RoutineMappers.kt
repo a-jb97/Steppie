@@ -1,12 +1,16 @@
 package com.example.steppie.data.local
 
+import com.example.steppie.domain.model.DailyLog
 import com.example.steppie.domain.model.IconRef
+import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
+private val localDateFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 private val localTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 fun Routine.toEntity(): RoutineEntity {
@@ -76,4 +80,26 @@ fun RoutineSetEntity.toDomain(routines: List<Routine> = emptyList()): RoutineSet
     updatedAt = Instant.ofEpochMilli(updatedAtEpochMillis),
     deletedAt = deletedAtEpochMillis?.let(Instant::ofEpochMilli),
     routines = routines,
+)
+
+fun DailyLog.toEntity(): DailyLogEntity = DailyLogEntity(
+    id = id,
+    date = date.format(localDateFormatter),
+    routineId = routineId,
+    routineSetId = routineSetId,
+    status = status.storageValue,
+    completedAtEpochMillis = completedAt?.toEpochMilli(),
+    createdAtEpochMillis = createdAt.toEpochMilli(),
+    updatedAtEpochMillis = updatedAt.toEpochMilli(),
+)
+
+fun DailyLogEntity.toDomain(): DailyLog = DailyLog(
+    id = id,
+    date = LocalDate.parse(date, localDateFormatter),
+    routineId = routineId,
+    routineSetId = routineSetId,
+    status = LogStatus.fromStorageValue(status),
+    completedAt = completedAtEpochMillis?.let(Instant::ofEpochMilli),
+    createdAt = Instant.ofEpochMilli(createdAtEpochMillis),
+    updatedAt = Instant.ofEpochMilli(updatedAtEpochMillis),
 )

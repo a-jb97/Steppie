@@ -18,6 +18,7 @@ class ChildRoutineViewModelTest {
 
         val state = childRoutineState(
             routines = listOf(routines[3], inactive, routines[2], deleted),
+            completedRoutineIds = emptySet(),
             selectedRoutineId = null,
             singlePane = ChildSinglePane.Focus,
         )
@@ -30,8 +31,8 @@ class ChildRoutineViewModelTest {
     fun `state preserves a valid selection and falls back from an invalid selection`() {
         val routines = RoutineSampleData.morning.routines
 
-        val selected = childRoutineState(routines, routines[3].id, ChildSinglePane.List)
-        val fallback = childRoutineState(routines, "missing", ChildSinglePane.Focus)
+        val selected = childRoutineState(routines, emptySet(), routines[3].id, ChildSinglePane.List)
+        val fallback = childRoutineState(routines, emptySet(), "missing", ChildSinglePane.Focus)
 
         assertEquals(routines[3].id, selected.selectedRoutineId)
         assertEquals(ChildSinglePane.List, selected.singlePane)
@@ -40,10 +41,52 @@ class ChildRoutineViewModelTest {
 
     @Test
     fun `empty routines produce an empty non-loading state`() {
-        val state = childRoutineState(emptyList(), null, ChildSinglePane.Focus)
+        val state = childRoutineState(emptyList(), emptySet(), null, ChildSinglePane.Focus)
 
         assertEquals(emptyList<Any>(), state.routines)
         assertNull(state.selectedRoutineId)
         assertEquals(false, state.isLoading)
+    }
+
+    @Test
+    fun `state derives progress and hides selected routine when all complete`() {
+        val routines = RoutineSampleData.morning.routines
+
+        val partial = childRoutineState(
+            routines = routines,
+            completedRoutineIds = setOf(routines[0].id, routines[1].id),
+            selectedRoutineId = routines[1].id,
+            singlePane = ChildSinglePane.Focus,
+        )
+        val complete = childRoutineState(
+            routines = routines,
+            completedRoutineIds = routines.mapTo(mutableSetOf()) { it.id },
+            selectedRoutineId = routines.last().id,
+            singlePane = ChildSinglePane.Focus,
+        )
+
+        assertEquals(2, partial.progressCount)
+        assertEquals(routines.size, partial.progressTotal)
+        assertEquals(routines[1].id, partial.selectedRoutineId)
+        assertEquals(true, complete.isAllComplete)
+        assertNull(complete.selectedRoutine)
+    }
+
+    @Test
+    fun `feedback routine remains selected until it is explicitly cleared`() {
+        val routines = RoutineSampleData.morning.routines
+
+        val feedback = childRoutineState(
+            routines = routines,
+            completedRoutineIds = setOf(routines[0].id),
+            selectedRoutineId = routines[0].id,
+            singlePane = ChildSinglePane.Focus,
+            feedbackRoutineId = routines[0].id,
+            undoRoutineId = routines[0].id,
+        )
+
+        assertEquals(routines[0].id, feedback.selectedRoutineId)
+        assertEquals(routines[0].id, feedback.feedbackRoutine?.id)
+        assertEquals(routines[1].id, feedback.nextIncompleteRoutine?.id)
     }
 }

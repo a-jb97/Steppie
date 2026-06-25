@@ -1,10 +1,13 @@
 package com.example.steppie.data.repository
 
+import com.example.steppie.domain.model.DailyLog
+import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
 import com.example.steppie.domain.model.requireUuidV4
 import com.example.steppie.domain.repository.RoutineRepository
 import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -17,6 +20,7 @@ class InMemoryRoutineRepository(
 ) : RoutineRepository {
     private val mutex = Mutex()
     private val state = MutableStateFlow(initialData.associateBy(RoutineSet::id))
+    private val logs = MutableStateFlow<Map<Pair<LocalDate, String>, DailyLog>>(emptyMap())
 
     override fun observeRoutineSets(): Flow<List<RoutineSet>> = state
         .map { sets -> sets.values.filter { it.deletedAt == null }.sortedBy { it.createdAt }.map(::visible) }
@@ -136,6 +140,60 @@ class InMemoryRoutineRepository(
                 },
             ),
         )
+    }
+
+    override fun observeDailyLogs(date: LocalDate): Flow<List<DailyLog>> = logs
+        .map { source ->
+            source.values
+                .filter { it.date == date }
+                .sortedWith(compareBy<DailyLog> { it.updatedAt }.thenBy { it.id })
+        }
+        .distinctUntilChanged()
+
+    override suspend fun completeRoutine(
+        routineId: String,
+        date: LocalDate,
+        completedAt: Instant,
+    ): DailyLog = mutex.withLock {
+        requireUuidV4(routineId, "Routine.id")
+        val routine = requireNotNull(getRoutine(routineId)) { "Routine not found: $routineId" }
+        val key = date to routineId
+        val existing = logs.value[key]
+        val saved = DailyLog(
+            id = existing?.id ?: com.example.steppie.domain.model.newUuidV4(),
+            date = date,
+            routineId = routineId,
+            routineSetId = routine.routineSetId,
+            status = LogStatus.Completed,
+            completedAt = completedAt,
+            createdAt = existing?.createdAt ?: completedAt,
+            updatedAt = completedAt,
+        )
+        logs.value = logs.value + (key to saved)
+        saved
+    }
+
+    override suspend fun undoRoutine(
+        routineId: String,
+        date: LocalDate,
+        updatedAt: Instant,
+    ): DailyLog = mutex.withLock {
+        requireUuidV4(routineId, "Routine.id")
+        val routine = requireNotNull(getRoutine(routineId)) { "Routine not found: $routineId" }
+        val key = date to routineId
+        val existing = logs.value[key]
+        val saved = DailyLog(
+            id = existing?.id ?: com.example.steppie.domain.model.newUuidV4(),
+            date = date,
+            routineId = routineId,
+            routineSetId = routine.routineSetId,
+            status = LogStatus.Undone,
+            completedAt = null,
+            createdAt = existing?.createdAt ?: updatedAt,
+            updatedAt = updatedAt,
+        )
+        logs.value = logs.value + (key to saved)
+        saved
     }
 
     private fun replace(set: RoutineSet) {

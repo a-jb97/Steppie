@@ -53,6 +53,40 @@ data class RoutineEntity(
     val deletedAtEpochMillis: Long?,
 )
 
+@Entity(
+    tableName = "daily_logs",
+    foreignKeys = [
+        ForeignKey(
+            entity = RoutineEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["routineId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+        ForeignKey(
+            entity = RoutineSetEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["routineSetId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+    ],
+    indices = [
+        Index(value = ["date"]),
+        Index(value = ["routineId"]),
+        Index(value = ["routineSetId"]),
+        Index(value = ["date", "routineId"], unique = true),
+    ],
+)
+data class DailyLogEntity(
+    @PrimaryKey val id: String,
+    val date: String,
+    val routineId: String,
+    val routineSetId: String,
+    val status: String,
+    val completedAtEpochMillis: Long?,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long,
+)
+
 data class RoutineSetWithRoutines(
     @Embedded val routineSet: RoutineSetEntity,
     @Relation(

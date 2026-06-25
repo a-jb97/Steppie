@@ -1,8 +1,10 @@
 package com.example.steppie.domain.repository
 
+import com.example.steppie.domain.model.DailyLog
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
 import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 
 interface RoutineRepository {
@@ -22,4 +24,16 @@ interface RoutineRepository {
         orderedRoutineIds: List<String>,
         updatedAt: Instant = Instant.now(),
     )
+
+    fun observeDailyLogs(date: LocalDate): Flow<List<DailyLog>>
+    suspend fun completeRoutine(
+        routineId: String,
+        date: LocalDate = LocalDate.now(),
+        completedAt: Instant = Instant.now(),
+    ): DailyLog
+    suspend fun undoRoutine(
+        routineId: String,
+        date: LocalDate = LocalDate.now(),
+        updatedAt: Instant = Instant.now(),
+    ): DailyLog
 }

@@ -9,6 +9,13 @@
     <string name="child_focus_title">지금 할 일</string>
     <string name="child_focus_subtitle">지금은 이 활동을 해요</string>
     <string name="child_focus_tap_hint">카드를 누르면 완료</string>
+    <string name="child_feedback_title">잘했어요!</string>
+    <string name="child_feedback_subtitle">다음 활동으로 넘어가요</string>
+    <string name="child_completed_card_title">%1$s 완료!</string>
+    <string name="child_undo_mistap">카드를 잘못 눌렀어요</string>
+    <string name="child_next_routine">다음 : %1$s</string>
+    <string name="child_all_complete_title">오늘 할 일 완료!</string>
+    <string name="child_all_complete_subtitle">모든 활동을 차례대로 끝냈어요</string>
     <string name="child_list_title">오늘의 순서</string>
     <string name="child_list_subtitle">위아래로만 움직여요</string>
     <string name="child_empty_title">오늘 할 일이 없어요</string>
