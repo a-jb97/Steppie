@@ -152,6 +152,9 @@ extension AppSettingsRecord {
             ttsVolume: domain.ttsVolume,
             hapticEnabled: domain.hapticEnabled,
             undoDurationSeconds: domain.undoDurationSeconds,
+            notificationLeadTimes: Self.encodeNotificationLeadTimes(domain.notificationLeadTimes),
+            quietHoursStart: domain.quietHoursStart?.description,
+            quietHoursEnd: domain.quietHoursEnd?.description,
             createdAt: domain.createdAt,
             updatedAt: domain.updatedAt
         )
@@ -161,6 +164,9 @@ extension AppSettingsRecord {
         guard let decodedIntensity = FeedbackIntensity(rawValue: feedbackIntensity) else {
             throw RoutinePersistenceMappingError.invalidStoredFeedbackIntensity(feedbackIntensity)
         }
+        let decodedQuietHoursStart = try decodeStoredLocalTime(quietHoursStart)
+        let decodedQuietHoursEnd = try decodeStoredLocalTime(quietHoursEnd)
+        let decodedLeadTimes = decodeNotificationLeadTimes(notificationLeadTimes)
 
         return try AppSettings(
             id: id,
@@ -171,6 +177,9 @@ extension AppSettingsRecord {
             ttsVolume: ttsVolume,
             hapticEnabled: hapticEnabled,
             undoDurationSeconds: undoDurationSeconds,
+            notificationLeadTimes: decodedLeadTimes,
+            quietHoursStart: decodedQuietHoursStart,
+            quietHoursEnd: decodedQuietHoursEnd,
             createdAt: createdAt,
             updatedAt: updatedAt
         )
@@ -184,8 +193,34 @@ extension AppSettingsRecord {
         ttsVolume = domain.ttsVolume
         hapticEnabled = domain.hapticEnabled
         undoDurationSeconds = domain.undoDurationSeconds
+        notificationLeadTimes = Self.encodeNotificationLeadTimes(domain.notificationLeadTimes)
+        quietHoursStart = domain.quietHoursStart?.description
+        quietHoursEnd = domain.quietHoursEnd?.description
         createdAt = domain.createdAt
         updatedAt = domain.updatedAt
+    }
+
+    private func decodeStoredLocalTime(_ value: String?) throws -> LocalTime? {
+        guard let value else { return nil }
+        do {
+            return try LocalTime(value)
+        } catch {
+            throw RoutinePersistenceMappingError.invalidStoredLocalTime(value)
+        }
+    }
+
+    private static func encodeNotificationLeadTimes(_ leadTimes: [Int]) -> String {
+        leadTimes
+            .map(String.init)
+            .joined(separator: ",")
+    }
+
+    private func decodeNotificationLeadTimes(_ value: String?) -> [Int] {
+        guard let value else { return [10, 5] }
+        guard !value.isEmpty else { return [] }
+        return value
+            .split(separator: ",")
+            .compactMap { Int(String($0)) }
     }
 }
 

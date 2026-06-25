@@ -18,6 +18,9 @@ nonisolated struct AppSettings: Codable, Equatable, Identifiable, Sendable {
     let ttsVolume: Double
     let hapticEnabled: Bool
     let undoDurationSeconds: Int
+    let notificationLeadTimes: [Int]
+    let quietHoursStart: LocalTime?
+    let quietHoursEnd: LocalTime?
     let createdAt: Date
     let updatedAt: Date
 
@@ -30,6 +33,9 @@ nonisolated struct AppSettings: Codable, Equatable, Identifiable, Sendable {
         ttsVolume: Double = 1.0,
         hapticEnabled: Bool = true,
         undoDurationSeconds: Int = 5,
+        notificationLeadTimes: [Int] = [10, 5],
+        quietHoursStart: LocalTime? = nil,
+        quietHoursEnd: LocalTime? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) throws {
@@ -41,6 +47,9 @@ nonisolated struct AppSettings: Codable, Equatable, Identifiable, Sendable {
         self.ttsVolume = ttsVolume
         self.hapticEnabled = hapticEnabled
         self.undoDurationSeconds = undoDurationSeconds
+        self.notificationLeadTimes = notificationLeadTimes
+        self.quietHoursStart = quietHoursStart
+        self.quietHoursEnd = quietHoursEnd
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         try validate()
@@ -58,6 +67,11 @@ nonisolated struct AppSettings: Codable, Equatable, Identifiable, Sendable {
         }
         guard [3, 5, 10].contains(undoDurationSeconds) else {
             throw RoutineDomainError.invalidUndoDuration(undoDurationSeconds)
+        }
+        let validLeadTimes = Set([5, 10])
+        guard Set(notificationLeadTimes).count == notificationLeadTimes.count,
+              notificationLeadTimes.allSatisfy(validLeadTimes.contains) else {
+            throw RoutineDomainError.invalidNotificationLeadTimes(notificationLeadTimes)
         }
         guard updatedAt >= createdAt else {
             throw RoutineDomainError.updatedAtPrecedesCreatedAt

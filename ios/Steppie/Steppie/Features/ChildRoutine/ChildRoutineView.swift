@@ -558,17 +558,17 @@ struct ChildRoutineView: View {
 }
 
 #Preview("Child Routine · iPhone", traits: .fixedLayout(width: 393, height: 852)) {
-    let repository = try! RoutinePreviewStore.makeSampleRepository()
-    ChildRoutineView(viewModel: ChildRoutineViewModel(repository: repository))
+    let repository = try! RoutinePreviewStore.makeLightweightSampleRepository()
+    ChildRoutineView(viewModel: ChildRoutineViewModel.preview(repository: repository))
 }
 
 #Preview("Child Routine · iPad Landscape", traits: .fixedLayout(width: 1194, height: 834)) {
-    let repository = try! RoutinePreviewStore.makeSampleRepository()
-    ChildRoutineView(viewModel: ChildRoutineViewModel(repository: repository))
+    let repository = try! RoutinePreviewStore.makeLightweightSampleRepository()
+    ChildRoutineView(viewModel: ChildRoutineViewModel.preview(repository: repository))
 }
 
 #Preview("Child Routine · Accessibility Text", traits: .fixedLayout(width: 393, height: 852)) {
-    let repository = try! RoutinePreviewStore.makeSampleRepository()
-    ChildRoutineView(viewModel: ChildRoutineViewModel(repository: repository))
+    let repository = try! RoutinePreviewStore.makeLightweightSampleRepository()
+    ChildRoutineView(viewModel: ChildRoutineViewModel.preview(repository: repository))
         .environment(\.dynamicTypeSize, .accessibility3)
 }

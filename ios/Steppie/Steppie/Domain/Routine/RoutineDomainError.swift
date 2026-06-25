@@ -17,6 +17,7 @@ nonisolated enum RoutineDomainError: Error, Equatable {
     case invalidTTSRate(Double)
     case invalidTTSVolume(Double)
     case invalidUndoDuration(Int)
+    case invalidNotificationLeadTimes([Int])
     case updatedAtPrecedesCreatedAt
     case activeRoutineSetCannotBeDeleted
 }
