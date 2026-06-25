@@ -34,7 +34,11 @@ struct ChildRoutineView: View {
                 allowsRetry: true
             )
         case .loaded:
-            loadedContent(layout: layout)
+            if viewModel.isAllCompleted && !viewModel.isShowingCompletionFeedback {
+                allDoneView
+            } else {
+                loadedContent(layout: layout)
+            }
         }
     }
 
@@ -71,24 +75,39 @@ struct ChildRoutineView: View {
     private var phoneFocusView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                childHeader(
-                    title: "screen.focus.title",
-                    subtitle: "screen.focus.subtitle",
-                    titleStyle: .childScreenTitle
-                )
+                if viewModel.isShowingCompletionFeedback {
+                    childHeader(
+                        title: "screen.feedback.title",
+                        subtitle: "screen.feedback.subtitle",
+                        titleStyle: .childFeedbackTitle
+                    )
+                } else {
+                    childHeader(
+                        title: "screen.focus.title",
+                        subtitle: "screen.focus.subtitle",
+                        titleStyle: .childScreenTitle
+                    )
+                }
 
                 progressDots
                     .padding(.top, 18)
 
-                focusCard(minimumHeight: 448)
+                focusContent(minimumHeight: 448)
                     .padding(.top, 40)
 
-                paneSwitchButton(
-                    systemImage: "chevron.down.2",
-                    title: "screen.action.showList",
-                    action: viewModel.showList
-                )
-                .padding(.top, SteppieSpacing.small)
+                if viewModel.isShowingCompletionFeedback {
+                    feedbackUndoButton
+                        .padding(.top, SteppieSpacing.small)
+                    nextRoutinePreview
+                        .padding(.top, SteppieSpacing.extraSmall)
+                } else {
+                    paneSwitchButton(
+                        systemImage: "chevron.down.2",
+                        title: "screen.action.showList",
+                        action: viewModel.showList
+                    )
+                    .padding(.top, SteppieSpacing.small)
+                }
             }
             .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
             .frame(maxWidth: .infinity)
@@ -147,13 +166,26 @@ struct ChildRoutineView: View {
     private var splitFocusView: some View {
         ScrollView {
             VStack(spacing: 28) {
-                Text("screen.focus.title")
-                    .steppieTextStyle(.childPaneTitle)
-                    .foregroundStyle(Color.steppieTextSecondary)
-                    .multilineTextAlignment(.center)
-                    .accessibilityAddTraits(.isHeader)
+                if viewModel.isShowingCompletionFeedback {
+                    Text("screen.feedback.title")
+                        .steppieTextStyle(.childPaneTitle)
+                        .foregroundStyle(Color.steppieSuccess)
+                        .multilineTextAlignment(.center)
+                        .accessibilityAddTraits(.isHeader)
+                } else {
+                    Text("screen.focus.title")
+                        .steppieTextStyle(.childPaneTitle)
+                        .foregroundStyle(Color.steppieTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .accessibilityAddTraits(.isHeader)
+                }
 
-                focusCard(minimumHeight: 520)
+                focusContent(minimumHeight: 520)
+
+                if viewModel.isShowingCompletionFeedback {
+                    feedbackUndoButton
+                    nextRoutinePreview
+                }
             }
             .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
             .frame(maxWidth: .infinity, minHeight: 722)
@@ -208,6 +240,15 @@ struct ChildRoutineView: View {
     }
 
     @ViewBuilder
+    private func focusContent(minimumHeight: CGFloat) -> some View {
+        if viewModel.isShowingCompletionFeedback, let routine = viewModel.selectedRoutine {
+            completedFeedbackCard(for: routine, minimumHeight: minimumHeight)
+        } else {
+            focusCard(minimumHeight: minimumHeight)
+        }
+    }
+
+    @ViewBuilder
     private func focusCard(minimumHeight: CGFloat) -> some View {
         if let routine = viewModel.selectedRoutine {
             RoutineCard(
@@ -216,12 +257,43 @@ struct ChildRoutineView: View {
                 presentation: .focus,
                 state: viewModel.cardState(for: routine),
                 cardColor: SteppieCardColor(colorToken: routine.colorToken),
-                isActionEnabled: false,
+                isActionEnabled: viewModel.cardState(for: routine) == .current,
                 focusMinimumHeight: minimumHeight
-            ) {} visual: {
+            ) {
+                viewModel.completeSelectedRoutine()
+            } visual: {
                 RoutineVisualView(icon: routine.icon, size: .card)
             }
         }
+    }
+
+    private func completedFeedbackCard(for routine: Routine, minimumHeight: CGFloat) -> some View {
+        VStack(spacing: SteppieSpacing.large) {
+            Image("feedback-check")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 150, height: 150)
+                .accessibilityHidden(true)
+
+            Text(verbatim: localizedTitle(for: routine) + localizedCompleteSuffix)
+                .steppieTextStyle(.childCardTitle)
+                .foregroundStyle(Color.steppieTextPrimary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(36)
+        .frame(maxWidth: SteppieLayout.focusCardPhoneMaximumWidth)
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: minimumHeight)
+        .background(Color.steppieCardMint)
+        .overlay {
+            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
+                .stroke(Color.steppieSuccess, lineWidth: 4)
+        }
+        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: localizedTitle(for: routine) + localizedCompleteSuffix))
+        .accessibilityValue(Text("a11y.status.completed"))
     }
 
     private func routineCards(compactMetadata: Bool) -> some View {
@@ -278,6 +350,12 @@ struct ChildRoutineView: View {
     }
 
     private func listMetadata(for routine: Routine, compact: Bool) -> Text {
+        if viewModel.cardState(for: routine) == .completed {
+            return compact
+                ? Text("screen.list.completed")
+                : Text(verbatim: "\(routine.order + 1) · ") + Text("screen.list.completed")
+        }
+
         if viewModel.cardState(for: routine) == .current {
             return compact
                 ? Text("screen.list.current")
@@ -291,11 +369,142 @@ struct ChildRoutineView: View {
             : order + Text(verbatim: " · \(scheduledTime.description)")
     }
 
+    private var feedbackUndoButton: some View {
+        Button(action: viewModel.undoLastCompletion) {
+            HStack(spacing: SteppieSpacing.extraSmall) {
+                Image("feedback-undo-arrow")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .accessibilityHidden(true)
+                Text("screen.feedback.undo")
+                    .steppieTextStyle(.childUndo)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+            }
+            .foregroundStyle(Color.steppieTextSecondary)
+            .padding(.horizontal, SteppieSpacing.medium)
+            .frame(minHeight: 39)
+            .background(Color.steppieBackgroundSecondary)
+            .overlay {
+                Capsule()
+                    .stroke(Color.steppieTextSecondary, lineWidth: 2)
+            }
+            .clipShape(.capsule)
+            .shadow(color: Color.steppieTextSecondary.opacity(0.14), radius: 2, y: 3)
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, minHeight: SteppieLayout.childMinimumTouchTarget)
+        .opacity(viewModel.canUndoCompletion ? 1 : 0)
+        .disabled(!viewModel.canUndoCompletion)
+        .accessibilityLabel(Text("screen.feedback.undo"))
+    }
+
+    @ViewBuilder
+    private var nextRoutinePreview: some View {
+        if let nextRoutine = viewModel.nextRoutineAfterFeedback {
+            Button(action: viewModel.proceedAfterCompletionFeedback) {
+                HStack(spacing: SteppieSpacing.small) {
+                    RoutineVisualView(icon: nextRoutine.icon, size: .list)
+                        .frame(width: 52, height: 52)
+                        .accessibilityHidden(true)
+
+                    Text("screen.feedback.nextPrefix")
+                        + Text(verbatim: localizedTitle(for: nextRoutine))
+                }
+                .steppieTextStyle(.childListTitle)
+                .foregroundStyle(Color.steppieTextPrimary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: SteppieLayout.childMinimumTouchTarget, alignment: .leading)
+                .padding(.horizontal, SteppieSpacing.medium)
+                .background(Color.steppieCardPeach)
+                .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("screen.feedback.nextPrefix") + Text(verbatim: localizedTitle(for: nextRoutine)))
+        } else if viewModel.isAllCompleted {
+            Button(action: viewModel.proceedAfterCompletionFeedback) {
+                HStack(spacing: SteppieSpacing.small) {
+                    Image("routine-all-done-stamp")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 52, height: 52)
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
+                        Text("screen.allDone.title")
+                        Text("screen.allDone.subtitle")
+                            .steppieTextStyle(.childCaption)
+                            .foregroundStyle(Color.steppieTextSecondary)
+                    }
+                }
+                .steppieTextStyle(.childListTitle)
+                .foregroundStyle(Color.steppieTextPrimary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: SteppieLayout.childMinimumTouchTarget, alignment: .leading)
+                .padding(.horizontal, SteppieSpacing.medium)
+                .background(Color.steppieCardSky)
+                .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("screen.allDone.title"))
+        }
+    }
+
+    private var allDoneView: some View {
+        ScrollView {
+            VStack {
+                Spacer(minLength: 72)
+
+                VStack(spacing: SteppieSpacing.large) {
+                    Image("routine-all-done-stamp")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 168, height: 164)
+                        .accessibilityHidden(true)
+
+                    Text("screen.allDone.title")
+                        .steppieTextStyle(.childCardTitle)
+                        .foregroundStyle(Color.steppieTextPrimary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text("screen.allDone.subtitle")
+                        .steppieTextStyle(.childAllDoneSubtitle)
+                        .foregroundStyle(Color.steppieFocusRing)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(SteppieSpacing.extraLarge)
+                .frame(maxWidth: SteppieLayout.focusCardPhoneMaximumWidth)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 620)
+                .background(Color.steppieCardSky)
+                .clipShape(.rect(cornerRadius: SteppieCornerRadius.sheet))
+                .accessibilityElement(children: .combine)
+
+                Spacer(minLength: 72)
+            }
+            .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, SteppieLayout.childScreenPadding)
+        }
+        .background(Color.steppieBackgroundSecondary)
+    }
+
     private func localizedTitle(for routine: Routine) -> String {
         routine.title.resolved(
             appLocale: locale.identifier,
             systemLanguages: [locale.identifier]
         )
+    }
+
+    private var localizedCompleteSuffix: String {
+        locale.language.languageCode?.identifier == "en" ? " complete!" : " 완료!"
     }
 
     private func messageState(
