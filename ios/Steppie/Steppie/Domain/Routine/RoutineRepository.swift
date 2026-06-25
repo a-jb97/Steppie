@@ -12,6 +12,8 @@ nonisolated enum RoutineRepositoryError: Error, Equatable {
     case routineSetCannotChange(routineID: UUID)
     case orderChangesRequireReorder(routineID: UUID)
     case invalidReorder
+    case duplicateDailyLog(date: String, routineID: UUID)
+    case dailyLogNotFound(date: String, routineID: UUID)
 }
 
 @MainActor
@@ -32,6 +34,23 @@ protocol RoutineRepository {
     func updateRoutine(_ routine: Routine) throws
     func deleteRoutine(id: UUID, at date: Date) throws
     func reorderRoutines(in routineSetID: UUID, orderedIDs: [UUID], at date: Date) throws
+
+    func dailyLogs(on date: String, routineSetID: UUID?) throws -> [DailyLog]
+    func dailyLog(on date: String, routineID: UUID) throws -> DailyLog?
+    func setRoutineCompleted(
+        routineID: UUID,
+        routineSetID: UUID,
+        on date: String,
+        at completedAt: Date
+    ) throws -> DailyLog
+    func undoRoutineCompletion(
+        routineID: UUID,
+        on date: String,
+        at updatedAt: Date
+    ) throws -> DailyLog?
+
+    func appSettings() throws -> AppSettings
+    func updateAppSettings(_ settings: AppSettings) throws
 }
 
 extension RoutineRepository {

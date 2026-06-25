@@ -2,6 +2,8 @@ import Foundation
 
 enum RoutinePersistenceMappingError: Error {
     case invalidStoredLocalTime(String)
+    case invalidStoredLogStatus(String)
+    case invalidStoredFeedbackIntensity(String)
 }
 
 extension RoutineSetRecord {
@@ -94,6 +96,96 @@ extension RoutineRecord {
         createdAt = domain.createdAt
         updatedAt = domain.updatedAt
         deletedAt = domain.deletedAt
+    }
+}
+
+extension DailyLogRecord {
+    convenience init(domain: DailyLog) {
+        self.init(
+            id: domain.id,
+            date: domain.date,
+            routineID: domain.routineID,
+            routineSetID: domain.routineSetID,
+            status: domain.status.rawValue,
+            completedAt: domain.completedAt,
+            createdAt: domain.createdAt,
+            updatedAt: domain.updatedAt
+        )
+    }
+
+    func domainModel() throws -> DailyLog {
+        guard let decodedStatus = LogStatus(rawValue: status) else {
+            throw RoutinePersistenceMappingError.invalidStoredLogStatus(status)
+        }
+
+        return try DailyLog(
+            id: id,
+            date: date,
+            routineID: routineID,
+            routineSetID: routineSetID,
+            status: decodedStatus,
+            completedAt: completedAt,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+
+    func apply(_ domain: DailyLog) {
+        date = domain.date
+        routineID = domain.routineID
+        routineSetID = domain.routineSetID
+        status = domain.status.rawValue
+        completedAt = domain.completedAt
+        createdAt = domain.createdAt
+        updatedAt = domain.updatedAt
+    }
+}
+
+extension AppSettingsRecord {
+    convenience init(domain: AppSettings) {
+        self.init(
+            id: domain.id,
+            feedbackIntensity: domain.feedbackIntensity.rawValue,
+            soundEnabled: domain.soundEnabled,
+            ttsEnabled: domain.ttsEnabled,
+            ttsRate: domain.ttsRate,
+            ttsVolume: domain.ttsVolume,
+            hapticEnabled: domain.hapticEnabled,
+            undoDurationSeconds: domain.undoDurationSeconds,
+            createdAt: domain.createdAt,
+            updatedAt: domain.updatedAt
+        )
+    }
+
+    func domainModel() throws -> AppSettings {
+        guard let decodedIntensity = FeedbackIntensity(rawValue: feedbackIntensity) else {
+            throw RoutinePersistenceMappingError.invalidStoredFeedbackIntensity(feedbackIntensity)
+        }
+
+        return try AppSettings(
+            id: id,
+            feedbackIntensity: decodedIntensity,
+            soundEnabled: soundEnabled,
+            ttsEnabled: ttsEnabled,
+            ttsRate: ttsRate,
+            ttsVolume: ttsVolume,
+            hapticEnabled: hapticEnabled,
+            undoDurationSeconds: undoDurationSeconds,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+
+    func apply(_ domain: AppSettings) {
+        feedbackIntensity = domain.feedbackIntensity.rawValue
+        soundEnabled = domain.soundEnabled
+        ttsEnabled = domain.ttsEnabled
+        ttsRate = domain.ttsRate
+        ttsVolume = domain.ttsVolume
+        hapticEnabled = domain.hapticEnabled
+        undoDurationSeconds = domain.undoDurationSeconds
+        createdAt = domain.createdAt
+        updatedAt = domain.updatedAt
     }
 }
 

@@ -10,6 +10,13 @@ nonisolated enum RoutineDomainError: Error, Equatable {
     case invalidBackupAssetName(String)
     case invalidColorToken(String)
     case invalidOrder(Int)
+    case invalidLocalDate(String)
+    case completedLogRequiresCompletedAt
+    case undoneLogRequiresNoCompletedAt
+    case invalidAppSettingsID(String)
+    case invalidTTSRate(Double)
+    case invalidTTSVolume(Double)
+    case invalidUndoDuration(Int)
     case updatedAtPrecedesCreatedAt
     case activeRoutineSetCannotBeDeleted
 }
