@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -62,4 +63,13 @@ interface RoutineDao {
 
     @Update
     suspend fun updateRoutine(entity: RoutineEntity)
+
+    @Query("SELECT * FROM daily_logs WHERE date = :date ORDER BY updatedAtEpochMillis, id")
+    fun observeDailyLogs(date: String): Flow<List<DailyLogEntity>>
+
+    @Query("SELECT * FROM daily_logs WHERE date = :date AND routineId = :routineId LIMIT 1")
+    suspend fun getDailyLog(date: String, routineId: String): DailyLogEntity?
+
+    @Upsert
+    suspend fun upsertDailyLog(entity: DailyLogEntity)
 }

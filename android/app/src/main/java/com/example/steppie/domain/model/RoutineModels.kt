@@ -1,6 +1,7 @@
 package com.example.steppie.domain.model
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
 import java.util.Locale
 import java.util.UUID
@@ -124,6 +125,37 @@ data class RoutineSet(
         require(visible.map(Routine::order).distinct().size == visible.size) {
             "Visible routine orders must be unique within a RoutineSet."
         }
+    }
+}
+
+enum class LogStatus(val storageValue: String) {
+    Completed("completed"),
+    Undone("undone");
+
+    companion object {
+        fun fromStorageValue(value: String): LogStatus = entries.firstOrNull { it.storageValue == value }
+            ?: error("Unknown LogStatus: $value")
+    }
+}
+
+data class DailyLog(
+    val id: String = newUuidV4(),
+    val date: LocalDate,
+    val routineId: String,
+    val routineSetId: String,
+    val status: LogStatus = LogStatus.Undone,
+    val completedAt: Instant? = null,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = createdAt,
+) {
+    init {
+        requireUuidV4(id, "DailyLog.id")
+        requireUuidV4(routineId, "DailyLog.routineId")
+        requireUuidV4(routineSetId, "DailyLog.routineSetId")
+        require((status == LogStatus.Completed) == (completedAt != null)) {
+            "DailyLog.completedAt must be present only when status is completed."
+        }
+        require(updatedAt >= createdAt) { "DailyLog.updatedAt cannot precede createdAt." }
     }
 }
 

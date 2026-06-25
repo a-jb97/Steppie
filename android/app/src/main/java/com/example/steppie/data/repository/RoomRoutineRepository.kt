@@ -5,11 +5,15 @@ import com.example.steppie.data.local.RoutineDao
 import com.example.steppie.data.local.SteppieDatabase
 import com.example.steppie.data.local.toDomain
 import com.example.steppie.data.local.toEntity
+import com.example.steppie.domain.model.DailyLog
+import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.domain.model.newUuidV4
 import com.example.steppie.domain.model.requireUuidV4
 import com.example.steppie.domain.repository.RoutineRepository
 import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -156,6 +160,53 @@ class RoomRoutineRepository(
             )
         }
         touchRoutineSet(routineSetId, updatedAt)
+    }
+
+    override fun observeDailyLogs(date: LocalDate): Flow<List<DailyLog>> =
+        dao.observeDailyLogs(date.toString()).map { logs -> logs.map { it.toDomain() } }
+
+    override suspend fun completeRoutine(
+        routineId: String,
+        date: LocalDate,
+        completedAt: Instant,
+    ): DailyLog = database.withTransaction {
+        requireUuidV4(routineId, "Routine.id")
+        val routine = requireNotNull(dao.getVisibleRoutineEntity(routineId)) { "Routine not found: $routineId" }
+        val existing = dao.getDailyLog(date.toString(), routineId)
+        val saved = DailyLog(
+            id = existing?.id ?: newUuidV4(),
+            date = date,
+            routineId = routineId,
+            routineSetId = routine.routineSetId,
+            status = LogStatus.Completed,
+            completedAt = completedAt,
+            createdAt = existing?.createdAtEpochMillis?.let(Instant::ofEpochMilli) ?: completedAt,
+            updatedAt = completedAt,
+        )
+        dao.upsertDailyLog(saved.toEntity())
+        saved
+    }
+
+    override suspend fun undoRoutine(
+        routineId: String,
+        date: LocalDate,
+        updatedAt: Instant,
+    ): DailyLog = database.withTransaction {
+        requireUuidV4(routineId, "Routine.id")
+        val routine = requireNotNull(dao.getVisibleRoutineEntity(routineId)) { "Routine not found: $routineId" }
+        val existing = dao.getDailyLog(date.toString(), routineId)
+        val saved = DailyLog(
+            id = existing?.id ?: newUuidV4(),
+            date = date,
+            routineId = routineId,
+            routineSetId = routine.routineSetId,
+            status = LogStatus.Undone,
+            completedAt = null,
+            createdAt = existing?.createdAtEpochMillis?.let(Instant::ofEpochMilli) ?: updatedAt,
+            updatedAt = updatedAt,
+        )
+        dao.upsertDailyLog(saved.toEntity())
+        saved
     }
 
     private suspend fun normalizeOrder(routineSetId: String, updatedAt: Instant) {
