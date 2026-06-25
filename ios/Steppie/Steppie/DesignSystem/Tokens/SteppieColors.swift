@@ -16,6 +16,7 @@ extension Color {
     static let steppieCardPeach = Color("ColorCardPeach")
     static let steppieCardLavender = Color("ColorCardLavender")
     static let steppieCardRose = Color("ColorCardRose")
+    static let steppieChildAction = Color("ColorChildAction")
 }
 
 enum SteppieCardColor: CaseIterable, Sendable {
@@ -34,6 +35,17 @@ enum SteppieCardColor: CaseIterable, Sendable {
         case .peach: .steppieCardPeach
         case .lavender: .steppieCardLavender
         case .rose: .steppieCardRose
+        }
+    }
+
+    init(colorToken: String) {
+        switch colorToken {
+        case "color.card.mint": self = .mint
+        case "color.card.lemon": self = .lemon
+        case "color.card.peach": self = .peach
+        case "color.card.lavender": self = .lavender
+        case "color.card.rose": self = .rose
+        default: self = .sky
         }
     }
 }

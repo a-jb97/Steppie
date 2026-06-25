@@ -10,7 +10,12 @@ import SwiftData
 
 @main
 struct SteppieApp: App {
-    var sharedModelContainer: ModelContainer = {
+    private let sharedModelContainer: ModelContainer
+    private let routineRepository: SwiftDataRoutineRepository
+
+    init() {
+        SteppieFontRegistrar.registerBundledFonts()
+
         let schema = Schema([
             Item.self,
             RoutineSetRecord.self,
@@ -19,15 +24,20 @@ struct SteppieApp: App {
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let container = try ModelContainer(
+                for: schema,
+                configurations: [modelConfiguration]
+            )
+            sharedModelContainer = container
+            routineRepository = SwiftDataRoutineRepository(modelContainer: container)
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
-    }()
+    }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(repository: routineRepository)
         }
         .modelContainer(sharedModelContainer)
     }

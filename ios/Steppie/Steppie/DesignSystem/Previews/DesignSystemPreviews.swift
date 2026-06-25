@@ -26,8 +26,8 @@ private struct DesignSystemPreview: View {
     private var cardSamples: some View {
         VStack(spacing: SteppieSpacing.medium) {
             RoutineCard(
-                title: "아침 준비하기",
-                metadata: "카드를 누르면 완료",
+                title: Text("아침 준비하기"),
+                metadata: Text("카드를 누르면 완료"),
                 presentation: .focus,
                 state: .current
             ) {} visual: {
@@ -35,8 +35,8 @@ private struct DesignSystemPreview: View {
             }
 
             RoutineCard(
-                title: "아침 준비하기",
-                metadata: "1 · 지금",
+                title: Text("아침 준비하기"),
+                metadata: Text("1 · 지금"),
                 presentation: .list,
                 state: .current
             ) {} visual: {

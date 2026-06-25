@@ -15,7 +15,7 @@ extension RoutineIconName {
     }
 }
 
-enum SteppieRoutineIconSize: Sendable {
+enum SteppieRoutineIconSize: Equatable, Sendable {
     case list
     case card
 
