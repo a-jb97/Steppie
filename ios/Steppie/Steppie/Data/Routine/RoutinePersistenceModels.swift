@@ -113,6 +113,9 @@ final class AppSettingsRecord {
     var ttsVolume: Double
     var hapticEnabled: Bool
     var undoDurationSeconds: Int
+    var notificationLeadTimes: String?
+    var quietHoursStart: String?
+    var quietHoursEnd: String?
     var createdAt: Date
     var updatedAt: Date
 
@@ -125,6 +128,9 @@ final class AppSettingsRecord {
         ttsVolume: Double,
         hapticEnabled: Bool,
         undoDurationSeconds: Int,
+        notificationLeadTimes: String? = nil,
+        quietHoursStart: String? = nil,
+        quietHoursEnd: String? = nil,
         createdAt: Date,
         updatedAt: Date
     ) {
@@ -136,6 +142,9 @@ final class AppSettingsRecord {
         self.ttsVolume = ttsVolume
         self.hapticEnabled = hapticEnabled
         self.undoDurationSeconds = undoDurationSeconds
+        self.notificationLeadTimes = notificationLeadTimes
+        self.quietHoursStart = quietHoursStart
+        self.quietHoursEnd = quietHoursEnd
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
