@@ -1,12 +1,15 @@
 package com.example.steppie.ui.child
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,13 +21,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
@@ -32,9 +38,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -44,8 +52,10 @@ import androidx.compose.ui.unit.dp
 import com.example.steppie.R
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.ui.components.RoutineCard
+import com.example.steppie.ui.components.RoutineCardColor
 import com.example.steppie.ui.components.RoutineCardPresentation
 import com.example.steppie.ui.components.RoutineCardState
+import com.example.steppie.ui.theme.SteppieCornerRadius
 import com.example.steppie.ui.theme.SteppieLayout
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
@@ -60,6 +70,9 @@ fun ChildRoutineScreen(
     onShowList: () -> Unit,
     onShowFocus: () -> Unit,
     onSelectRoutine: (String) -> Unit,
+    onCompleteRoutine: () -> Unit,
+    onAdvanceFromFeedback: () -> Unit,
+    onUndoRoutine: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(
@@ -73,6 +86,9 @@ fun ChildRoutineScreen(
             maxWidth >= SplitLayoutMinimumWidth && maxWidth > maxHeight -> SplitRoutineLayout(
                 state = state,
                 onSelectRoutine = onSelectRoutine,
+                onCompleteRoutine = onCompleteRoutine,
+                onAdvanceFromFeedback = onAdvanceFromFeedback,
+                onUndoRoutine = onUndoRoutine,
             )
             state.singlePane == ChildSinglePane.List -> PhoneRoutineList(
                 state = state,
@@ -82,6 +98,9 @@ fun ChildRoutineScreen(
             else -> PhoneFocusView(
                 state = state,
                 onShowList = onShowList,
+                onCompleteRoutine = onCompleteRoutine,
+                onAdvanceFromFeedback = onAdvanceFromFeedback,
+                onUndoRoutine = onUndoRoutine,
             )
         }
     }
@@ -101,6 +120,9 @@ private fun LoadingContent() {
 private fun PhoneFocusView(
     state: ChildRoutineUiState,
     onShowList: () -> Unit,
+    onCompleteRoutine: () -> Unit,
+    onAdvanceFromFeedback: () -> Unit,
+    onUndoRoutine: () -> Unit,
 ) {
     val routine = state.selectedRoutine
     Column(
@@ -114,17 +136,42 @@ private fun PhoneFocusView(
         verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Large),
     ) {
         ChildHeader(
-            title = stringResource(R.string.child_focus_title),
-            subtitle = stringResource(R.string.child_focus_subtitle),
+            title = if (state.feedbackRoutine != null) {
+                stringResource(R.string.child_feedback_title)
+            } else {
+                stringResource(R.string.child_focus_title)
+            },
+            subtitle = if (state.feedbackRoutine != null) {
+                stringResource(R.string.child_feedback_subtitle)
+            } else {
+                stringResource(R.string.child_focus_subtitle)
+            },
         )
-        ProgressIndicator(total = state.routines.size)
-        if (routine == null) {
-            EmptyRoutineContent(modifier = Modifier.weightlessFill())
-        } else {
-            FocusRoutineContent(
+        ProgressIndicator(completed = state.progressCount, total = state.progressTotal)
+        when {
+            routine != null -> FocusRoutineContent(
                 routine = routine,
+                state = state,
                 tablet = false,
+                onCompleteRoutine = onCompleteRoutine,
             )
+            state.isAllComplete -> AllCompleteContent(modifier = Modifier.weightlessFill())
+            else -> EmptyRoutineContent(modifier = Modifier.weightlessFill())
+        }
+        if (state.undoRoutine != null) {
+            UndoFeedbackButton(
+                label = stringResource(R.string.child_undo_mistap),
+                onClick = onUndoRoutine,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+        }
+        if (state.feedbackRoutine != null) {
+            val nextRoutine = state.nextIncompleteRoutine
+            if (nextRoutine != null) {
+                NextRoutinePreview(routine = nextRoutine, onClick = onAdvanceFromFeedback)
+            } else {
+                AllCompletePreview(onClick = onAdvanceFromFeedback)
+            }
         }
         FocusListNavigation(
             label = stringResource(R.string.child_list_title),
@@ -160,7 +207,7 @@ private fun PhoneRoutineList(
                 title = stringResource(R.string.child_list_title),
                 subtitle = stringResource(R.string.child_list_subtitle),
             )
-            ProgressIndicator(total = state.routines.size)
+            ProgressIndicator(completed = state.progressCount, total = state.progressTotal)
         }
         RoutineList(
             state = state,
@@ -181,6 +228,9 @@ private fun PhoneRoutineList(
 private fun SplitRoutineLayout(
     state: ChildRoutineUiState,
     onSelectRoutine: (String) -> Unit,
+    onCompleteRoutine: () -> Unit,
+    onAdvanceFromFeedback: () -> Unit,
+    onUndoRoutine: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -204,6 +254,7 @@ private fun SplitRoutineLayout(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = SteppieTheme.typography.guardianTitle,
             )
+            ProgressIndicator(completed = state.progressCount, total = state.progressTotal)
             RoutineList(
                 state = state,
                 onSelectRoutine = onSelectRoutine,
@@ -228,16 +279,47 @@ private fun SplitRoutineLayout(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = stringResource(R.string.child_focus_title),
+                text = if (state.feedbackRoutine != null) {
+                    stringResource(R.string.child_feedback_title)
+                } else {
+                    stringResource(R.string.child_focus_title)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = SteppieTheme.typography.guardianTitle,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.size(28.dp))
-            state.selectedRoutine?.let { routine ->
-                FocusRoutineContent(routine = routine, tablet = true)
-            } ?: EmptyRoutineContent()
+            val selectedRoutine = state.selectedRoutine
+            when {
+                selectedRoutine != null -> {
+                    FocusRoutineContent(
+                        routine = selectedRoutine,
+                        state = state,
+                        tablet = true,
+                        onCompleteRoutine = onCompleteRoutine,
+                    )
+                    if (state.undoRoutine != null) {
+                        Spacer(Modifier.size(SteppieSpacing.Medium))
+                        UndoFeedbackButton(
+                            label = stringResource(R.string.child_undo_mistap),
+                            onClick = onUndoRoutine,
+                        )
+                    }
+                    if (state.feedbackRoutine != null) {
+                        val nextRoutine = state.nextIncompleteRoutine
+                        if (nextRoutine != null) {
+                            Spacer(Modifier.size(SteppieSpacing.Medium))
+                            NextRoutinePreview(routine = nextRoutine, onClick = onAdvanceFromFeedback)
+                        } else {
+                            Spacer(Modifier.size(SteppieSpacing.Medium))
+                            AllCompletePreview(onClick = onAdvanceFromFeedback)
+                        }
+                    }
+                }
+                state.isAllComplete -> AllCompleteContent()
+                else -> EmptyRoutineContent()
+            }
         }
     }
 }
@@ -250,7 +332,11 @@ private fun ChildHeader(
     Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall)) {
         Text(
             text = title,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (title == stringResource(R.string.child_feedback_title)) {
+                SteppieTheme.colors.success
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
             style = SteppieTheme.typography.childCardTitle,
         )
         Text(
@@ -262,8 +348,8 @@ private fun ChildHeader(
 }
 
 @Composable
-private fun ProgressIndicator(total: Int) {
-    val description = stringResource(R.string.a11y_progress, 0, total)
+private fun ProgressIndicator(completed: Int, total: Int) {
+    val description = stringResource(R.string.a11y_progress, completed, total)
     Row(
         modifier = Modifier.semantics(mergeDescendants = true) {
             contentDescription = description
@@ -271,16 +357,22 @@ private fun ProgressIndicator(total: Int) {
         horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        repeat(total) {
+        repeat(total) { index ->
             Box(
                 modifier = Modifier
                     .size(24.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.outline),
+                    .background(
+                        if (index < completed) {
+                            SteppieTheme.colors.progressComplete
+                        } else {
+                            SteppieTheme.colors.progressPending
+                        },
+                    ),
             )
         }
         Text(
-            text = stringResource(R.string.child_progress_label, 0, total),
+            text = stringResource(R.string.child_progress_label, completed, total),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = SteppieTheme.typography.childProgress,
         )
@@ -290,26 +382,43 @@ private fun ProgressIndicator(total: Int) {
 @Composable
 private fun FocusRoutineContent(
     routine: Routine,
+    state: ChildRoutineUiState,
     tablet: Boolean,
+    onCompleteRoutine: () -> Unit,
 ) {
     val title = routine.localizedTitle()
+    val isFeedback = state.feedbackRoutineId == routine.id
+    val isCompleted = routine.id in state.completedRoutineIds || isFeedback
     RoutineCard(
-        title = title,
-        state = RoutineCardState.Current,
-        onClick = {},
+        title = if (isFeedback) stringResource(R.string.child_completed_card_title, title) else title,
+        state = if (isCompleted) RoutineCardState.Completed else RoutineCardState.Current,
+        onClick = onCompleteRoutine,
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("focus_routine_card")
             .then(if (tablet) Modifier.heightIn(min = 520.dp) else Modifier),
         presentation = RoutineCardPresentation.Focus,
         cardColor = routine.cardColor(),
-        meta = stringResource(R.string.child_focus_tap_hint),
+        meta = if (isCompleted) {
+            stringResource(R.string.routine_state_completed)
+        } else {
+            stringResource(R.string.child_focus_tap_hint)
+        },
         focusMaxWidth = if (tablet) {
             SteppieLayout.FocusCardTabletMaxWidth
         } else {
             SteppieLayout.FocusCardPhoneMaxWidth
         },
     ) {
-        RoutineIcon(icon = routine.icon, focus = true, modifier = Modifier.fillMaxSize())
+        if (isFeedback) {
+            Image(
+                painter = painterResource(R.drawable.ic_feedback_check),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            RoutineIcon(icon = routine.icon, focus = true, modifier = Modifier.fillMaxSize())
+        }
     }
 }
 
@@ -327,17 +436,22 @@ private fun RoutineList(
     LazyColumn(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = contentBottomPadding),
+        contentPadding = PaddingValues(bottom = contentBottomPadding),
     ) {
         items(state.routines, key = Routine::id) { routine ->
             val isCurrent = routine.id == state.selectedRoutineId
+            val isCompleted = routine.id in state.completedRoutineIds
             RoutineCard(
                 title = routine.localizedTitle(),
-                state = if (isCurrent) RoutineCardState.Current else RoutineCardState.Upcoming,
+                state = when {
+                    isCompleted -> RoutineCardState.Completed
+                    isCurrent -> RoutineCardState.Current
+                    else -> RoutineCardState.Upcoming
+                },
                 onClick = { onSelectRoutine(routine.id) },
                 modifier = Modifier.testTag("routine_${routine.id}"),
                 cardColor = routine.cardColor(),
-                meta = routine.listMeta(isCurrent),
+                meta = routine.listMeta(isCurrent, isCompleted),
             ) {
                 RoutineIcon(icon = routine.icon, focus = false, modifier = Modifier.fillMaxSize())
             }
@@ -354,9 +468,10 @@ private fun Routine.localizedTitle(): String {
 }
 
 @Composable
-private fun Routine.listMeta(isCurrent: Boolean): String {
+private fun Routine.listMeta(isCurrent: Boolean, isCompleted: Boolean): String {
     val orderLabel = order + 1
     return when {
+        isCompleted -> stringResource(R.string.routine_state_completed)
         isCurrent -> stringResource(R.string.routine_meta_current, orderLabel)
         scheduledTime != null -> stringResource(
             R.string.routine_meta_scheduled,
@@ -364,6 +479,149 @@ private fun Routine.listMeta(isCurrent: Boolean): String {
             scheduledTime.toString(),
         )
         else -> stringResource(R.string.routine_meta_order, orderLabel)
+    }
+}
+
+@Composable
+private fun UndoFeedbackButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .widthIn(min = 198.dp)
+            .heightIn(min = SteppieLayout.GuardianMinimumTouchTarget)
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(2.dp, Color(0xFF5D4037), RoundedCornerShape(18.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.TwoExtraSmall),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_undo_arrow),
+            contentDescription = null,
+            tint = Color.Unspecified,
+            modifier = Modifier.size(24.dp),
+        )
+        Spacer(Modifier.size(SteppieSpacing.ExtraSmall))
+        Text(
+            text = label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = SteppieTheme.typography.button,
+        )
+    }
+}
+
+@Composable
+private fun NextRoutinePreview(
+    routine: Routine,
+    onClick: () -> Unit,
+) {
+    val description = stringResource(R.string.child_next_routine, routine.localizedTitle())
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = SteppieLayout.ChildMinimumTouchTarget)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+            .background(routine.previewColor())
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+            }
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.Small),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+    ) {
+        Box(
+            modifier = Modifier.size(52.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            RoutineIcon(icon = routine.icon, focus = false, modifier = Modifier.size(48.dp))
+        }
+        Text(
+            text = description,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = SteppieTheme.typography.childListTitle,
+            maxLines = 2,
+        )
+    }
+}
+
+@Composable
+private fun AllCompletePreview(onClick: () -> Unit) {
+    val description = stringResource(R.string.child_all_complete_title)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = SteppieLayout.ChildMinimumTouchTarget)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+            .background(SteppieTheme.colors.cardSky)
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+            }
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.Small),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+    ) {
+        Image(
+            painter = painterResource(R.drawable.complete_stamp),
+            contentDescription = null,
+            modifier = Modifier.size(52.dp),
+        )
+        Column(
+            verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
+        ) {
+            Text(
+                text = stringResource(R.string.child_all_complete_title),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.button,
+                maxLines = 1,
+            )
+            Text(
+                text = stringResource(R.string.child_all_complete_subtitle),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianCaption,
+                maxLines = 2,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AllCompleteContent(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 620.dp)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Sheet))
+            .background(SteppieTheme.colors.cardSky)
+            .padding(SteppieSpacing.ExtraLarge),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.complete_stamp),
+            contentDescription = null,
+            modifier = Modifier.size(width = 168.dp, height = 164.dp),
+        )
+        Spacer(Modifier.size(SteppieSpacing.Large))
+        Text(
+            text = stringResource(R.string.child_all_complete_title),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = SteppieTheme.typography.childCardTitle,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.size(SteppieSpacing.Medium))
+        Text(
+            text = stringResource(R.string.child_all_complete_subtitle),
+            color = Color(0xFF44499E),
+            style = SteppieTheme.typography.guardianSection,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -421,6 +679,16 @@ private fun EmptyRoutineContent(modifier: Modifier = Modifier) {
             textAlign = TextAlign.Center,
         )
     }
+}
+
+@Composable
+private fun Routine.previewColor(): Color = when (cardColor()) {
+    RoutineCardColor.Sky -> SteppieTheme.colors.cardSky
+    RoutineCardColor.Mint -> SteppieTheme.colors.cardMint
+    RoutineCardColor.Lemon -> SteppieTheme.colors.cardLemon
+    RoutineCardColor.Peach -> SteppieTheme.colors.cardPeach
+    RoutineCardColor.Lavender -> SteppieTheme.colors.cardLavender
+    RoutineCardColor.Rose -> SteppieTheme.colors.cardRose
 }
 
 private fun Modifier.onVerticalSwipe(

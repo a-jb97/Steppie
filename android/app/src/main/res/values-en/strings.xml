@@ -9,6 +9,13 @@
     <string name="child_focus_title">Now</string>
     <string name="child_focus_subtitle">This is the step to do now</string>
     <string name="child_focus_tap_hint">Tap the card when finished</string>
+    <string name="child_feedback_title">Well done!</string>
+    <string name="child_feedback_subtitle">Moving to the next activity</string>
+    <string name="child_completed_card_title">%1$s done!</string>
+    <string name="child_undo_mistap">I tapped the card by mistake</string>
+    <string name="child_next_routine">Next: %1$s</string>
+    <string name="child_all_complete_title">Today\'s steps are done!</string>
+    <string name="child_all_complete_subtitle">You finished every activity in order</string>
     <string name="child_list_title">Today\'s steps</string>
     <string name="child_list_subtitle">Move up and down</string>
     <string name="child_empty_title">No steps today</string>
