@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -61,6 +62,8 @@ fun SteppieButton(
     loadingStateDescription: String? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val resolvedLoadingStateDescription = loadingStateDescription
+        ?: stringResource(R.string.state_loading)
     val isPointerPressed by interactionSource.collectIsPressedAsState()
     val isPressed = state == SteppieButtonState.Pressed ||
         (state == SteppieButtonState.Enabled && isPointerPressed)
@@ -123,8 +126,7 @@ fun SteppieButton(
             .semantics {
                 accessibilityLabel?.let { contentDescription = it }
                 if (state == SteppieButtonState.Loading) {
-                    stateDescription = loadingStateDescription
-                        ?: context.getString(R.string.state_loading)
+                    stateDescription = resolvedLoadingStateDescription
                 }
             }
             .padding(horizontal = SteppieSpacing.Large, vertical = SteppieSpacing.Medium),
