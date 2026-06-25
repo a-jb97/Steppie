@@ -16,11 +16,7 @@ struct SteppieApp: App {
     init() {
         SteppieFontRegistrar.registerBundledFonts()
 
-        let schema = Schema([
-            Item.self,
-            RoutineSetRecord.self,
-            RoutineRecord.self,
-        ])
+        let schema = RoutinePersistenceSchema.schema
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
@@ -37,7 +33,11 @@ struct SteppieApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(repository: routineRepository)
+            ContentView(
+                repository: routineRepository,
+                speechGuide: IOSRoutineSpeechGuide(),
+                feedbackPerformer: IOSRoutineFeedbackPerformer()
+            )
         }
         .modelContainer(sharedModelContainer)
     }

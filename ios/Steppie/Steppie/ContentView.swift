@@ -3,9 +3,17 @@ import SwiftUI
 struct ContentView: View {
     @State private var viewModel: ChildRoutineViewModel
 
-    init(repository: any RoutineRepository) {
+    init(
+        repository: any RoutineRepository,
+        speechGuide: (any RoutineSpeechGuiding)? = nil,
+        feedbackPerformer: (any RoutineFeedbackPerforming)? = nil
+    ) {
         _viewModel = State(
-            initialValue: ChildRoutineViewModel(repository: repository)
+            initialValue: ChildRoutineViewModel(
+                repository: repository,
+                speechGuide: speechGuide,
+                feedbackPerformer: feedbackPerformer
+            )
         )
     }
 

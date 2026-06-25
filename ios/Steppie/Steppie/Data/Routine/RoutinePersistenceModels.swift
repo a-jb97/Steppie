@@ -71,10 +71,82 @@ final class RoutineRecord {
     }
 }
 
+@Model
+final class DailyLogRecord {
+    @Attribute(.unique) var id: UUID
+    var date: String
+    var routineID: UUID
+    var routineSetID: UUID
+    var status: String
+    var completedAt: Date?
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(
+        id: UUID,
+        date: String,
+        routineID: UUID,
+        routineSetID: UUID,
+        status: String,
+        completedAt: Date?,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.date = date
+        self.routineID = routineID
+        self.routineSetID = routineSetID
+        self.status = status
+        self.completedAt = completedAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+@Model
+final class AppSettingsRecord {
+    @Attribute(.unique) var id: String
+    var feedbackIntensity: String
+    var soundEnabled: Bool
+    var ttsEnabled: Bool
+    var ttsRate: Double
+    var ttsVolume: Double
+    var hapticEnabled: Bool
+    var undoDurationSeconds: Int
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(
+        id: String,
+        feedbackIntensity: String,
+        soundEnabled: Bool,
+        ttsEnabled: Bool,
+        ttsRate: Double,
+        ttsVolume: Double,
+        hapticEnabled: Bool,
+        undoDurationSeconds: Int,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.feedbackIntensity = feedbackIntensity
+        self.soundEnabled = soundEnabled
+        self.ttsEnabled = ttsEnabled
+        self.ttsRate = ttsRate
+        self.ttsVolume = ttsVolume
+        self.hapticEnabled = hapticEnabled
+        self.undoDurationSeconds = undoDurationSeconds
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
 enum RoutinePersistenceSchema {
     static let models: [any PersistentModel.Type] = [
         RoutineSetRecord.self,
         RoutineRecord.self,
+        DailyLogRecord.self,
+        AppSettingsRecord.self,
     ]
 
     static var schema: Schema {

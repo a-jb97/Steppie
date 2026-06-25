@@ -5,10 +5,13 @@ enum SteppieTextStyle: Sendable {
     case childListTitle
     case childProgress
     case childScreenTitle
+    case childFeedbackTitle
     case childPaneTitle
     case childSubtitle
+    case childAllDoneSubtitle
     case childHint
     case childNavigation
+    case childUndo
     case childCaption
     case guardianTitle
     case guardianSection
@@ -22,9 +25,12 @@ enum SteppieTextStyle: Sendable {
         case .childListTitle: 24
         case .childProgress, .childHint: 20
         case .childScreenTitle: 32
+        case .childFeedbackTitle: 28
         case .childPaneTitle: 28
+        case .childAllDoneSubtitle: 20
         case .childSubtitle, .childCaption: 14
         case .childNavigation: 17
+        case .childUndo: 14
         case .guardianTitle: 28
         case .guardianSection: 20
         case .guardianBody, .button: 17
@@ -43,7 +49,8 @@ enum SteppieTextStyle: Sendable {
         switch self {
         case .guardianBody, .guardianCaption, .childSubtitle, .childCaption: .regular
         case .childCardTitle, .childScreenTitle, .childPaneTitle, .childHint,
-             .childNavigation, .guardianTitle: .bold
+             .childFeedbackTitle, .childAllDoneSubtitle, .childNavigation, .childUndo,
+             .guardianTitle: .bold
         case .childListTitle, .childProgress, .guardianSection, .button: .semibold
         }
     }
@@ -51,17 +58,18 @@ enum SteppieTextStyle: Sendable {
     fileprivate var relativeTextStyle: Font.TextStyle {
         switch self {
         case .childCardTitle, .childScreenTitle: .largeTitle
-        case .childListTitle, .childPaneTitle, .guardianTitle: .title2
-        case .childProgress, .childHint, .guardianSection: .title3
+        case .childListTitle, .childPaneTitle, .childFeedbackTitle, .guardianTitle: .title2
+        case .childProgress, .childHint, .childAllDoneSubtitle, .guardianSection: .title3
         case .childNavigation, .guardianBody, .button: .body
-        case .childSubtitle, .childCaption, .guardianCaption: .caption
+        case .childSubtitle, .childUndo, .childCaption, .guardianCaption: .caption
         }
     }
 
     fileprivate var customFontName: String? {
         switch self {
         case .childCardTitle, .childListTitle, .childScreenTitle, .childPaneTitle,
-             .childHint, .childNavigation:
+             .childFeedbackTitle, .childAllDoneSubtitle, .childHint, .childNavigation,
+             .childUndo:
             "MangoDdobak-B"
         case .childSubtitle, .childCaption:
             "MangoDdobak-R"

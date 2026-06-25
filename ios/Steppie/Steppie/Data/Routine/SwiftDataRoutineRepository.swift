@@ -164,6 +164,101 @@ final class SwiftDataRoutineRepository: RoutineRepository {
         try context.save()
     }
 
+    func dailyLogs(on date: String, routineSetID: UUID?) throws -> [DailyLog] {
+        guard DailyLog.isValidLocalDate(date) else {
+            throw RoutineDomainError.invalidLocalDate(date)
+        }
+        return try dailyLogRecords(on: date)
+            .filter { routineSetID == nil || $0.routineSetID == routineSetID }
+            .sorted {
+                if $0.updatedAt == $1.updatedAt { return $0.id.uuidString < $1.id.uuidString }
+                return $0.updatedAt < $1.updatedAt
+            }
+            .map { try $0.domainModel() }
+    }
+
+    func dailyLog(on date: String, routineID: UUID) throws -> DailyLog? {
+        guard DailyLog.isValidLocalDate(date) else {
+            throw RoutineDomainError.invalidLocalDate(date)
+        }
+        return try dailyLogRecord(on: date, routineID: routineID)?.domainModel()
+    }
+
+    func setRoutineCompleted(
+        routineID: UUID,
+        routineSetID: UUID,
+        on date: String,
+        at completedAt: Date
+    ) throws -> DailyLog {
+        guard try routine(id: routineID) != nil else {
+            throw RoutineRepositoryError.routineNotFound(routineID)
+        }
+        try validateParent(routineSetID)
+
+        let log = try DailyLog(
+            id: dailyLogRecord(on: date, routineID: routineID)?.id ?? UUID(),
+            date: date,
+            routineID: routineID,
+            routineSetID: routineSetID,
+            status: .completed,
+            completedAt: completedAt,
+            createdAt: dailyLogRecord(on: date, routineID: routineID)?.createdAt ?? completedAt,
+            updatedAt: completedAt
+        )
+
+        if let record = try dailyLogRecord(on: date, routineID: routineID) {
+            record.apply(log)
+        } else {
+            context.insert(DailyLogRecord(domain: log))
+        }
+        try context.save()
+        return log
+    }
+
+    func undoRoutineCompletion(
+        routineID: UUID,
+        on date: String,
+        at updatedAt: Date
+    ) throws -> DailyLog? {
+        guard let record = try dailyLogRecord(on: date, routineID: routineID) else {
+            return nil
+        }
+        let log = try DailyLog(
+            id: record.id,
+            date: record.date,
+            routineID: record.routineID,
+            routineSetID: record.routineSetID,
+            status: .undone,
+            completedAt: nil,
+            createdAt: record.createdAt,
+            updatedAt: updatedAt
+        )
+        record.apply(log)
+        try context.save()
+        return log
+    }
+
+    func appSettings() throws -> AppSettings {
+        if let record = try appSettingsRecord() {
+            return try record.domainModel()
+        }
+
+        let settings = try AppSettings()
+        context.insert(AppSettingsRecord(domain: settings))
+        try context.save()
+        return settings
+    }
+
+    func updateAppSettings(_ settings: AppSettings) throws {
+        try settings.validate()
+        if let record = try appSettingsRecord() {
+            record.apply(settings)
+        } else {
+            context.insert(AppSettingsRecord(domain: settings))
+        }
+        try context.save()
+    }
+
     private func routineSetRecord(id: UUID) throws -> RoutineSetRecord? {
         let id = id
         let descriptor = FetchDescriptor<RoutineSetRecord>(
@@ -190,6 +285,35 @@ final class SwiftDataRoutineRepository: RoutineRepository {
             predicate: #Predicate { $0.routineSetID == routineSetID }
         )
         return try context.fetch(descriptor)
+    }
+
+    private func dailyLogRecords(on date: String) throws -> [DailyLogRecord] {
+        let date = date
+        let descriptor = FetchDescriptor<DailyLogRecord>(
+            predicate: #Predicate { $0.date == date }
+        )
+        return try context.fetch(descriptor)
+    }
+
+    private func dailyLogRecord(on date: String, routineID: UUID) throws -> DailyLogRecord? {
+        let date = date
+        let routineID = routineID
+        let descriptor = FetchDescriptor<DailyLogRecord>(
+            predicate: #Predicate { $0.date == date && $0.routineID == routineID }
+        )
+        let records = try context.fetch(descriptor)
+        guard records.count <= 1 else {
+            throw RoutineRepositoryError.duplicateDailyLog(date: date, routineID: routineID)
+        }
+        return records.first
+    }
+
+    private func appSettingsRecord() throws -> AppSettingsRecord? {
+        let id = AppSettings.singletonID
+        let descriptor = FetchDescriptor<AppSettingsRecord>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try context.fetch(descriptor).first
     }
 
     private func validateParent(_ id: UUID, allowDeleted: Bool = false) throws {

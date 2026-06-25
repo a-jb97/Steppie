@@ -1,0 +1,37 @@
+<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="13" height="13" fill="#1E1E1E"/>
+<g id="Steppie UI Screens - v1.0 core flows">
+<rect width="2540" height="4504" transform="translate(-1029.25 -906.25)" fill="#F6EFEE"/>
+<g id="child mode phone screens">
+<g id="03 &#236;&#149;&#132;&#236;&#157;&#180; &#235;&#170;&#168;&#235;&#147;&#156; / &#236;&#153;&#132;&#235;&#163;&#140; &#237;&#148;&#188;&#235;&#147;&#156;&#235;&#176;&#177;">
+<rect x="-130.75" y="-685.75" width="392" height="851" rx="27.5" fill="#EFE6E1"/>
+<rect x="-130.75" y="-685.75" width="392" height="851" rx="27.5" stroke="#D7CCC8"/>
+<g id="Group 4">
+<g id="undo button treatment" filter="url(#filter0_d_0_1)">
+<rect x="-33.25" y="-13.25" width="198" height="39" rx="18" fill="#EFE6E1"/>
+<rect x="-32.25" y="-12.25" width="196" height="37" rx="17" stroke="#5D4037" stroke-width="2"/>
+<g id="Group 3">
+<g id="icon/undo-arrow">
+<g id="Group 2">
+<path id="Vector" d="M3.68333 3.57051H0.75V0.75" stroke="#5D4037" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_2" d="M1.26331 3.14744C2.28997 1.66667 4.04997 0.75 6.02997 0.75C9.1833 0.75 11.75 3.21795 11.75 6.25C11.75 9.28205 9.1833 11.75 6.02997 11.75C4.04997 11.75 2.28997 10.7628 1.26331 9.28205" stroke="#5D4037" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+</g>
+</g>
+</g>
+</g>
+</g>
+</g>
+<defs>
+<filter id="filter0_d_0_1" x="-41.25" y="-18.25" width="214" height="55" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="3"/>
+<feGaussianBlur stdDeviation="4"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.365 0 0 0 0 0.251 0 0 0 0 0.216 0 0 0 0.14 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+</filter>
+</defs>
+</svg>
