@@ -37,6 +37,75 @@ struct SteppieTests {
         #expect(try repository.routines(in: upcoming.routineSetID) == originalRoutines)
     }
 
+    @Test("포커스 카드 완료는 피드백 화면을 유지하고 다음 카드 선택 후 current를 이동한다")
+    func childRoutineCompletionWaitsForManualAdvance() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
+        let completedDate = DailyLog.localDateString(for: completedAt)
+        let viewModel = ChildRoutineViewModel(
+            repository: repository,
+            now: { completedAt }
+        )
+        viewModel.load()
+        let firstRoutine = try #require(viewModel.currentRoutine)
+
+        viewModel.completeSelectedRoutine()
+        #expect(viewModel.completedCount == 1)
+        #expect(viewModel.cardState(for: firstRoutine) == .completed)
+        #expect(try repository.dailyLog(on: completedDate, routineID: firstRoutine.id)?.status == .completed)
+        #expect(viewModel.isShowingCompletionFeedback)
+        #expect(viewModel.selectedRoutine?.id == firstRoutine.id)
+        #expect(viewModel.nextRoutineAfterFeedback?.id == viewModel.routines[1].id)
+        #expect(viewModel.cardState(for: viewModel.routines[1]) == .upcoming)
+
+        viewModel.proceedAfterCompletionFeedback()
+        #expect(viewModel.currentRoutine?.id == viewModel.routines[1].id)
+        #expect(viewModel.selectedRoutineID == viewModel.routines[1].id)
+        #expect(viewModel.cardState(for: viewModel.routines[1]) == .current)
+    }
+
+    @Test("완료 직후 undo는 DailyLog를 undone으로 되돌리고 같은 루틴을 다시 current로 만든다")
+    func childRoutineUndoRestoresCompletedRoutine() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
+        let completedDate = DailyLog.localDateString(for: completedAt)
+        let viewModel = ChildRoutineViewModel(
+            repository: repository,
+            now: { completedAt }
+        )
+        viewModel.load()
+        let firstRoutine = try #require(viewModel.currentRoutine)
+
+        viewModel.completeSelectedRoutine()
+        viewModel.undoLastCompletion()
+
+        #expect(viewModel.completedCount == 0)
+        #expect(viewModel.currentRoutine?.id == firstRoutine.id)
+        #expect(viewModel.cardState(for: firstRoutine) == .current)
+        #expect(try repository.dailyLog(on: completedDate, routineID: firstRoutine.id)?.status == .undone)
+    }
+
+    @Test("모든 루틴 완료 후 사용자가 진행하면 전체 완료 상태가 된다")
+    func childRoutineAllDoneState() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
+        let viewModel = ChildRoutineViewModel(
+            repository: repository,
+            now: { completedAt }
+        )
+        viewModel.load()
+
+        for _ in viewModel.routines {
+            viewModel.completeSelectedRoutine()
+            #expect(viewModel.isShowingCompletionFeedback)
+            viewModel.proceedAfterCompletionFeedback()
+        }
+
+        #expect(viewModel.completedCount == 3)
+        #expect(viewModel.currentRoutine == nil)
+        #expect(viewModel.isAllCompleted)
+    }
+
     @Test("반응형 레이아웃은 905pt에서 split pane으로 전환한다")
     func childRoutineResponsiveBreakpoint() {
         #expect(SteppieLayout.splitMinimumWidth == 905)
@@ -67,6 +136,33 @@ struct SteppieTests {
         #expect(fetchedRoutines.map(\.id) == fixture.routines.map(\.id))
         #expect(fetchedRoutines.map(\.order) == [0, 1, 2])
         #expect(fetchedRoutines[0].scheduledTime?.description == "08:00")
+    }
+
+    @Test("DailyLog 완료와 되돌리기는 date + routineId 조합을 하나로 유지한다")
+    func completeAndUndoDailyLog() throws {
+        let fixture = try makeFixture(routineCount: 1)
+        let routine = fixture.routines[0]
+        let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
+        let completedDate = DailyLog.localDateString(for: completedAt)
+
+        let completed = try fixture.repository.setRoutineCompleted(
+            routineID: routine.id,
+            routineSetID: fixture.routineSet.id,
+            on: completedDate,
+            at: completedAt
+        )
+        let undone = try fixture.repository.undoRoutineCompletion(
+            routineID: routine.id,
+            on: completedDate,
+            at: completedAt.addingTimeInterval(10)
+        )
+
+        let logs = try fixture.repository.dailyLogs(on: completedDate, routineSetID: fixture.routineSet.id)
+        #expect(completed.status == .completed)
+        #expect(undone?.id == completed.id)
+        #expect(undone?.status == .undone)
+        #expect(logs.count == 1)
+        #expect(logs[0].completedAt == nil)
     }
 
     @Test("Routine 내용을 수정하되 ID와 상위 세트는 유지한다")
