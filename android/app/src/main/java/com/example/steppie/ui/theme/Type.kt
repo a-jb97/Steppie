@@ -4,11 +4,19 @@ import androidx.compose.material3.Typography
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.example.steppie.R
 
-private val SteppieFontFamily = FontFamily.SansSerif
+private val SteppieFontFamily = FontFamily(
+    Font(R.font.mango_ddobak_light, weight = FontWeight.Light),
+    Font(R.font.mango_ddobak_regular, weight = FontWeight.Normal),
+    Font(R.font.mango_ddobak_regular, weight = FontWeight.Medium),
+    Font(R.font.mango_ddobak_bold, weight = FontWeight.SemiBold),
+    Font(R.font.mango_ddobak_bold, weight = FontWeight.Bold),
+)
 
 @Immutable
 data class SteppieTypography(
