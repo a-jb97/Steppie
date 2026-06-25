@@ -138,6 +138,49 @@ enum class LogStatus(val storageValue: String) {
     }
 }
 
+enum class FeedbackIntensity(val storageValue: String) {
+    Strong("strong"),
+    Normal("normal"),
+    Quiet("quiet"),
+    Off("off");
+
+    companion object {
+        fun fromStorageValue(value: String): FeedbackIntensity = entries.firstOrNull { it.storageValue == value }
+            ?: error("Unknown FeedbackIntensity: $value")
+    }
+}
+
+data class AppSettings(
+    val feedbackIntensity: FeedbackIntensity = FeedbackIntensity.Normal,
+    val soundEnabled: Boolean = true,
+    val ttsEnabled: Boolean = true,
+    val ttsRate: Double = 1.0,
+    val ttsVolume: Double = 1.0,
+    val hapticEnabled: Boolean = true,
+    val undoDurationSeconds: Int = 5,
+    val notificationLeadTimes: List<Int> = listOf(10, 5),
+    val quietHoursStart: LocalTime? = null,
+    val quietHoursEnd: LocalTime? = null,
+    val locale: String? = null,
+) {
+    init {
+        require(ttsRate in 0.5..1.5) { "ttsRate must be in 0.5..1.5." }
+        require(ttsVolume in 0.0..1.0) { "ttsVolume must be in 0.0..1.0." }
+        require(undoDurationSeconds in setOf(3, 5, 10)) { "undoDurationSeconds must be 3, 5, or 10." }
+        require(notificationLeadTimes.all { it > 0 }) { "notificationLeadTimes must contain positive minute values." }
+        require(notificationLeadTimes.distinct().size == notificationLeadTimes.size) {
+            "notificationLeadTimes cannot contain duplicates."
+        }
+        require(quietHoursStart == null || (quietHoursStart.second == 0 && quietHoursStart.nano == 0)) {
+            "quietHoursStart must use HH:mm precision."
+        }
+        require(quietHoursEnd == null || (quietHoursEnd.second == 0 && quietHoursEnd.nano == 0)) {
+            "quietHoursEnd must use HH:mm precision."
+        }
+        require(locale?.isNotBlank() != false) { "locale cannot be blank." }
+    }
+}
+
 data class DailyLog(
     val id: String = newUuidV4(),
     val date: LocalDate,
