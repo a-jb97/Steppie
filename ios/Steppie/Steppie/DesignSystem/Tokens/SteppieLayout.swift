@@ -29,4 +29,8 @@ enum SteppieLayout {
     static let splitListWidth: CGFloat = 360
     static let childScreenPadding: CGFloat = 24
     static let guardianScreenPadding: CGFloat = 20
+    static let splitMinimumWidth = splitListWidth
+        + SteppieStroke.divider
+        + (2 * SteppieSpacing.extraLarge)
+        + focusCardPhoneMaximumWidth
 }

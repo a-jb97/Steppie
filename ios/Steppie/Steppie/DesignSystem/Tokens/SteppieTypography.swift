@@ -4,6 +4,12 @@ enum SteppieTextStyle: Sendable {
     case childCardTitle
     case childListTitle
     case childProgress
+    case childScreenTitle
+    case childPaneTitle
+    case childSubtitle
+    case childHint
+    case childNavigation
+    case childCaption
     case guardianTitle
     case guardianSection
     case guardianBody
@@ -14,7 +20,11 @@ enum SteppieTextStyle: Sendable {
         switch self {
         case .childCardTitle: 32
         case .childListTitle: 24
-        case .childProgress: 22
+        case .childProgress, .childHint: 20
+        case .childScreenTitle: 32
+        case .childPaneTitle: 28
+        case .childSubtitle, .childCaption: 14
+        case .childNavigation: 17
         case .guardianTitle: 28
         case .guardianSection: 20
         case .guardianBody, .button: 17
@@ -31,19 +41,32 @@ enum SteppieTextStyle: Sendable {
 
     fileprivate var weight: Font.Weight {
         switch self {
-        case .guardianBody, .guardianCaption: .regular
-        case .childCardTitle, .guardianTitle: .bold
+        case .guardianBody, .guardianCaption, .childSubtitle, .childCaption: .regular
+        case .childCardTitle, .childScreenTitle, .childPaneTitle, .childHint,
+             .childNavigation, .guardianTitle: .bold
         case .childListTitle, .childProgress, .guardianSection, .button: .semibold
         }
     }
 
     fileprivate var relativeTextStyle: Font.TextStyle {
         switch self {
-        case .childCardTitle: .largeTitle
-        case .childListTitle, .guardianTitle: .title2
-        case .childProgress, .guardianSection: .title3
-        case .guardianBody, .button: .body
-        case .guardianCaption: .caption
+        case .childCardTitle, .childScreenTitle: .largeTitle
+        case .childListTitle, .childPaneTitle, .guardianTitle: .title2
+        case .childProgress, .childHint, .guardianSection: .title3
+        case .childNavigation, .guardianBody, .button: .body
+        case .childSubtitle, .childCaption, .guardianCaption: .caption
+        }
+    }
+
+    fileprivate var customFontName: String? {
+        switch self {
+        case .childCardTitle, .childListTitle, .childScreenTitle, .childPaneTitle,
+             .childHint, .childNavigation:
+            "MangoDdobak-B"
+        case .childSubtitle, .childCaption:
+            "MangoDdobak-R"
+        default:
+            nil
         }
     }
 }
@@ -53,6 +76,7 @@ private struct SteppieTextStyleModifier: ViewModifier {
     @ScaledMetric private var scaledSize: CGFloat
 
     init(style: SteppieTextStyle) {
+        SteppieFontRegistrar.registerBundledFonts()
         self.style = style
         _scaledSize = ScaledMetric(
             wrappedValue: style.size,
@@ -61,13 +85,17 @@ private struct SteppieTextStyleModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content.font(
-            .system(
-                size: max(scaledSize, style.minimumSize),
-                weight: style.weight,
-                design: .default
+        if let customFontName = style.customFontName {
+            content.font(.custom(customFontName, size: max(scaledSize, style.minimumSize)))
+        } else {
+            content.font(
+                .system(
+                    size: max(scaledSize, style.minimumSize),
+                    weight: style.weight,
+                    design: .default
+                )
             )
-        )
+        }
     }
 }
 

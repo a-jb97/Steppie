@@ -24,20 +24,24 @@ struct RoutineCard<Visual: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isFocused: Bool
 
-    let title: LocalizedStringKey
-    let metadata: LocalizedStringKey
+    let title: Text
+    let metadata: Text
     let presentation: RoutineCardPresentation
     let state: RoutineCardState
     let cardColor: SteppieCardColor
+    let isActionEnabled: Bool
+    let focusMinimumHeight: CGFloat
     let action: () -> Void
     let visual: () -> Visual
 
     init(
-        title: LocalizedStringKey,
-        metadata: LocalizedStringKey,
+        title: Text,
+        metadata: Text,
         presentation: RoutineCardPresentation,
         state: RoutineCardState,
         cardColor: SteppieCardColor = .sky,
+        isActionEnabled: Bool = true,
+        focusMinimumHeight: CGFloat = 448,
         action: @escaping () -> Void,
         @ViewBuilder visual: @escaping () -> Visual
     ) {
@@ -46,6 +50,8 @@ struct RoutineCard<Visual: View>: View {
         self.presentation = presentation
         self.state = state
         self.cardColor = cardColor
+        self.isActionEnabled = isActionEnabled
+        self.focusMinimumHeight = focusMinimumHeight
         self.action = action
         self.visual = visual
     }
@@ -60,7 +66,7 @@ struct RoutineCard<Visual: View>: View {
             }
         }
         .buttonStyle(RoutineCardButtonStyle(reduceMotion: reduceMotion))
-        .disabled(presentation == .focus && state != .current)
+        .disabled(!isActionEnabled || (presentation == .focus && state != .current))
         .focused($isFocused)
         .overlay {
             if isFocused {
@@ -82,7 +88,7 @@ struct RoutineCard<Visual: View>: View {
                 .frame(minHeight: 150)
                 .accessibilityHidden(true)
 
-            Text(title)
+            title
                 .steppieTextStyle(.childCardTitle)
                 .foregroundStyle(Color.steppieTextPrimary)
                 .multilineTextAlignment(.center)
@@ -94,16 +100,16 @@ struct RoutineCard<Visual: View>: View {
                         .accessibilityHidden(true)
                 }
 
-                Text(metadata)
-                    .steppieTextStyle(.guardianBody)
+                metadata
+                    .steppieTextStyle(.childHint)
                     .multilineTextAlignment(.center)
             }
-            .foregroundStyle(state == .completed ? Color.steppieSuccess : Color.steppieTextSecondary)
+            .foregroundStyle(focusMetadataColor)
             .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(SteppieSpacing.extraLarge)
+        .padding(36)
         .frame(maxWidth: focusMaximumWidth)
-        .frame(minHeight: 448)
+        .frame(minHeight: focusMinimumHeight)
         .background(cardColor.color)
         .overlay {
             if state == .completed {
@@ -142,19 +148,21 @@ struct RoutineCard<Visual: View>: View {
         visual()
             .frame(width: 48, height: 48)
             .frame(width: 64, height: 64)
+            .background(Color.steppieBackgroundPrimary)
+            .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
             .accessibilityHidden(true)
     }
 
     private var listCopy: some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
-            Text(title)
+            title
                 .steppieTextStyle(.childListTitle)
                 .foregroundStyle(Color.steppieTextPrimary)
                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text(metadata)
-                .steppieTextStyle(.guardianCaption)
+            metadata
+                .steppieTextStyle(.childCaption)
                 .foregroundStyle(state == .completed ? Color.steppieSuccess : Color.steppieTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -175,9 +183,17 @@ struct RoutineCard<Visual: View>: View {
             : SteppieLayout.focusCardPhoneMaximumWidth
     }
 
+    private var focusMetadataColor: Color {
+        switch state {
+        case .completed: .steppieSuccess
+        case .current: .steppieChildAction
+        case .upcoming: .steppieTextSecondary
+        }
+    }
+
     private var accessibilityHint: Text {
         switch presentation {
-        case .focus where state == .current:
+        case .focus where state == .current && isActionEnabled:
             Text("component.focus.completeHint")
         case .focus:
             Text("")
@@ -212,8 +228,8 @@ private extension View {
 #Preview("RoutineCard · Focus") {
     HStack(spacing: SteppieSpacing.large) {
         RoutineCard(
-            title: "양치하기",
-            metadata: "카드를 누르면 완료",
+            title: Text("양치하기"),
+            metadata: Text("카드를 누르면 완료"),
             presentation: .focus,
             state: .current
         ) {} visual: {
@@ -221,8 +237,8 @@ private extension View {
         }
 
         RoutineCard(
-            title: "양치하기 완료",
-            metadata: "완료했어요",
+            title: Text("양치하기 완료"),
+            metadata: Text("완료했어요"),
             presentation: .focus,
             state: .completed,
             cardColor: .mint
@@ -238,8 +254,8 @@ private extension View {
     VStack(spacing: SteppieSpacing.medium) {
         ForEach([RoutineCardState.current, .completed, .upcoming], id: \.self) { state in
             RoutineCard(
-                title: "양치하기",
-                metadata: state == .completed ? "1 · 완료" : "2 · 지금",
+                title: Text("양치하기"),
+                metadata: Text(state == .completed ? "1 · 완료" : "2 · 지금"),
                 presentation: .list,
                 state: state,
                 cardColor: state == .completed ? .mint : .sky
