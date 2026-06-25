@@ -106,6 +106,226 @@ struct SteppieTests {
         #expect(viewModel.isAllCompleted)
     }
 
+    @Test("포커스 로드는 알림 권한을 요청하고 오늘 남은 루틴 알림을 재예약한다")
+    func childRoutineLoadRequestsNotificationAuthorizationAndSchedulesReminders() async throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let scheduler = FakeRoutineNotificationScheduler()
+        let now = Date(timeIntervalSince1970: 1_767_225_600)
+        let viewModel = ChildRoutineViewModel(
+            repository: repository,
+            notificationScheduler: scheduler,
+            now: { now },
+            locale: { Locale(identifier: "ko_KR") }
+        )
+
+        viewModel.load()
+        try await Task.sleep(nanoseconds: 10_000_000)
+
+        #expect(scheduler.authorizationRequestCount == 1)
+        #expect(scheduler.rescheduleCalls.count == 1)
+        #expect(scheduler.rescheduleCalls[0].completedRoutineIDs.isEmpty)
+        #expect(scheduler.rescheduleCalls[0].settings.notificationLeadTimes == [10, 5])
+    }
+
+    @Test("완료와 undo는 알림 예약 상태를 다시 계산한다")
+    func childRoutineCompletionAndUndoRescheduleReminders() async throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let scheduler = FakeRoutineNotificationScheduler()
+        let now = Date(timeIntervalSince1970: 1_767_225_600)
+        let viewModel = ChildRoutineViewModel(
+            repository: repository,
+            notificationScheduler: scheduler,
+            now: { now },
+            locale: { Locale(identifier: "ko_KR") }
+        )
+        viewModel.load()
+        try await Task.sleep(nanoseconds: 10_000_000)
+        let firstRoutine = try #require(viewModel.currentRoutine)
+
+        viewModel.completeSelectedRoutine()
+        try await Task.sleep(nanoseconds: 10_000_000)
+        #expect(scheduler.rescheduleCalls.last?.completedRoutineIDs == [firstRoutine.id])
+
+        viewModel.undoLastCompletion()
+        try await Task.sleep(nanoseconds: 10_000_000)
+        #expect(scheduler.rescheduleCalls.last?.completedRoutineIDs.isEmpty == true)
+    }
+
+    @Test("알림 요청 계산은 완료, 과거 시각, 알림 없음 설정, 방해 금지 시간을 제외한다")
+    func notificationRequestCalculationFiltersIneligibleReminders() throws {
+        let fixture = try makeFixture(routineCount: 1)
+        let routine = fixture.routines[0]
+        let date = "2026-01-01"
+        let calendar = Calendar(identifier: .gregorian)
+        let beforeRoutine = try #require(calendar.date(from: DateComponents(
+            year: 2026,
+            month: 1,
+            day: 1,
+            hour: 7,
+            minute: 52
+        )))
+
+        let requests = IOSRoutineNotificationScheduler.notificationRequests(
+            routines: fixture.routines,
+            completedRoutineIDs: [],
+            routineSetID: fixture.routineSet.id,
+            date: date,
+            settings: try AppSettings(notificationLeadTimes: [10, 5]),
+            now: beforeRoutine,
+            calendar: calendar,
+            locale: Locale(identifier: "ko_KR")
+        )
+        #expect(requests.map(\.routineID) == [routine.id])
+        #expect(requests.map(\.body) == ["5분 뒤 루틴 0을 시작해요."])
+
+        let completedRequests = IOSRoutineNotificationScheduler.notificationRequests(
+            routines: fixture.routines,
+            completedRoutineIDs: [routine.id],
+            routineSetID: fixture.routineSet.id,
+            date: date,
+            settings: try AppSettings(notificationLeadTimes: [10, 5]),
+            now: beforeRoutine,
+            calendar: calendar,
+            locale: Locale(identifier: "ko_KR")
+        )
+        #expect(completedRequests.isEmpty)
+
+        let disabledRequests = IOSRoutineNotificationScheduler.notificationRequests(
+            routines: fixture.routines,
+            completedRoutineIDs: [],
+            routineSetID: fixture.routineSet.id,
+            date: date,
+            settings: try AppSettings(notificationLeadTimes: []),
+            now: beforeRoutine,
+            calendar: calendar,
+            locale: Locale(identifier: "ko_KR")
+        )
+        #expect(disabledRequests.isEmpty)
+
+        let quietRequests = IOSRoutineNotificationScheduler.notificationRequests(
+            routines: fixture.routines,
+            completedRoutineIDs: [],
+            routineSetID: fixture.routineSet.id,
+            date: date,
+            settings: try AppSettings(
+                notificationLeadTimes: [5],
+                quietHoursStart: LocalTime(hour: 7, minute: 0),
+                quietHoursEnd: LocalTime(hour: 8, minute: 0)
+            ),
+            now: beforeRoutine,
+            calendar: calendar,
+            locale: Locale(identifier: "ko_KR")
+        )
+        #expect(quietRequests.isEmpty)
+    }
+
+    @Test("AppSettings는 알림 리드타임과 방해 금지 시간을 검증한다")
+    func appSettingsNotificationFieldsValidate() throws {
+        let settings = try AppSettings(
+            notificationLeadTimes: [10, 5],
+            quietHoursStart: LocalTime(hour: 22, minute: 0),
+            quietHoursEnd: LocalTime(hour: 7, minute: 0)
+        )
+
+        #expect(settings.notificationLeadTimes == [10, 5])
+        #expect(settings.quietHoursStart?.description == "22:00")
+        #expect(settings.quietHoursEnd?.description == "07:00")
+        #expect(throws: RoutineDomainError.invalidNotificationLeadTimes([5, 5])) {
+            try AppSettings(notificationLeadTimes: [5, 5])
+        }
+        #expect(throws: RoutineDomainError.invalidNotificationLeadTimes([15])) {
+            try AppSettings(notificationLeadTimes: [15])
+        }
+    }
+
+    @Test("알림 payload는 루틴 포커스 route로 변환된다")
+    func notificationPayloadBuildsRoute() throws {
+        let routineID = UUID()
+        let routineSetID = UUID()
+        let route = try #require(RoutineNotificationRoute(userInfo: [
+            "routineID": routineID.uuidString,
+            "routineSetID": routineSetID.uuidString,
+            "date": "2026-01-01",
+        ]))
+
+        #expect(route.routineID == routineID)
+        #expect(route.routineSetID == routineSetID)
+        #expect(route.date == "2026-01-01")
+        #expect(RoutineNotificationRoute(userInfo: ["routineID": "bad"]) == nil)
+    }
+
+    @Test("load 전 수신한 알림 route는 load 후 해당 루틴을 포커스한다")
+    func pendingNotificationRouteFocusesRoutineAfterLoad() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let now = Date(timeIntervalSince1970: 1_767_225_600)
+        let date = DailyLog.localDateString(for: now)
+        let routines = try repository.routines(in: repository.routineSets()[0].id)
+        let target = routines[2]
+        let viewModel = ChildRoutineViewModel(
+            repository: repository,
+            now: { now }
+        )
+
+        viewModel.openNotificationRoute(
+            RoutineNotificationRoute(
+                routineID: target.id,
+                routineSetID: target.routineSetID,
+                date: date
+            )
+        )
+        viewModel.load()
+
+        #expect(viewModel.page == .focus)
+        #expect(viewModel.selectedRoutineID == target.id)
+    }
+
+    @Test("loaded 상태에서 수신한 알림 route는 즉시 해당 루틴을 포커스한다")
+    func loadedNotificationRouteFocusesRoutineImmediately() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let now = Date(timeIntervalSince1970: 1_767_225_600)
+        let date = DailyLog.localDateString(for: now)
+        let viewModel = ChildRoutineViewModel(
+            repository: repository,
+            now: { now }
+        )
+        viewModel.load()
+        let target = viewModel.routines[2]
+
+        viewModel.openNotificationRoute(
+            RoutineNotificationRoute(
+                routineID: target.id,
+                routineSetID: target.routineSetID,
+                date: date
+            )
+        )
+
+        #expect(viewModel.page == .focus)
+        #expect(viewModel.selectedRoutineID == target.id)
+    }
+
+    @Test("다른 날짜나 없는 루틴의 알림 route는 무시한다")
+    func invalidNotificationRouteIsIgnored() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let now = Date(timeIntervalSince1970: 1_767_225_600)
+        let viewModel = ChildRoutineViewModel(
+            repository: repository,
+            now: { now }
+        )
+        viewModel.load()
+        let originalSelectedID = viewModel.selectedRoutineID
+        let activeSetID = try #require(viewModel.activeRoutineSet?.id)
+
+        viewModel.openNotificationRoute(
+            RoutineNotificationRoute(
+                routineID: UUID(),
+                routineSetID: activeSetID,
+                date: "2026-01-01"
+            )
+        )
+
+        #expect(viewModel.selectedRoutineID == originalSelectedID)
+    }
+
     @Test("반응형 레이아웃은 905pt에서 split pane으로 전환한다")
     func childRoutineResponsiveBreakpoint() {
         #expect(SteppieLayout.splitMinimumWidth == 905)
@@ -416,5 +636,39 @@ struct SteppieTests {
             try repository.createRoutine(routine)
         }
         return (repository, routineSet, routines)
+    }
+}
+
+@MainActor
+private final class FakeRoutineNotificationScheduler: RoutineNotificationScheduling {
+    struct RescheduleCall: Equatable {
+        let completedRoutineIDs: Set<UUID>
+        let settings: AppSettings
+    }
+
+    var authorizationRequestCount = 0
+    var rescheduleCalls: [RescheduleCall] = []
+
+    func requestAuthorizationIfNeeded() async -> RoutineNotificationAuthorizationStatus {
+        authorizationRequestCount += 1
+        return .authorized
+    }
+
+    func rescheduleTodayReminders(
+        routines: [Routine],
+        completedRoutineIDs: Set<UUID>,
+        routineSetID: UUID,
+        date: String,
+        settings: AppSettings,
+        now: Date,
+        calendar: Calendar,
+        locale: Locale
+    ) async {
+        rescheduleCalls.append(
+            RescheduleCall(
+                completedRoutineIDs: completedRoutineIDs,
+                settings: settings
+            )
+        )
     }
 }
