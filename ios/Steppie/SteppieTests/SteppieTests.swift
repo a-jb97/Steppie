@@ -4,6 +4,58 @@ import Testing
 
 @MainActor
 struct SteppieTests {
+    @Test("아이 모드가 활성 루틴을 순서대로 불러오고 첫 항목을 current로 선택한다")
+    func childRoutineViewModelLoadsActiveRoutines() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let viewModel = ChildRoutineViewModel(repository: repository)
+
+        viewModel.load()
+
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.routines.map(\.order) == [0, 1, 2])
+        #expect(viewModel.selectedRoutineID == viewModel.routines.first?.id)
+        #expect(viewModel.currentRoutine?.id == viewModel.routines.first?.id)
+        #expect(viewModel.completedCount == 0)
+        #expect(viewModel.totalCount == 3)
+    }
+
+    @Test("목록의 upcoming 항목 선택은 포커스만 바꾸고 저장 데이터를 변경하지 않는다")
+    func childRoutineSelectionIsReadOnly() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let viewModel = ChildRoutineViewModel(repository: repository)
+        viewModel.load()
+        let activeSetID = try #require(viewModel.activeRoutineSet?.id)
+        let originalRoutines = try repository.routines(in: activeSetID)
+        let upcoming = try #require(viewModel.routines.last)
+
+        viewModel.showList()
+        viewModel.selectRoutine(upcoming, showFocus: true)
+
+        #expect(viewModel.page == .focus)
+        #expect(viewModel.selectedRoutineID == upcoming.id)
+        #expect(viewModel.cardState(for: upcoming) == .upcoming)
+        #expect(try repository.routines(in: upcoming.routineSetID) == originalRoutines)
+    }
+
+    @Test("반응형 레이아웃은 905pt에서 split pane으로 전환한다")
+    func childRoutineResponsiveBreakpoint() {
+        #expect(SteppieLayout.splitMinimumWidth == 905)
+        #expect(ChildRoutineLayoutPolicy.layout(for: 904) == .singlePane)
+        #expect(ChildRoutineLayoutPolicy.layout(for: 905) == .splitPane)
+    }
+
+    @Test("활성 루틴 세트가 없으면 아이 모드는 빈 상태를 표시한다")
+    func childRoutineViewModelHandlesEmptyRepository() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let viewModel = ChildRoutineViewModel(repository: repository)
+
+        viewModel.load()
+
+        #expect(viewModel.loadState == .empty)
+        #expect(viewModel.routines.isEmpty)
+        #expect(viewModel.selectedRoutine == nil)
+    }
+
     @Test("RoutineSet과 Routine을 생성하고 순서대로 조회한다")
     func createAndRead() throws {
         let fixture = try makeFixture(routineCount: 3)
