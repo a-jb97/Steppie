@@ -26,4 +26,11 @@
     <string name="a11y_progress">전체 %2$d개 중 %1$d개 완료</string>
     <string name="a11y_show_list">오늘의 순서 보기</string>
     <string name="a11y_show_focus">지금 할 일 보기</string>
+    <string name="notification_routine_reminder_channel_name">루틴 알림</string>
+    <string name="notification_routine_reminder_channel_description">예정된 루틴을 미리 알려줘요</string>
+    <string name="notification_routine_reminder_title">곧 할 일이 있어요</string>
+    <plurals name="notification_routine_reminder_body">
+        <item quantity="one">%1$d분 뒤 %2$s 시간이에요</item>
+        <item quantity="other">%1$d분 뒤 %2$s 시간이에요</item>
+    </plurals>
 </resources>
