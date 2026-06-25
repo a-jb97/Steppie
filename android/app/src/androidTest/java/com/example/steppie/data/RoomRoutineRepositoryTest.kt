@@ -11,6 +11,7 @@ import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -111,6 +112,22 @@ class RoomRoutineRepositoryTest {
         assertEquals(listOf(third.id, first.id, second.id), routines.map { it.id })
         assertEquals(listOf(0, 1, 2), routines.map { it.order })
     }
+
+    @Test
+    fun dailyLog_completeAndUndo_keepOneRowPerRoutinePerDate() = runBlocking {
+        repository.createRoutineSet(testSet())
+        val routine = repository.createRoutine(testRoutine(1))
+        val date = LocalDate.parse("2026-01-02")
+        val completedAt = Instant.parse("2026-01-02T08:00:00Z")
+
+        val completed = repository.completeRoutine(routine.id, date, completedAt)
+        val undone = repository.undoRoutine(routine.id, date, Instant.parse("2026-01-02T08:01:00Z"))
+
+        assertEquals(completed.id, undone.id)
+        assertEquals("undone", undone.status.storageValue)
+        assertNull(undone.completedAt)
+    }
+
 
     @Test
     fun routineSetCrud_enforcesSingleActiveSetAndSoftDeleteRule() = runBlocking {
