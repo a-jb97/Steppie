@@ -30,8 +30,13 @@ final class ChildRoutineViewModel {
     private let repository: any RoutineRepository
     private let speechGuide: any RoutineSpeechGuiding
     private let feedbackPerformer: any RoutineFeedbackPerforming
+    private let notificationScheduler: any RoutineNotificationScheduling
     private let now: () -> Date
     private let calendar: Calendar
+    private let locale: () -> Locale
+    private let isNotificationSchedulingEnabled: Bool
+    @ObservationIgnored private var didRequestNotificationAuthorization = false
+    @ObservationIgnored private var pendingNotificationRoute: RoutineNotificationRoute?
 
     private(set) var loadState: ChildRoutineLoadState = .idle
     private(set) var activeRoutineSet: RoutineSet?
@@ -48,15 +53,29 @@ final class ChildRoutineViewModel {
         repository: any RoutineRepository,
         speechGuide: (any RoutineSpeechGuiding)? = nil,
         feedbackPerformer: (any RoutineFeedbackPerforming)? = nil,
+        notificationScheduler: (any RoutineNotificationScheduling)? = nil,
         now: @escaping () -> Date = Date.init,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        locale: @escaping () -> Locale = { .autoupdatingCurrent },
+        isNotificationSchedulingEnabled: Bool = true
     ) {
         self.repository = repository
         self.speechGuide = speechGuide ?? NoopRoutineSpeechGuide()
         self.feedbackPerformer = feedbackPerformer ?? NoopRoutineFeedbackPerformer()
+        self.notificationScheduler = notificationScheduler ?? NoopRoutineNotificationScheduler()
         self.now = now
         self.calendar = calendar
+        self.locale = locale
+        self.isNotificationSchedulingEnabled = isNotificationSchedulingEnabled
         today = DailyLog.localDateString(for: now(), calendar: calendar)
+    }
+
+    static func preview(repository: any RoutineRepository) -> ChildRoutineViewModel {
+        ChildRoutineViewModel(
+            repository: repository,
+            notificationScheduler: NoopRoutineNotificationScheduler(),
+            isNotificationSchedulingEnabled: false
+        )
     }
 
     var currentRoutine: Routine? {
@@ -123,7 +142,9 @@ final class ChildRoutineViewModel {
                 selectedRoutineID = currentRoutine?.id
             }
             loadState = .loaded
+            applyPendingNotificationRouteIfNeeded()
             speakSelectedRoutineIfNeeded()
+            requestNotificationAuthorizationAndRescheduleIfNeeded()
         } catch {
             reset(to: .failed)
         }
@@ -182,6 +203,7 @@ final class ChildRoutineViewModel {
             if let settings {
                 feedbackPerformer.routineCompleted(settings: settings)
             }
+            rescheduleNotifications()
         } catch {
             reset(to: .failed)
         }
@@ -201,6 +223,7 @@ final class ChildRoutineViewModel {
             self.undoRoutineID = nil
             page = .focus
             speakSelectedRoutineIfNeeded()
+            rescheduleNotifications()
         } catch {
             reset(to: .failed)
         }
@@ -221,6 +244,25 @@ final class ChildRoutineViewModel {
             selectedRoutineID = currentRoutine?.id
             speakSelectedRoutineIfNeeded()
         }
+        rescheduleNotifications()
+    }
+
+    func appDidBecomeActive() {
+        guard loadState == .loaded else { return }
+        let currentDate = DailyLog.localDateString(for: now(), calendar: calendar)
+        if currentDate == today {
+            rescheduleNotifications()
+        } else {
+            load()
+        }
+    }
+
+    func openNotificationRoute(_ route: RoutineNotificationRoute) {
+        if loadState != .loaded {
+            pendingNotificationRoute = route
+            return
+        }
+        applyNotificationRoute(route)
     }
 
     private func reset(to state: ChildRoutineLoadState) {
@@ -247,6 +289,64 @@ final class ChildRoutineViewModel {
             return
         }
         speechGuide.speak(localizedTitle(for: selectedRoutine), settings: settings)
+    }
+
+    private func applyPendingNotificationRouteIfNeeded() {
+        guard let pendingNotificationRoute else { return }
+        self.pendingNotificationRoute = nil
+        applyNotificationRoute(pendingNotificationRoute)
+    }
+
+    private func applyNotificationRoute(_ route: RoutineNotificationRoute) {
+        guard route.date == today,
+              activeRoutineSet?.id == route.routineSetID,
+              routines.contains(where: { $0.id == route.routineID }) else {
+            return
+        }
+        completionFeedbackRoutineID = nil
+        undoRoutineID = nil
+        selectedRoutineID = route.routineID
+        page = .focus
+        speakSelectedRoutineIfNeeded()
+    }
+
+    private func requestNotificationAuthorizationAndRescheduleIfNeeded() {
+        guard isNotificationSchedulingEnabled else { return }
+        guard !didRequestNotificationAuthorization else {
+            rescheduleNotifications()
+            return
+        }
+        didRequestNotificationAuthorization = true
+        Task { [weak self, notificationScheduler] in
+            _ = await notificationScheduler.requestAuthorizationIfNeeded()
+            await MainActor.run {
+                self?.rescheduleNotifications()
+            }
+        }
+    }
+
+    private func rescheduleNotifications() {
+        guard isNotificationSchedulingEnabled else { return }
+        guard let activeRoutineSet, let settings else { return }
+        let routines = routines
+        let completedRoutineIDs = completedRoutineIDs
+        let routineSetID = activeRoutineSet.id
+        let date = today
+        let now = now()
+        let calendar = calendar
+        let locale = locale()
+        Task { [notificationScheduler] in
+            await notificationScheduler.rescheduleTodayReminders(
+                routines: routines,
+                completedRoutineIDs: completedRoutineIDs,
+                routineSetID: routineSetID,
+                date: date,
+                settings: settings,
+                now: now,
+                calendar: calendar,
+                locale: locale
+            )
+        }
     }
 
     private func localizedTitle(for routine: Routine) -> String {
