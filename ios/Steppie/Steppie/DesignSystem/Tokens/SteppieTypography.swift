@@ -67,14 +67,10 @@ enum SteppieTextStyle: Sendable {
 
     fileprivate var customFontName: String? {
         switch self {
-        case .childCardTitle, .childListTitle, .childScreenTitle, .childPaneTitle,
-             .childFeedbackTitle, .childAllDoneSubtitle, .childHint, .childNavigation,
-             .childUndo:
-            "MangoDdobak-B"
-        case .childSubtitle, .childCaption:
+        case .guardianBody, .guardianCaption, .childSubtitle, .childCaption:
             "MangoDdobak-R"
         default:
-            nil
+            "MangoDdobak-B"
         }
     }
 }
