@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "guardian-menu-security.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

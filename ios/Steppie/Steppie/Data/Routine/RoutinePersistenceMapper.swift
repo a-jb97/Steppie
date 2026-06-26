@@ -145,6 +145,8 @@ extension AppSettingsRecord {
     convenience init(domain: AppSettings) {
         self.init(
             id: domain.id,
+            guardianPinHash: domain.guardianPinHash,
+            recoveryCodeHash: domain.recoveryCodeHash,
             feedbackIntensity: domain.feedbackIntensity.rawValue,
             soundEnabled: domain.soundEnabled,
             ttsEnabled: domain.ttsEnabled,
@@ -170,6 +172,8 @@ extension AppSettingsRecord {
 
         return try AppSettings(
             id: id,
+            guardianPinHash: guardianPinHash,
+            recoveryCodeHash: recoveryCodeHash,
             feedbackIntensity: decodedIntensity,
             soundEnabled: soundEnabled,
             ttsEnabled: ttsEnabled,
@@ -186,6 +190,8 @@ extension AppSettingsRecord {
     }
 
     func apply(_ domain: AppSettings) {
+        guardianPinHash = domain.guardianPinHash
+        recoveryCodeHash = domain.recoveryCodeHash
         feedbackIntensity = domain.feedbackIntensity.rawValue
         soundEnabled = domain.soundEnabled
         ttsEnabled = domain.ttsEnabled

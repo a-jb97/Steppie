@@ -106,6 +106,8 @@ final class DailyLogRecord {
 @Model
 final class AppSettingsRecord {
     @Attribute(.unique) var id: String
+    var guardianPinHash: String?
+    var recoveryCodeHash: String?
     var feedbackIntensity: String
     var soundEnabled: Bool
     var ttsEnabled: Bool
@@ -121,6 +123,8 @@ final class AppSettingsRecord {
 
     init(
         id: String,
+        guardianPinHash: String? = nil,
+        recoveryCodeHash: String? = nil,
         feedbackIntensity: String,
         soundEnabled: Bool,
         ttsEnabled: Bool,
@@ -135,6 +139,8 @@ final class AppSettingsRecord {
         updatedAt: Date
     ) {
         self.id = id
+        self.guardianPinHash = guardianPinHash
+        self.recoveryCodeHash = recoveryCodeHash
         self.feedbackIntensity = feedbackIntensity
         self.soundEnabled = soundEnabled
         self.ttsEnabled = ttsEnabled
