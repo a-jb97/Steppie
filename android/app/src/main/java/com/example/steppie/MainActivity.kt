@@ -34,8 +34,11 @@ import com.example.steppie.notifications.EXTRA_ROUTINE_ID
 import com.example.steppie.ui.child.ChildRoutineFeedbackEvent
 import com.example.steppie.ui.child.ChildRoutineScreen
 import com.example.steppie.ui.child.ChildRoutineViewModel
+import com.example.steppie.ui.guardian.GuardianModeScreen
+import com.example.steppie.ui.guardian.GuardianModeViewModel
 import com.example.steppie.ui.theme.SteppieTheme
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
@@ -62,7 +65,11 @@ class MainActivity : ComponentActivity() {
                 val childViewModel: ChildRoutineViewModel = viewModel(
                     factory = ChildRoutineViewModel.factory(routineRepository),
                 )
-                val state by childViewModel.uiState.collectAsStateWithLifecycle()
+                val guardianViewModel: GuardianModeViewModel = viewModel(
+                    factory = GuardianModeViewModel.factory(routineRepository, appSettingsRepository),
+                )
+                val childState by childViewModel.uiState.collectAsStateWithLifecycle()
+                val guardianState by guardianViewModel.uiState.collectAsStateWithLifecycle()
                 val settings by appSettingsRepository.observeAppSettings()
                     .collectAsStateWithLifecycle(initialValue = AppSettings())
                 val targetRoutineId by notificationRoutineId.collectAsStateWithLifecycle()
@@ -86,29 +93,67 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(childViewModel) {
                     childViewModel.feedbackEvents.collect(feedbackController::play)
                 }
-                LaunchedEffect(state.routines, state.completedRoutineIds, settings, notificationPermissionRefresh) {
+                LaunchedEffect(childState.routines, childState.completedRoutineIds, settings, notificationPermissionRefresh) {
                     notificationScheduler.reconcileToday(
-                        routines = state.routines,
-                        completedRoutineIds = state.completedRoutineIds,
+                        routines = childState.routines,
+                        completedRoutineIds = childState.completedRoutineIds,
                         settings = settings,
                     )
                 }
-                LaunchedEffect(targetRoutineId, state.routines) {
+                LaunchedEffect(targetRoutineId, childState.routines) {
                     val routineId = targetRoutineId ?: return@LaunchedEffect
-                    if (state.routines.any { it.id == routineId }) {
+                    if (childState.routines.any { it.id == routineId }) {
                         childViewModel.selectRoutine(routineId)
                         notificationRoutineId.value = null
                     }
                 }
-                ChildRoutineScreen(
-                    state = state,
-                    onShowList = childViewModel::showList,
-                    onShowFocus = childViewModel::showFocus,
-                    onSelectRoutine = childViewModel::selectRoutine,
-                    onCompleteRoutine = childViewModel::completeSelectedRoutine,
-                    onAdvanceFromFeedback = childViewModel::advanceFromFeedback,
-                    onUndoRoutine = childViewModel::undoLastCompletion,
-                )
+                LaunchedEffect(
+                    guardianState.isActive,
+                    guardianState.isAuthenticated,
+                    guardianState.interactionToken,
+                ) {
+                    if (guardianState.isActive && guardianState.isAuthenticated) {
+                        delay(180_000L)
+                        guardianViewModel.closeToChild()
+                    }
+                }
+                if (guardianState.isActive) {
+                    GuardianModeScreen(
+                        state = guardianState,
+                        onDigit = guardianViewModel::inputPinDigit,
+                        onDeletePinDigit = guardianViewModel::deletePinDigit,
+                        onCloseToChild = guardianViewModel::closeToChild,
+                        onInteraction = guardianViewModel::markInteraction,
+                        onOpenHome = guardianViewModel::openHome,
+                        onOpenRoutineEdit = guardianViewModel::openRoutineEdit,
+                        onOpenSecurity = guardianViewModel::openSecurity,
+                        onOpenPinChange = guardianViewModel::openPinChange,
+                        onOpenNewRoutineEditor = guardianViewModel::openNewRoutineEditor,
+                        onOpenRoutineEditor = guardianViewModel::openRoutineEditor,
+                        onDraftTitleChange = guardianViewModel::updateDraftTitle,
+                        onDraftIconChange = guardianViewModel::updateDraftIcon,
+                        onDraftColorChange = guardianViewModel::updateDraftColor,
+                        onDraftScheduledTimeChange = guardianViewModel::updateDraftScheduledTime,
+                        onSaveDraft = guardianViewModel::saveDraft,
+                        onRequestDelete = guardianViewModel::requestDelete,
+                        onCancelDelete = guardianViewModel::cancelDelete,
+                        onConfirmDelete = guardianViewModel::confirmDelete,
+                        onMoveRoutine = guardianViewModel::moveRoutine,
+                        onShowOutOfScopeNotice = guardianViewModel::showOutOfScopeNotice,
+                        onClearNotice = guardianViewModel::clearNotice,
+                    )
+                } else {
+                    ChildRoutineScreen(
+                        state = childState,
+                        onShowList = childViewModel::showList,
+                        onShowFocus = childViewModel::showFocus,
+                        onSelectRoutine = childViewModel::selectRoutine,
+                        onCompleteRoutine = childViewModel::completeSelectedRoutine,
+                        onAdvanceFromFeedback = childViewModel::advanceFromFeedback,
+                        onUndoRoutine = childViewModel::undoLastCompletion,
+                        onRequestGuardianMode = guardianViewModel::openFromChild,
+                    )
+                }
             }
         }
     }

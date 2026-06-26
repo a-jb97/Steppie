@@ -4,6 +4,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,6 +63,7 @@ import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
 import java.util.Locale
+import kotlinx.coroutines.withTimeoutOrNull
 
 private val SplitLayoutMinimumWidth = 905.dp
 
@@ -73,6 +76,7 @@ fun ChildRoutineScreen(
     onCompleteRoutine: () -> Unit,
     onAdvanceFromFeedback: () -> Unit,
     onUndoRoutine: () -> Unit,
+    onRequestGuardianMode: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(
@@ -103,6 +107,27 @@ fun ChildRoutineScreen(
                 onUndoRoutine = onUndoRoutine,
             )
         }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(SteppieLayout.ChildMinimumTouchTarget)
+                .testTag("guardian_hidden_entry")
+                .pointerInput(onRequestGuardianMode) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val heldForThreeSeconds: Boolean = withTimeoutOrNull<Boolean>(3_000L) {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                if (event.changes.none { it.id == down.id && it.pressed }) {
+                                    return@withTimeoutOrNull false
+                                }
+                            }
+                            false
+                        } ?: true
+                        if (heldForThreeSeconds) onRequestGuardianMode()
+                    }
+                },
+        )
     }
 }
 
