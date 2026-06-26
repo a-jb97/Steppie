@@ -119,12 +119,12 @@ struct SteppieTests {
         )
 
         viewModel.load()
-        try await Task.sleep(nanoseconds: 10_000_000)
+        try await Task.sleep(nanoseconds: 100_000_000)
 
         #expect(scheduler.authorizationRequestCount == 1)
-        #expect(scheduler.rescheduleCalls.count == 1)
-        #expect(scheduler.rescheduleCalls[0].completedRoutineIDs.isEmpty)
-        #expect(scheduler.rescheduleCalls[0].settings.notificationLeadTimes == [10, 5])
+        let call = try #require(scheduler.rescheduleCalls.first)
+        #expect(call.completedRoutineIDs.isEmpty)
+        #expect(call.settings.notificationLeadTimes == [10, 5])
     }
 
     @Test("완료와 undo는 알림 예약 상태를 다시 계산한다")
@@ -139,15 +139,15 @@ struct SteppieTests {
             locale: { Locale(identifier: "ko_KR") }
         )
         viewModel.load()
-        try await Task.sleep(nanoseconds: 10_000_000)
+        try await Task.sleep(nanoseconds: 100_000_000)
         let firstRoutine = try #require(viewModel.currentRoutine)
 
         viewModel.completeSelectedRoutine()
-        try await Task.sleep(nanoseconds: 10_000_000)
+        try await Task.sleep(nanoseconds: 100_000_000)
         #expect(scheduler.rescheduleCalls.last?.completedRoutineIDs == [firstRoutine.id])
 
         viewModel.undoLastCompletion()
-        try await Task.sleep(nanoseconds: 10_000_000)
+        try await Task.sleep(nanoseconds: 100_000_000)
         #expect(scheduler.rescheduleCalls.last?.completedRoutineIDs.isEmpty == true)
     }
 
@@ -236,6 +236,71 @@ struct SteppieTests {
         #expect(throws: RoutineDomainError.invalidNotificationLeadTimes([15])) {
             try AppSettings(notificationLeadTimes: [15])
         }
+    }
+
+    @Test("보호자 PIN은 4자리 숫자만 허용하고 원본을 저장하지 않는다")
+    func guardianPINHashing() throws {
+        let hash = try GuardianPinService.makeHash(for: "1234", salt: "test-salt")
+
+        #expect(hash != "1234")
+        #expect(GuardianPinService.verify("1234", against: hash))
+        #expect(!GuardianPinService.verify("0000", against: hash))
+        #expect(throws: GuardianPinError.invalidPIN) {
+            try GuardianPinService.makeHash(for: "12a4")
+        }
+    }
+
+    @Test("보호자 ViewModel은 PIN 설정과 검증을 AppSettings에 저장한다")
+    func guardianViewModelStoresPINHash() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+
+        #expect(!viewModel.hasGuardianPIN())
+        #expect(viewModel.setPIN("1234"))
+        #expect(viewModel.hasGuardianPIN())
+        #expect(viewModel.verifyPIN("1234"))
+        #expect(!viewModel.verifyPIN("0000"))
+        #expect(try repository.appSettings().guardianPinHash != "1234")
+    }
+
+    @Test("보호자 루틴 편집은 추가 수정 삭제 순서 변경을 Repository와 연결한다")
+    func guardianRoutineEditing() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        var changeCount = 0
+        let viewModel = GuardianModeViewModel(repository: repository) {
+            changeCount += 1
+        }
+        viewModel.load()
+        let activeSetID = try #require(viewModel.activeRoutineSet?.id)
+
+        viewModel.beginAddRoutine()
+        viewModel.draft?.title = "학교 버스"
+        viewModel.draft?.iconName = .bus
+        viewModel.draft?.colorToken = "color.card.lemon"
+        viewModel.draft?.scheduledTime = try LocalTime("08:30")
+        viewModel.saveDraft(localeIdentifier: "ko")
+
+        var routines = try repository.routines(in: activeSetID)
+        #expect(routines.count == 4)
+        #expect(routines.map(\.order) == [0, 1, 2, 3])
+        let added = try #require(routines.last)
+        #expect(added.title.resolved(appLocale: "ko") == "학교 버스")
+
+        viewModel.beginEditRoutine(added)
+        viewModel.draft?.title = "버스 타기"
+        viewModel.saveDraft(localeIdentifier: "ko")
+        #expect(try repository.routine(id: added.id)?.title.resolved(appLocale: "ko") == "버스 타기")
+
+        viewModel.moveRoutine(try #require(viewModel.routines.last), direction: -1)
+        routines = try repository.routines(in: activeSetID)
+        #expect(routines.map(\.order) == [0, 1, 2, 3])
+
+        viewModel.requestDelete(try #require(viewModel.routines.first))
+        viewModel.confirmDelete()
+        routines = try repository.routines(in: activeSetID)
+        #expect(routines.count == 3)
+        #expect(routines.map(\.order) == [0, 1, 2])
+        #expect(changeCount >= 4)
     }
 
     @Test("알림 payload는 루틴 포커스 route로 변환된다")

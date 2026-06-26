@@ -128,9 +128,52 @@ final class PreviewRoutineRepository: RoutineRepository {
         routines[index] = routine
     }
 
-    func deleteRoutine(id: UUID, at date: Date) throws {}
+    func deleteRoutine(id: UUID, at date: Date) throws {
+        guard let index = routines.firstIndex(where: { $0.id == id }) else { return }
+        let original = routines[index]
+        routines[index] = try Routine(
+            id: original.id,
+            routineSetID: original.routineSetID,
+            titleKey: original.titleKey,
+            title: original.title,
+            icon: original.icon,
+            colorToken: original.colorToken,
+            order: original.order,
+            scheduledTime: original.scheduledTime,
+            isActive: false,
+            createdAt: original.createdAt,
+            updatedAt: date,
+            deletedAt: date
+        )
+        try compactOrders(in: original.routineSetID, at: date)
+    }
 
-    func reorderRoutines(in routineSetID: UUID, orderedIDs: [UUID], at date: Date) throws {}
+    func reorderRoutines(in routineSetID: UUID, orderedIDs: [UUID], at date: Date) throws {
+        let activeIDs = routines
+            .filter { $0.routineSetID == routineSetID && $0.isActive && $0.deletedAt == nil }
+            .map(\.id)
+        guard Set(activeIDs) == Set(orderedIDs), Set(orderedIDs).count == orderedIDs.count else {
+            throw RoutineRepositoryError.invalidReorder
+        }
+        for (order, id) in orderedIDs.enumerated() {
+            guard let index = routines.firstIndex(where: { $0.id == id }) else { continue }
+            let original = routines[index]
+            routines[index] = try Routine(
+                id: original.id,
+                routineSetID: original.routineSetID,
+                titleKey: original.titleKey,
+                title: original.title,
+                icon: original.icon,
+                colorToken: original.colorToken,
+                order: order,
+                scheduledTime: original.scheduledTime,
+                isActive: original.isActive,
+                createdAt: original.createdAt,
+                updatedAt: date,
+                deletedAt: original.deletedAt
+            )
+        }
+    }
 
     func dailyLogs(on date: String, routineSetID: UUID?) throws -> [DailyLog] {
         dailyLogs
@@ -191,5 +234,28 @@ final class PreviewRoutineRepository: RoutineRepository {
 
     func updateAppSettings(_ settings: AppSettings) throws {
         self.settings = settings
+    }
+
+    private func compactOrders(in routineSetID: UUID, at date: Date) throws {
+        let active = routines
+            .filter { $0.routineSetID == routineSetID && $0.isActive && $0.deletedAt == nil }
+            .sorted { $0.order < $1.order }
+        for (order, routine) in active.enumerated() {
+            guard let index = routines.firstIndex(where: { $0.id == routine.id }) else { continue }
+            routines[index] = try Routine(
+                id: routine.id,
+                routineSetID: routine.routineSetID,
+                titleKey: routine.titleKey,
+                title: routine.title,
+                icon: routine.icon,
+                colorToken: routine.colorToken,
+                order: order,
+                scheduledTime: routine.scheduledTime,
+                isActive: routine.isActive,
+                createdAt: routine.createdAt,
+                updatedAt: date,
+                deletedAt: routine.deletedAt
+            )
+        }
     }
 }
