@@ -52,6 +52,27 @@ class DataStoreAppSettingsRepository(
         )
     }
 
+    suspend fun getAppSettings(): AppSettings = observeAppSettings().first()
+
+    suspend fun replaceAppSettings(settings: AppSettings) {
+        dataStore.edit { preferences ->
+            preferences.clear()
+            settings.guardianPinHash?.let { preferences[Keys.GuardianPinHash] = it }
+            settings.recoveryCodeHash?.let { preferences[Keys.RecoveryCodeHash] = it }
+            preferences[Keys.FeedbackIntensity] = settings.feedbackIntensity.storageValue
+            preferences[Keys.SoundEnabled] = settings.soundEnabled
+            preferences[Keys.TtsEnabled] = settings.ttsEnabled
+            preferences[Keys.TtsRate] = settings.ttsRate
+            preferences[Keys.TtsVolume] = settings.ttsVolume
+            preferences[Keys.HapticEnabled] = settings.hapticEnabled
+            preferences[Keys.UndoDurationSeconds] = settings.undoDurationSeconds
+            preferences[Keys.NotificationLeadTimes] = settings.notificationLeadTimes.joinToString(",")
+            settings.quietHoursStart?.let { preferences[Keys.QuietHoursStart] = it.toString() }
+            settings.quietHoursEnd?.let { preferences[Keys.QuietHoursEnd] = it.toString() }
+            settings.locale?.let { preferences[Keys.Locale] = it }
+        }
+    }
+
     override suspend fun setGuardianPin(pin: String) {
         require(pin.matches(pinPattern)) { "Guardian PIN must be exactly 4 digits." }
         val recoveryCode = generateRecoveryCode()

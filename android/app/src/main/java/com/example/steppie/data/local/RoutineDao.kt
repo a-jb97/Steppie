@@ -26,6 +26,9 @@ interface RoutineDao {
     @Query("SELECT * FROM routine_sets WHERE id = :id")
     suspend fun getRoutineSetEntity(id: String): RoutineSetEntity?
 
+    @Query("SELECT * FROM routine_sets ORDER BY createdAtEpochMillis, id")
+    suspend fun getAllRoutineSetEntities(): List<RoutineSetEntity>
+
     @Query("SELECT id FROM routine_sets WHERE isActive = 1 AND deletedAtEpochMillis IS NULL LIMIT 1")
     suspend fun getActiveRoutineSetId(): String?
 
@@ -40,6 +43,9 @@ interface RoutineDao {
 
     @Query("SELECT * FROM routines WHERE id = :id")
     suspend fun getRoutineEntity(id: String): RoutineEntity?
+
+    @Query("SELECT * FROM routines ORDER BY routineSetId, sortOrder, id")
+    suspend fun getAllRoutineEntities(): List<RoutineEntity>
 
     @Query(
         """
@@ -67,9 +73,30 @@ interface RoutineDao {
     @Query("SELECT * FROM daily_logs WHERE date = :date ORDER BY updatedAtEpochMillis, id")
     fun observeDailyLogs(date: String): Flow<List<DailyLogEntity>>
 
+    @Query("SELECT * FROM daily_logs ORDER BY date, updatedAtEpochMillis, id")
+    suspend fun getAllDailyLogEntities(): List<DailyLogEntity>
+
     @Query("SELECT * FROM daily_logs WHERE date = :date AND routineId = :routineId LIMIT 1")
     suspend fun getDailyLog(date: String, routineId: String): DailyLogEntity?
 
     @Upsert
     suspend fun upsertDailyLog(entity: DailyLogEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertRoutineSets(entities: List<RoutineSetEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertRoutines(entities: List<RoutineEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertDailyLogs(entities: List<DailyLogEntity>)
+
+    @Query("DELETE FROM daily_logs")
+    suspend fun deleteAllDailyLogs()
+
+    @Query("DELETE FROM routines")
+    suspend fun deleteAllRoutines()
+
+    @Query("DELETE FROM routine_sets")
+    suspend fun deleteAllRoutineSets()
 }
