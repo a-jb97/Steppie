@@ -259,6 +259,50 @@ final class SwiftDataRoutineRepository: RoutineRepository {
         try context.save()
     }
 
+    func backupSnapshot() throws -> RoutineRepositorySnapshot {
+        try RoutineRepositorySnapshot(
+            routineSets: context.fetch(FetchDescriptor<RoutineSetRecord>())
+                .map { try $0.domainModel() },
+            routines: context.fetch(FetchDescriptor<RoutineRecord>())
+                .map { try $0.domainModel() },
+            dailyLogs: context.fetch(FetchDescriptor<DailyLogRecord>())
+                .map { try $0.domainModel() },
+            appSettings: appSettings()
+        )
+    }
+
+    func replaceAll(with snapshot: RoutineRepositorySnapshot) throws {
+        do {
+            for record in try context.fetch(FetchDescriptor<DailyLogRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<RoutineRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<RoutineSetRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<AppSettingsRecord>()) {
+                context.delete(record)
+            }
+
+            for routineSet in snapshot.routineSets {
+                context.insert(try RoutineSetRecord(domain: routineSet))
+            }
+            for routine in snapshot.routines {
+                context.insert(try RoutineRecord(domain: routine))
+            }
+            for dailyLog in snapshot.dailyLogs {
+                context.insert(DailyLogRecord(domain: dailyLog))
+            }
+            context.insert(AppSettingsRecord(domain: snapshot.appSettings))
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
     private func routineSetRecord(id: UUID) throws -> RoutineSetRecord? {
         let id = id
         let descriptor = FetchDescriptor<RoutineSetRecord>(

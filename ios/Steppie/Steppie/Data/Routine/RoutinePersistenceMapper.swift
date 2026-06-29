@@ -157,6 +157,7 @@ extension AppSettingsRecord {
             notificationLeadTimes: Self.encodeNotificationLeadTimes(domain.notificationLeadTimes),
             quietHoursStart: domain.quietHoursStart?.description,
             quietHoursEnd: domain.quietHoursEnd?.description,
+            locale: domain.locale,
             createdAt: domain.createdAt,
             updatedAt: domain.updatedAt
         )
@@ -184,6 +185,7 @@ extension AppSettingsRecord {
             notificationLeadTimes: decodedLeadTimes,
             quietHoursStart: decodedQuietHoursStart,
             quietHoursEnd: decodedQuietHoursEnd,
+            locale: locale,
             createdAt: createdAt,
             updatedAt: updatedAt
         )
@@ -202,6 +204,7 @@ extension AppSettingsRecord {
         notificationLeadTimes = Self.encodeNotificationLeadTimes(domain.notificationLeadTimes)
         quietHoursStart = domain.quietHoursStart?.description
         quietHoursEnd = domain.quietHoursEnd?.description
+        locale = domain.locale
         createdAt = domain.createdAt
         updatedAt = domain.updatedAt
     }
