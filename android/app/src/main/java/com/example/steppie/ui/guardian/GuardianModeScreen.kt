@@ -52,7 +52,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -85,6 +87,7 @@ fun GuardianModeScreen(
     onOpenHome: () -> Unit,
     onOpenRoutineEdit: () -> Unit,
     onOpenSecurity: () -> Unit,
+    onOpenBackupRestore: () -> Unit = {},
     onOpenPinChange: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
@@ -116,6 +119,11 @@ fun GuardianModeScreen(
     onConfirmDeleteRoutineSet: () -> Unit,
     onMoveRoutine: (String, Int) -> Unit,
     onShowOutOfScopeNotice: () -> Unit,
+    onCreateBackupFile: () -> Unit = {},
+    onOpenRestoreFile: () -> Unit = {},
+    onRestorePinDigit: (Int) -> Unit = {},
+    onDeleteRestorePinDigit: () -> Unit = {},
+    onCancelRestore: () -> Unit = {},
     onClearNotice: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -206,7 +214,14 @@ fun GuardianModeScreen(
             GuardianDestination.Security -> GuardianSecurityScreen(
                 onOpenHome = onOpenHome,
                 onOpenPinChange = onOpenPinChange,
+                onOpenBackupRestore = onOpenBackupRestore,
                 onShowOutOfScopeNotice = onShowOutOfScopeNotice,
+            )
+            GuardianDestination.BackupRestore -> GuardianBackupRestoreScreen(
+                state = state,
+                onOpenSecurity = onOpenSecurity,
+                onCreateBackupFile = onCreateBackupFile,
+                onOpenRestoreFile = onOpenRestoreFile,
             )
         }
     }
@@ -280,6 +295,55 @@ fun GuardianModeScreen(
                 SteppieButton(
                     label = stringResource(R.string.action_cancel),
                     onClick = onCancelEditRoutineSetName,
+                    style = SteppieButtonStyle.Secondary,
+                )
+            },
+        )
+    }
+
+    if (state.pendingRestorePreview != null) {
+        AlertDialog(
+            onDismissRequest = onCancelRestore,
+            title = { Text(stringResource(R.string.guardian_restore_confirm_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small)) {
+                    Text(
+                        text = stringResource(
+                            R.string.guardian_restore_confirm_body,
+                            state.pendingRestorePreview.routineSetCount,
+                            state.pendingRestorePreview.routineCount,
+                            state.pendingRestorePreview.dailyLogCount,
+                        ),
+                    )
+                    Text(
+                        text = stringResource(R.string.guardian_restore_pin_prompt),
+                        style = SteppieTheme.typography.guardianBody,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        repeat(4) { index ->
+                            Box(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (index < state.restorePinDigits.length) {
+                                            SteppieTheme.colors.progressComplete
+                                        } else {
+                                            SteppieTheme.colors.progressPending
+                                        },
+                                    ),
+                            )
+                        }
+                    }
+                    CompactPinKeypad(onDigit = onRestorePinDigit, onDelete = onDeleteRestorePinDigit)
+                    state.backupError?.let { ErrorMessage(it) }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                SteppieButton(
+                    label = stringResource(R.string.action_cancel),
+                    onClick = onCancelRestore,
                     style = SteppieButtonStyle.Secondary,
                 )
             },
@@ -383,6 +447,47 @@ private fun PinKeypad(onDigit: (Int) -> Unit, onDelete: () -> Unit) {
                                 text = label,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 style = SteppieTheme.typography.childCardTitle,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactPinKeypad(onDigit: (Int) -> Unit, onDelete: () -> Unit) {
+    val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("", "0", "⌫"))
+    val deleteDescription = stringResource(R.string.a11y_pin_delete)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        rows.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
+                row.forEach { label ->
+                    if (label.isBlank()) {
+                        Spacer(Modifier.size(width = 64.dp, height = 56.dp))
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 64.dp, height = 56.dp)
+                                .clip(RoundedCornerShape(SteppieCornerRadius.Control))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .clickable(role = Role.Button) {
+                                    if (label == "⌫") onDelete() else onDigit(label.toInt())
+                                }
+                                .semantics {
+                                    contentDescription = if (label == "⌫") deleteDescription else label
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = label,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = SteppieTheme.typography.guardianSection,
                             )
                         }
                     }
@@ -1001,6 +1106,7 @@ private fun GuardianCardEditScreen(
 private fun GuardianSecurityScreen(
     onOpenHome: () -> Unit,
     onOpenPinChange: () -> Unit,
+    onOpenBackupRestore: () -> Unit,
     onShowOutOfScopeNotice: () -> Unit,
 ) {
     GuardianScaffold(
@@ -1010,8 +1116,40 @@ private fun GuardianSecurityScreen(
     ) {
         GuardianMenuCard(R.drawable.ic_guardian_security_warning, stringResource(R.string.guardian_pin_change), stringResource(R.string.guardian_pin_change_desc), onOpenPinChange)
         GuardianMenuCard(R.drawable.ic_guardian_security_warning, stringResource(R.string.guardian_recovery_code), stringResource(R.string.guardian_recovery_code_desc), onShowOutOfScopeNotice)
-        GuardianMenuCard(R.drawable.ic_guardian_security_backup, stringResource(R.string.guardian_backup), stringResource(R.string.guardian_backup_desc), onShowOutOfScopeNotice)
+        GuardianMenuCard(R.drawable.ic_guardian_security_backup, stringResource(R.string.guardian_backup), stringResource(R.string.guardian_backup_desc), onOpenBackupRestore)
         GuardianPrivacyNote()
+    }
+}
+
+@Composable
+private fun GuardianBackupRestoreScreen(
+    state: GuardianModeUiState,
+    onOpenSecurity: () -> Unit,
+    onCreateBackupFile: () -> Unit,
+    onOpenRestoreFile: () -> Unit,
+) {
+    GuardianScaffold(
+        title = stringResource(R.string.guardian_backup_title),
+        subtitle = stringResource(R.string.guardian_backup_subtitle),
+        onBack = onOpenSecurity,
+    ) {
+        WarningMessage(stringResource(R.string.guardian_backup_privacy_notice))
+        SteppieButton(
+            label = stringResource(R.string.guardian_backup_create),
+            onClick = onCreateBackupFile,
+            modifier = Modifier.fillMaxWidth(),
+            state = if (state.backupInProgress) SteppieButtonState.Loading else SteppieButtonState.Enabled,
+        )
+        SteppieButton(
+            label = stringResource(R.string.guardian_restore_select),
+            onClick = onOpenRestoreFile,
+            modifier = Modifier.fillMaxWidth(),
+            style = SteppieButtonStyle.Secondary,
+            state = if (state.backupInProgress) SteppieButtonState.Loading else SteppieButtonState.Enabled,
+        )
+        WarningMessage(stringResource(R.string.guardian_restore_replace_warning))
+        state.backupMessage?.let { SuccessMessage(it) }
+        state.backupError?.takeIf { state.pendingRestorePreview == null }?.let { ErrorMessage(it) }
     }
 }
 
@@ -1369,6 +1507,7 @@ private fun ErrorMessage(message: String) {
             .clip(RoundedCornerShape(SteppieCornerRadius.Control))
             .background(SteppieTheme.colors.cardRose)
             .border(SteppieStroke.Divider, MaterialTheme.colorScheme.error, RoundedCornerShape(SteppieCornerRadius.Control))
+            .semantics { liveRegion = LiveRegionMode.Polite }
             .padding(SteppieSpacing.Medium),
         color = MaterialTheme.colorScheme.error,
         style = SteppieTheme.typography.guardianCaption,
@@ -1384,6 +1523,23 @@ private fun WarningMessage(message: String) {
             .clip(RoundedCornerShape(SteppieCornerRadius.Control))
             .background(SteppieTheme.colors.cardLemon)
             .border(SteppieStroke.Divider, SteppieTheme.colors.warning, RoundedCornerShape(SteppieCornerRadius.Control))
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .padding(SteppieSpacing.Medium),
+        color = MaterialTheme.colorScheme.onSurface,
+        style = SteppieTheme.typography.guardianCaption,
+    )
+}
+
+@Composable
+private fun SuccessMessage(message: String) {
+    Text(
+        text = message,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(SteppieCornerRadius.Control))
+            .background(SteppieTheme.colors.cardMint)
+            .border(SteppieStroke.Divider, SteppieTheme.colors.success, RoundedCornerShape(SteppieCornerRadius.Control))
+            .semantics { liveRegion = LiveRegionMode.Polite }
             .padding(SteppieSpacing.Medium),
         color = MaterialTheme.colorScheme.onSurface,
         style = SteppieTheme.typography.guardianCaption,

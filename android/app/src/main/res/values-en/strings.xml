@@ -105,6 +105,15 @@
     <string name="guardian_recovery_code_desc">6-digit recovery code. Original is not stored</string>
     <string name="guardian_backup">Backup/restore</string>
     <string name="guardian_backup_desc">Cloud backup and replace restore</string>
+    <string name="guardian_backup_title">Backup/restore</string>
+    <string name="guardian_backup_subtitle">Save a backup file or restore from a selected file</string>
+    <string name="guardian_backup_privacy_notice">Backups may include routine names, completion history, settings, and PIN hashes. Raw PINs and recovery codes are never stored.</string>
+    <string name="guardian_backup_create">Create backup file</string>
+    <string name="guardian_restore_select">Restore from backup file</string>
+    <string name="guardian_restore_replace_warning">Restore replaces the current app data with the selected backup. Merge restore is not supported in v1.0.</string>
+    <string name="guardian_restore_confirm_title">Restore this backup?</string>
+    <string name="guardian_restore_confirm_body">This imports %1$d routine sets, %2$d routines, and %3$d logs. Current data will be replaced.</string>
+    <string name="guardian_restore_pin_prompt">Enter the guardian PIN to restore.</string>
     <string name="guardian_privacy_note">v1.0 privacy principle: no ads, in-app purchases, or server account system. Core routine features work 100% offline.</string>
     <string name="guardian_privacy_title">v1.0 privacy principle</string>
     <string name="guardian_privacy_body">No ads, in-app purchases, or server account system. Core routine features work 100% offline.</string>
