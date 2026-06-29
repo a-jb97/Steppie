@@ -303,6 +303,176 @@ struct SteppieTests {
         #expect(changeCount >= 4)
     }
 
+    @Test("보호자 모드는 활성 루틴 세트가 없어도 루틴 세트 생성으로 진입할 수 있다")
+    func guardianModeCanCreateRoutineSetFromEmptyRepository() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+
+        viewModel.load()
+        #expect(viewModel.loadState == .empty)
+        #expect(viewModel.activeRoutineSet == nil)
+
+        viewModel.beginCreateRoutineSet()
+        #expect(viewModel.selectedDestination == .routineSetCreator)
+        #expect(viewModel.routineSetDraft?.steps.isEmpty == true)
+        #expect(!viewModel.canSaveRoutineSetDraft)
+    }
+
+    @Test("루틴 세트 생성은 최소 1개 단계를 요구한다")
+    func guardianRoutineSetCreationRequiresAtLeastOneStep() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "등원 루틴"
+        #expect(!viewModel.canSaveRoutineSetDraft)
+
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "가방 챙기기"
+        viewModel.routineSetStepDraft?.iconName = .packBag
+        viewModel.routineSetStepDraft?.colorToken = "color.card.mint"
+        viewModel.saveRoutineSetStepDraft()
+
+        #expect(viewModel.routineSetDraft?.steps.count == 1)
+        #expect(viewModel.canSaveRoutineSetDraft)
+    }
+
+    @Test("루틴 세트 생성은 활성 세트와 단계들을 0부터 연속 order로 저장한다")
+    func guardianRoutineSetCreationSavesActiveSetAndOrderedSteps() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        var changeCount = 0
+        let viewModel = GuardianModeViewModel(repository: repository) {
+            changeCount += 1
+        }
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "아침 준비"
+
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "일어나기"
+        viewModel.routineSetStepDraft?.iconName = .wakeUp
+        viewModel.routineSetStepDraft?.colorToken = "color.card.sky"
+        viewModel.saveRoutineSetStepDraft()
+
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "세수하기"
+        viewModel.routineSetStepDraft?.iconName = .washFace
+        viewModel.routineSetStepDraft?.colorToken = "color.card.lemon"
+        viewModel.routineSetStepDraft?.scheduledTime = try LocalTime("07:40")
+        viewModel.saveRoutineSetStepDraft()
+
+        viewModel.saveRoutineSetDraft(localeIdentifier: "ko")
+
+        let activeSet = try #require(try repository.routineSets().first(where: \.isActive))
+        let routines = try repository.routines(in: activeSet.id)
+        #expect(activeSet.name.resolved(appLocale: "ko") == "아침 준비")
+        #expect(routines.map { $0.title.resolved(appLocale: "ko") } == ["일어나기", "세수하기"])
+        #expect(routines.map(\.order) == [0, 1])
+        #expect(routines.map(\.colorToken) == ["color.card.sky", "color.card.lemon"])
+        #expect(routines[1].scheduledTime?.description == "07:40")
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.activeRoutineSet?.id == activeSet.id)
+        #expect(viewModel.selectedDestination == .routineEditor)
+        #expect(changeCount == 1)
+    }
+
+    @Test("루틴 관리는 여러 루틴 세트를 목록으로 유지하고 선택한 세트의 단계만 편집한다")
+    func guardianRoutineManagementKeepsMultipleRoutineSets() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+        viewModel.load()
+        let originalSet = try #require(viewModel.selectedRoutineSet)
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "하교 루틴"
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "가방 정리"
+        viewModel.routineSetStepDraft?.iconName = .packBag
+        viewModel.routineSetStepDraft?.colorToken = "color.card.peach"
+        viewModel.saveRoutineSetStepDraft()
+        viewModel.saveRoutineSetDraft(localeIdentifier: "ko")
+
+        #expect(viewModel.routineSets.count == 2)
+        #expect(viewModel.routineSets.map { $0.name.resolved(appLocale: "ko") } == ["아침 루틴", "하교 루틴"])
+        #expect(viewModel.activeRoutineSet?.name.resolved(appLocale: "ko") == "하교 루틴")
+        #expect(viewModel.selectedRoutineSet?.name.resolved(appLocale: "ko") == "하교 루틴")
+        #expect(viewModel.routines.map { $0.title.resolved(appLocale: "ko") } == ["가방 정리"])
+
+        viewModel.selectRoutineSet(originalSet)
+        #expect(viewModel.selectedRoutineSet?.id == originalSet.id)
+        #expect(viewModel.routines.map { $0.title.resolved(appLocale: "ko") } == ["일어나기", "세수하기", "양치하기"])
+
+        viewModel.beginAddRoutine()
+        viewModel.draft?.title = "물 마시기"
+        viewModel.draft?.iconName = .snack
+        viewModel.draft?.colorToken = "color.card.mint"
+        viewModel.saveDraft(localeIdentifier: "ko")
+
+        let originalRoutines = try repository.routines(in: originalSet.id)
+        let latestActiveSet = try #require(try repository.routineSets().first(where: \.isActive))
+        let latestActiveRoutines = try repository.routines(in: latestActiveSet.id)
+        #expect(originalRoutines.map { $0.title.resolved(appLocale: "ko") }.contains("물 마시기"))
+        #expect(latestActiveRoutines.map { $0.title.resolved(appLocale: "ko") } == ["가방 정리"])
+    }
+
+    @Test("루틴 세트 편집 모드는 세트 이름 변경과 세트 삭제를 Repository에 반영한다")
+    func guardianRoutineSetEditModeRenamesAndDeletesRoutineSets() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+        viewModel.load()
+        let originalSet = try #require(viewModel.selectedRoutineSet)
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "하교 루틴"
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "가방 정리"
+        viewModel.routineSetStepDraft?.iconName = .packBag
+        viewModel.routineSetStepDraft?.colorToken = "color.card.peach"
+        viewModel.saveRoutineSetStepDraft()
+        viewModel.saveRoutineSetDraft(localeIdentifier: "ko")
+        let createdSet = try #require(viewModel.selectedRoutineSet)
+
+        viewModel.beginRenameRoutineSet(originalSet)
+        viewModel.routineSetNameDraft?.name = "평일 아침"
+        viewModel.saveRoutineSetName(localeIdentifier: "ko")
+        #expect(try repository.routineSet(id: originalSet.id)?.name.resolved(appLocale: "ko") == "평일 아침")
+
+        viewModel.requestDeleteRoutineSet(createdSet)
+        viewModel.confirmDeleteRoutineSet()
+
+        let visibleSets = try repository.routineSets()
+        #expect(visibleSets.map(\.id) == [originalSet.id])
+        #expect(visibleSets.first?.isActive == true)
+        #expect(viewModel.routineSets.map(\.id) == [originalSet.id])
+        #expect(viewModel.selectedRoutineSet?.id == originalSet.id)
+    }
+
+    @Test("새 루틴 세트 생성 후 아이 모드는 새 활성 세트를 읽는다")
+    func childRoutineLoadsNewlyCreatedRoutineSet() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let childViewModel = ChildRoutineViewModel(repository: repository)
+        let guardianViewModel = GuardianModeViewModel(repository: repository) {
+            childViewModel.load()
+        }
+
+        childViewModel.load()
+        #expect(childViewModel.loadState == .empty)
+
+        guardianViewModel.beginCreateRoutineSet()
+        guardianViewModel.routineSetDraft?.name = "저녁 루틴"
+        guardianViewModel.beginAddRoutineSetStep()
+        guardianViewModel.routineSetStepDraft?.title = "책 읽기"
+        guardianViewModel.routineSetStepDraft?.iconName = .book
+        guardianViewModel.routineSetStepDraft?.colorToken = "color.card.lavender"
+        guardianViewModel.saveRoutineSetStepDraft()
+        guardianViewModel.saveRoutineSetDraft(localeIdentifier: "ko")
+
+        #expect(childViewModel.loadState == .loaded)
+        #expect(childViewModel.activeRoutineSet?.name.resolved(appLocale: "ko") == "저녁 루틴")
+        #expect(childViewModel.routines.map { $0.title.resolved(appLocale: "ko") } == ["책 읽기"])
+        #expect(childViewModel.selectedRoutineID == childViewModel.routines.first?.id)
+    }
+
     @Test("알림 payload는 루틴 포커스 route로 변환된다")
     func notificationPayloadBuildsRoute() throws {
         let routineID = UUID()
