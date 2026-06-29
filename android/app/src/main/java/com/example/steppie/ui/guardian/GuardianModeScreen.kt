@@ -484,10 +484,10 @@ private fun GuardianSecurityScreen(
         subtitle = stringResource(R.string.guardian_security_subtitle),
         onBack = onOpenHome,
     ) {
-        GuardianMenuCard(R.drawable.ic_guardian_menu_security, stringResource(R.string.guardian_pin_change), stringResource(R.string.guardian_pin_change_desc), onOpenPinChange)
-        GuardianMenuCard(R.drawable.ic_guardian_menu_security, stringResource(R.string.guardian_recovery_code), stringResource(R.string.guardian_recovery_code_desc), onShowOutOfScopeNotice)
-        GuardianMenuCard(R.drawable.ic_guardian_menu_records, stringResource(R.string.guardian_backup), stringResource(R.string.guardian_backup_desc), onShowOutOfScopeNotice)
-        WarningMessage(stringResource(R.string.guardian_privacy_note))
+        GuardianMenuCard(R.drawable.ic_guardian_security_warning, stringResource(R.string.guardian_pin_change), stringResource(R.string.guardian_pin_change_desc), onOpenPinChange)
+        GuardianMenuCard(R.drawable.ic_guardian_security_warning, stringResource(R.string.guardian_recovery_code), stringResource(R.string.guardian_recovery_code_desc), onShowOutOfScopeNotice)
+        GuardianMenuCard(R.drawable.ic_guardian_security_backup, stringResource(R.string.guardian_backup), stringResource(R.string.guardian_backup_desc), onShowOutOfScopeNotice)
+        GuardianPrivacyNote()
     }
 }
 
@@ -832,6 +832,31 @@ private fun WarningMessage(message: String) {
         color = MaterialTheme.colorScheme.onSurface,
         style = SteppieTheme.typography.guardianCaption,
     )
+}
+
+@Composable
+private fun GuardianPrivacyNote() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(148.dp)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+            .background(SteppieTheme.colors.cardLemon)
+            .border(SteppieStroke.Divider, SteppieTheme.colors.warning, RoundedCornerShape(SteppieCornerRadius.Card))
+            .padding(SteppieSpacing.Medium),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.guardian_privacy_title),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = SteppieTheme.typography.guardianSection,
+        )
+        Text(
+            text = stringResource(R.string.guardian_privacy_body),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = SteppieTheme.typography.guardianCaption,
+        )
+    }
 }
 
 @Composable

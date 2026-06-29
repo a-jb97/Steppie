@@ -84,6 +84,8 @@
     <string name="guardian_backup">Backup/restore</string>
     <string name="guardian_backup_desc">Cloud backup and replace restore</string>
     <string name="guardian_privacy_note">v1.0 privacy principle: no ads, in-app purchases, or server account system. Core routine features work 100% offline.</string>
+    <string name="guardian_privacy_title">v1.0 privacy principle</string>
+    <string name="guardian_privacy_body">No ads, in-app purchases, or server account system. Core routine features work 100% offline.</string>
     <string name="guardian_delete_title">Delete this activity?</string>
     <string name="guardian_delete_body">The activity will be hidden from child mode and existing progress records will remain.</string>
     <string name="guardian_notice_title">Notice</string>

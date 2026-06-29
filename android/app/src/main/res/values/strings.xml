@@ -84,6 +84,8 @@
     <string name="guardian_backup">백업/복원</string>
     <string name="guardian_backup_desc">클라우드 백업과 Replace 복원</string>
     <string name="guardian_privacy_note">v1.0 개인정보 원칙: 광고, 인앱결제, 서버 계정 시스템은 없습니다. 핵심 루틴 기능은 오프라인에서 100% 동작합니다.</string>
+    <string name="guardian_privacy_title">v1.0 개인정보 원칙</string>
+    <string name="guardian_privacy_body">광고, 인앱결제, 서버 계정 시스템은 없습니다. 핵심 루틴 기능은 오프라인에서 100% 동작합니다.</string>
     <string name="guardian_delete_title">활동을 삭제할까요?</string>
     <string name="guardian_delete_body">삭제한 활동은 아이 모드에서 숨겨지고, 기존 진행 기록은 유지됩니다.</string>
     <string name="guardian_notice_title">안내</string>
