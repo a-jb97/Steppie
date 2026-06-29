@@ -151,6 +151,8 @@ enum class FeedbackIntensity(val storageValue: String) {
 }
 
 data class AppSettings(
+    val guardianPinHash: String? = null,
+    val recoveryCodeHash: String? = null,
     val feedbackIntensity: FeedbackIntensity = FeedbackIntensity.Normal,
     val soundEnabled: Boolean = true,
     val ttsEnabled: Boolean = true,
@@ -163,7 +165,12 @@ data class AppSettings(
     val quietHoursEnd: LocalTime? = null,
     val locale: String? = null,
 ) {
+    val hasGuardianPin: Boolean
+        get() = guardianPinHash != null
+
     init {
+        require(guardianPinHash?.isNotBlank() != false) { "guardianPinHash cannot be blank." }
+        require(recoveryCodeHash?.isNotBlank() != false) { "recoveryCodeHash cannot be blank." }
         require(ttsRate in 0.5..1.5) { "ttsRate must be in 0.5..1.5." }
         require(ttsVolume in 0.0..1.0) { "ttsVolume must be in 0.0..1.0." }
         require(undoDurationSeconds in setOf(3, 5, 10)) { "undoDurationSeconds must be 3, 5, or 10." }

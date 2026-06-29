@@ -4,7 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-internal val LightBackgroundPrimary = Color(0xFFEFE6E1)
+internal val LightBackgroundPrimary = Color(0xFFF6EFEE)
 internal val LightBackgroundSecondary = Color(0xFFEFE6E1)
 internal val LightTextPrimary = Color(0xFF190E0B)
 internal val LightTextSecondary = Color(0xFF5D4037)
