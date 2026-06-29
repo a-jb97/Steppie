@@ -3,16 +3,39 @@ import SwiftUI
 struct ChildRoutineView: View {
     @Environment(\.locale) private var locale
     let viewModel: ChildRoutineViewModel
+    let onGuardianEntryRequested: () -> Void
+
+    init(
+        viewModel: ChildRoutineViewModel,
+        onGuardianEntryRequested: @escaping () -> Void = {}
+    ) {
+        self.viewModel = viewModel
+        self.onGuardianEntryRequested = onGuardianEntryRequested
+    }
 
     var body: some View {
         GeometryReader { proxy in
             content(layout: ChildRoutineLayoutPolicy.layout(for: proxy.size.width))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(alignment: .topTrailing) {
+                    guardianEntryHotspot
+                }
         }
         .background(Color.steppieBackgroundSecondary)
         .task {
             viewModel.loadIfNeeded()
         }
+    }
+
+    private var guardianEntryHotspot: some View {
+        Color.clear
+            .frame(width: SteppieLayout.childMinimumTouchTarget, height: SteppieLayout.childMinimumTouchTarget)
+            .contentShape(.rect)
+            .gesture(
+                LongPressGesture(minimumDuration: 3)
+                    .onEnded { _ in onGuardianEntryRequested() }
+            )
+            .accessibilityHidden(true)
     }
 
     @ViewBuilder

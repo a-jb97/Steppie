@@ -11,6 +11,8 @@ nonisolated struct AppSettings: Codable, Equatable, Identifiable, Sendable {
     static let singletonID = "singleton"
 
     let id: String
+    let guardianPinHash: String?
+    let recoveryCodeHash: String?
     let feedbackIntensity: FeedbackIntensity
     let soundEnabled: Bool
     let ttsEnabled: Bool
@@ -26,6 +28,8 @@ nonisolated struct AppSettings: Codable, Equatable, Identifiable, Sendable {
 
     init(
         id: String = AppSettings.singletonID,
+        guardianPinHash: String? = nil,
+        recoveryCodeHash: String? = nil,
         feedbackIntensity: FeedbackIntensity = .normal,
         soundEnabled: Bool = true,
         ttsEnabled: Bool = true,
@@ -40,6 +44,8 @@ nonisolated struct AppSettings: Codable, Equatable, Identifiable, Sendable {
         updatedAt: Date = .now
     ) throws {
         self.id = id
+        self.guardianPinHash = guardianPinHash
+        self.recoveryCodeHash = recoveryCodeHash
         self.feedbackIntensity = feedbackIntensity
         self.soundEnabled = soundEnabled
         self.ttsEnabled = ttsEnabled
