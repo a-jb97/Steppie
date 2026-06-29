@@ -314,9 +314,10 @@ ios/ 디렉터리는 수정하지 마.
 | 5 | 피드백 및 완료/언두 시나리오 확정 | TTS/햅틱/효과음/완료 흐름 | TTS/진동/효과음/완료 흐름 |
 | 6 | 알림 권한, 예고 시각, 재예약 시나리오 확정 | UserNotifications 기반 로컬 알림 | Notification API와 AlarmManager 기반 로컬 알림 |
 | 7 | 보호자 모드 계약 확정 | 루틴 편집/정렬/PIN | 루틴 편집/정렬/PIN |
-| 8 | 백업/복원 및 스키마 버전 정책 확정 | iCloud/CloudKit 백업·복원 | Google Drive 백업·복원, 지연 작업은 WorkManager 사용 |
-| 9 | 접근성 체크리스트와 공통 테스트 시나리오 확정 | VoiceOver/Dynamic Type 검증 | TalkBack/Font Scale 검증 |
-| 10 | 출시 체크리스트 확정 | App Store 준비 | Google Play 준비 |
+| 8 | 초기 루틴 생성, 빈 상태, 보호자 메뉴 계약 확정 | 루틴 세트 생성, 빈 상태 보호자 메뉴, 루틴 생성 화면 | 루틴 세트 생성, 빈 상태 보호자 메뉴, 루틴 생성 화면 |
+| 9 | 백업/복원 및 스키마 버전 정책 확정 | iCloud/CloudKit 백업·복원 | Google Drive 백업·복원, 지연 작업은 WorkManager 사용 |
+| 10 | 접근성 체크리스트와 공통 테스트 시나리오 확정 | VoiceOver/Dynamic Type 검증 | TalkBack/Font Scale 검증 |
+| 11 | 출시 체크리스트 확정 | App Store 준비 | Google Play 준비 |
 
 ---
 
