@@ -7,6 +7,7 @@ enum GuardianDestination: Hashable {
     case feedbackSettings
     case records
     case security
+    case backupRestore
 }
 
 enum GuardianLoadState: Equatable {
@@ -108,6 +109,14 @@ final class GuardianModeViewModel {
     var routineSetNameDraft: RoutineSetNameDraft?
     var pendingDeleteRoutine: Routine?
     var pendingDeleteRoutineSet: RoutineSet?
+    private(set) var backupPackage: BackupPackage?
+    private(set) var validatedRestorePayload: BackupRestorePayload?
+    private(set) var backupStatusMessage: String?
+    var restorePIN = ""
+
+    var validatedRestoreSnapshot: RoutineRepositorySnapshot? {
+        validatedRestorePayload?.snapshot
+    }
 
     init(
         repository: any RoutineRepository,
@@ -557,6 +566,60 @@ final class GuardianModeViewModel {
         }
     }
 
+    func createBackupPackage() {
+        do {
+            backupPackage = try BackupService(repository: repository, now: now).exportPackage()
+            backupStatusMessage = "백업 파일을 만들었어요."
+            errorMessage = nil
+        } catch {
+            backupPackage = nil
+            errorMessage = "백업 파일을 만들지 못했어요."
+        }
+    }
+
+    func validateRestorePackage(_ data: Data) {
+        do {
+            validatedRestorePayload = try BackupService(repository: repository, now: now).validatePackagePayload(data)
+            restorePIN = ""
+            backupStatusMessage = "백업 파일을 확인했어요. 복원하려면 보호자 PIN을 입력해 주세요."
+            errorMessage = nil
+        } catch {
+            validatedRestorePayload = nil
+            restorePIN = ""
+            errorMessage = backupErrorMessage(for: error)
+        }
+    }
+
+    var canConfirmRestore: Bool {
+        validatedRestorePayload != nil && verifyPIN(restorePIN)
+    }
+
+    func cancelRestore() {
+        validatedRestorePayload = nil
+        restorePIN = ""
+    }
+
+    func confirmRestore() {
+        guard let validatedRestorePayload, verifyPIN(restorePIN) else {
+            errorMessage = "PIN을 확인해 주세요."
+            return
+        }
+        do {
+            try BackupService(repository: repository, now: now).restorePayload(validatedRestorePayload)
+            self.validatedRestorePayload = nil
+            restorePIN = ""
+            backupStatusMessage = "백업을 복원했어요."
+            load()
+            onDataChanged()
+        } catch {
+            errorMessage = "복원하지 못했어요. 기존 데이터는 유지됩니다."
+        }
+    }
+
+    func reportBackupFileError(_ message: String) {
+        errorMessage = message
+    }
+
     func localizedTitle(for routine: Routine) -> String {
         routine.title.resolved(
             appLocale: Locale.autoupdatingCurrent.identifier,
@@ -590,8 +653,27 @@ final class GuardianModeViewModel {
             notificationLeadTimes: settings.notificationLeadTimes,
             quietHoursStart: settings.quietHoursStart,
             quietHoursEnd: settings.quietHoursEnd,
+            locale: settings.locale,
             createdAt: settings.createdAt,
             updatedAt: now()
         )
+    }
+
+    private func backupErrorMessage(for error: Error) -> String {
+        guard let backupError = error as? BackupError else {
+            return "백업 파일을 읽지 못했어요."
+        }
+        switch backupError {
+        case .invalidChecksum:
+            return "백업 파일이 손상되었어요."
+        case .unsupportedSchemaVersion:
+            return "지원하지 않는 백업 버전이에요."
+        case .unsupportedPlatform:
+            return "이 iOS 버전에서 복원할 수 없는 백업이에요."
+        case .missingFile, .invalidPackage, .invalidManifest, .invalidData:
+            return "올바른 Steppie 백업 파일이 아니에요."
+        case .duplicateID, .invalidReference:
+            return "백업 데이터 관계가 올바르지 않아요."
+        }
     }
 }

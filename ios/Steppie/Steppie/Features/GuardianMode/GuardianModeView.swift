@@ -137,6 +137,19 @@ struct GuardianModeView: View {
                 unavailableScreen(title: "진행 기록", subtitle: "Sprint 7 이후 상세 구현 예정입니다")
             case .security:
                 securityScreen(isWide: isWide)
+            case .backupRestore:
+                BackupRestoreView(
+                    viewModel: viewModel,
+                    onDone: onDone,
+                    onInteraction: onInteraction
+                )
+                .toolbar {
+                    if !isWide {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("뒤로") { viewModel.selectedDestination = .security }
+                        }
+                    }
+                }
             }
         }
     }
@@ -891,7 +904,10 @@ struct GuardianModeView: View {
                     onInteraction()
                 }
                 securityCard(title: "복구 코드 확인", subtitle: "6자리 복구 코드. 원본은 저장하지 않음", assetName: "guardian-security-warning", iconSize: 55) {}
-                securityCard(title: "백업/복원", subtitle: "클라우드 백업과 Replace 복원", assetName: "guardian-security-backup", iconSize: 50) {}
+                securityCard(title: "백업/복원", subtitle: "로컬 파일 백업과 Replace 복원", assetName: "guardian-security-backup", iconSize: 50) {
+                    viewModel.selectedDestination = .backupRestore
+                    onInteraction()
+                }
                 privacyPolicyNote
                 SteppieButton("완료", role: .secondary, action: onDone)
                     .padding(.top, SteppieSpacing.large)
