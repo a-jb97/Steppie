@@ -16,6 +16,13 @@ nonisolated enum RoutineRepositoryError: Error, Equatable {
     case dailyLogNotFound(date: String, routineID: UUID)
 }
 
+nonisolated struct RoutineRepositorySnapshot: Equatable, Sendable {
+    let routineSets: [RoutineSet]
+    let routines: [Routine]
+    let dailyLogs: [DailyLog]
+    let appSettings: AppSettings
+}
+
 @MainActor
 protocol RoutineRepository {
     func createRoutineSet(_ routineSet: RoutineSet) throws
@@ -51,6 +58,9 @@ protocol RoutineRepository {
 
     func appSettings() throws -> AppSettings
     func updateAppSettings(_ settings: AppSettings) throws
+
+    func backupSnapshot() throws -> RoutineRepositorySnapshot
+    func replaceAll(with snapshot: RoutineRepositorySnapshot) throws
 }
 
 extension RoutineRepository {

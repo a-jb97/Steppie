@@ -23,6 +23,7 @@ nonisolated struct AppSettings: Codable, Equatable, Identifiable, Sendable {
     let notificationLeadTimes: [Int]
     let quietHoursStart: LocalTime?
     let quietHoursEnd: LocalTime?
+    let locale: String?
     let createdAt: Date
     let updatedAt: Date
 
@@ -40,6 +41,7 @@ nonisolated struct AppSettings: Codable, Equatable, Identifiable, Sendable {
         notificationLeadTimes: [Int] = [10, 5],
         quietHoursStart: LocalTime? = nil,
         quietHoursEnd: LocalTime? = nil,
+        locale: String? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) throws {
@@ -56,6 +58,7 @@ nonisolated struct AppSettings: Codable, Equatable, Identifiable, Sendable {
         self.notificationLeadTimes = notificationLeadTimes
         self.quietHoursStart = quietHoursStart
         self.quietHoursEnd = quietHoursEnd
+        self.locale = locale
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         try validate()

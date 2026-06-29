@@ -118,6 +118,7 @@ final class AppSettingsRecord {
     var notificationLeadTimes: String?
     var quietHoursStart: String?
     var quietHoursEnd: String?
+    var locale: String?
     var createdAt: Date
     var updatedAt: Date
 
@@ -135,6 +136,7 @@ final class AppSettingsRecord {
         notificationLeadTimes: String? = nil,
         quietHoursStart: String? = nil,
         quietHoursEnd: String? = nil,
+        locale: String? = nil,
         createdAt: Date,
         updatedAt: Date
     ) {
@@ -151,6 +153,7 @@ final class AppSettingsRecord {
         self.notificationLeadTimes = notificationLeadTimes
         self.quietHoursStart = quietHoursStart
         self.quietHoursEnd = quietHoursEnd
+        self.locale = locale
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

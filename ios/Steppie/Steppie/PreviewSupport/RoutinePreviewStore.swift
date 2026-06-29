@@ -242,6 +242,22 @@ final class PreviewRoutineRepository: RoutineRepository {
         self.settings = settings
     }
 
+    func backupSnapshot() throws -> RoutineRepositorySnapshot {
+        RoutineRepositorySnapshot(
+            routineSets: routineSets,
+            routines: routines,
+            dailyLogs: dailyLogs,
+            appSettings: settings
+        )
+    }
+
+    func replaceAll(with snapshot: RoutineRepositorySnapshot) throws {
+        routineSets = snapshot.routineSets
+        routines = snapshot.routines
+        dailyLogs = snapshot.dailyLogs
+        settings = snapshot.appSettings
+    }
+
     private func compactOrders(in routineSetID: UUID, at date: Date) throws {
         let active = routines
             .filter { $0.routineSetID == routineSetID && $0.isActive && $0.deletedAt == nil }

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 @testable import Steppie
@@ -837,6 +838,219 @@ struct SteppieTests {
         }
     }
 
+    @Test("백업 export는 manifest와 data checksum을 포함하고 replace 복원한다")
+    func backupExportAndReplaceRestore() throws {
+        let source = try RoutinePreviewStore.makeSampleRepository()
+        let settingsWithPIN = try AppSettings(
+            guardianPinHash: GuardianPinService.makeHash(for: "1234", salt: "backup-test")
+        )
+        try source.updateAppSettings(settingsWithPIN)
+        let activeSet = try #require(try source.routineSets().first)
+        let firstRoutine = try #require(try source.routines(in: activeSet.id).first)
+        let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
+        _ = try source.setRoutineCompleted(
+            routineID: firstRoutine.id,
+            routineSetID: activeSet.id,
+            on: DailyLog.localDateString(for: completedAt),
+            at: completedAt
+        )
+
+        let package = try BackupService(
+            repository: source,
+            now: { Date(timeIntervalSince1970: 1_767_230_000) },
+            appVersion: { "1.0.0" }
+        ).exportPackage()
+        let entries = try SteppieZipArchive.readArchive(package.archiveData)
+        #expect(entries["manifest.json"] != nil)
+        #expect(entries["data.json"] != nil)
+
+        let target = try RoutinePreviewStore.makeRepository()
+        try BackupService(repository: target).restorePackage(package.archiveData)
+
+        #expect(try target.routineSets().map(\.id) == [activeSet.id])
+        #expect(try target.routines(in: activeSet.id).map(\.id).contains(firstRoutine.id))
+        #expect(try target.appSettings().guardianPinHash == settingsWithPIN.guardianPinHash)
+        #expect(try target.dailyLogs(on: DailyLog.localDateString(for: completedAt), routineSetID: activeSet.id).count == 1)
+    }
+
+    @Test("checksum이 손상된 백업은 복원을 거부한다")
+    func backupRejectsInvalidChecksum() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let service = BackupService(repository: repository)
+        let package = try service.exportPackage()
+        let entries = try SteppieZipArchive.readArchive(package.archiveData)
+        let damagedArchive = try SteppieZipArchive.makeArchive(entries: [
+            SteppieZipEntry(path: "manifest.json", data: try #require(entries["manifest.json"])),
+            SteppieZipEntry(path: "data.json", data: Data(#"{"schemaVersion":1}"#.utf8)),
+        ])
+
+        #expect(throws: BackupError.invalidChecksum) {
+            try service.validatePackage(damagedArchive)
+        }
+    }
+
+    @Test("백업 파일의 다중 활성 RoutineSet은 가장 최근 세트 하나로 보정된다")
+    func backupNormalizesMultipleActiveRoutineSets() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let firstCreatedAt = Date(timeIntervalSince1970: 1_767_225_600)
+        let secondCreatedAt = firstCreatedAt.addingTimeInterval(60)
+        let first = try RoutineSet(
+            name: LocalizedText(["ko": "첫 루틴"]),
+            isActive: true,
+            createdAt: firstCreatedAt,
+            updatedAt: firstCreatedAt
+        )
+        let second = try RoutineSet(
+            name: LocalizedText(["ko": "둘째 루틴"]),
+            isActive: true,
+            createdAt: secondCreatedAt,
+            updatedAt: secondCreatedAt
+        )
+        let snapshot = RoutineRepositorySnapshot(
+            routineSets: [first, second],
+            routines: [],
+            dailyLogs: [],
+            appSettings: try AppSettings()
+        )
+        try repository.replaceAll(with: snapshot)
+
+        let package = try BackupService(repository: repository).exportPackage()
+        let restoredSnapshot = try BackupService(repository: repository).validatePackage(package.archiveData)
+
+        #expect(restoredSnapshot.routineSets.filter(\.isActive).map(\.id) == [second.id])
+    }
+
+    @Test("사진 에셋이 누락된 백업은 루틴을 유지하고 placeholder 아이콘으로 복원한다")
+    func backupMissingPhotoAssetUsesPlaceholderIcon() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let createdAt = Date(timeIntervalSince1970: 1_767_225_600)
+        let routineSet = try RoutineSet(
+            name: LocalizedText(["ko": "사진 루틴"]),
+            isActive: true,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        try repository.createRoutineSet(routineSet)
+        let routine = try Routine(
+            routineSetID: routineSet.id,
+            title: LocalizedText(["ko": "사진 보기"]),
+            icon: IconRef.photo(
+                localAssetID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
+                backupAssetName: "routine-photo-33333333-3333-4333-8333-333333333333.jpg"
+            ),
+            order: 0,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        try repository.createRoutine(routine)
+
+        let package = try BackupService(repository: repository).exportPackage()
+        let restoredSnapshot = try BackupService(repository: repository).validatePackage(package.archiveData)
+
+        #expect(restoredSnapshot.routines.first?.id == routine.id)
+        #expect(restoredSnapshot.routines.first?.icon.name == RoutineIconName.star.rawValue)
+    }
+
+    @Test("사진 에셋이 있는 백업은 assets 디렉터리에 파일을 포함하고 복원 시 저장한다")
+    func backupIncludesAndRestoresPhotoAsset() throws {
+        let assetName = "routine-photo-44444444-4444-4444-8444-444444444444.jpg"
+        let sourceAssetStore = FakeBackupAssetStore(assets: [assetName: Data([0xff, 0xd8, 0xff])])
+        let targetAssetStore = FakeBackupAssetStore()
+        let repository = try RoutinePreviewStore.makeRepository()
+        let createdAt = Date(timeIntervalSince1970: 1_767_225_600)
+        let routineSet = try RoutineSet(
+            name: LocalizedText(["ko": "사진 루틴"]),
+            isActive: true,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        try repository.createRoutineSet(routineSet)
+        let routine = try Routine(
+            routineSetID: routineSet.id,
+            title: LocalizedText(["ko": "사진 보기"]),
+            icon: IconRef.photo(
+                localAssetID: UUID(uuidString: "44444444-4444-4444-8444-444444444444")!,
+                backupAssetName: assetName
+            ),
+            order: 0,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        try repository.createRoutine(routine)
+
+        let package = try BackupService(repository: repository, assetStore: sourceAssetStore).exportPackage()
+        let entries = try SteppieZipArchive.readArchive(package.archiveData)
+        #expect(entries["assets/\(assetName)"] == Data([0xff, 0xd8, 0xff]))
+
+        let target = try RoutinePreviewStore.makeRepository()
+        try BackupService(repository: target, assetStore: targetAssetStore).restorePackage(package.archiveData)
+
+        #expect(try target.routines(in: routineSet.id).first?.icon.backupAssetName == assetName)
+        #expect(targetAssetStore.assets[assetName] == Data([0xff, 0xd8, 0xff]))
+    }
+
+    @Test("RoutineSet 없이 routines가 남은 백업은 거부한다")
+    func backupRejectsRoutinesWithoutRoutineSet() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let createdAt = Date(timeIntervalSince1970: 1_767_225_600)
+        let orphanRoutine = try Routine(
+            routineSetID: UUID(uuidString: "55555555-5555-4555-8555-555555555555")!,
+            title: LocalizedText(["ko": "고아 루틴"]),
+            icon: IconRef.builtin(name: "star"),
+            order: 0,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        let data = BackupData(
+            schemaVersion: 1,
+            exportedAt: createdAt,
+            routineSets: [],
+            routines: [orphanRoutine],
+            dailyLogs: [],
+            appSettings: try AppSettings()
+        )
+        let dataJson = try backupTestJSONEncoder.encode(data)
+        let manifest = BackupManifest(
+            app: "Steppie",
+            backupSchemaVersion: 1,
+            createdAt: createdAt,
+            sourcePlatform: "ios",
+            appVersion: "1.0.0",
+            dataFile: "data.json",
+            assetDirectory: "assets",
+            checksum: BackupChecksum(
+                algorithm: "sha256",
+                dataJson: SHA256.hash(data: dataJson).map { String(format: "%02x", $0) }.joined()
+            )
+        )
+        let archive = try SteppieZipArchive.makeArchive(entries: [
+            SteppieZipEntry(path: "manifest.json", data: try backupTestJSONEncoder.encode(manifest)),
+            SteppieZipEntry(path: "data.json", data: dataJson),
+        ])
+
+        #expect(throws: BackupError.invalidReference("RoutineSet")) {
+            try BackupService(repository: repository).validatePackage(archive)
+        }
+    }
+
+    @Test("보호자 ViewModel 복원은 PIN 확인 전 replace를 실행하지 않는다")
+    func guardianRestoreRequiresPINConfirmation() throws {
+        let source = try RoutinePreviewStore.makeSampleRepository()
+        let package = try BackupService(repository: source).exportPackage()
+        let target = try RoutinePreviewStore.makeRepository()
+        let viewModel = GuardianModeViewModel(repository: target) {}
+
+        #expect(viewModel.setPIN("1234"))
+        viewModel.validateRestorePackage(package.archiveData)
+        viewModel.restorePIN = "0000"
+        viewModel.confirmRestore()
+        #expect(try target.routineSets().isEmpty)
+
+        viewModel.restorePIN = "1234"
+        viewModel.confirmRestore()
+        #expect(try target.routineSets().isEmpty == false)
+    }
+
     private func makeFixture(
         routineCount: Int
     ) throws -> (
@@ -907,3 +1121,26 @@ private final class FakeRoutineNotificationScheduler: RoutineNotificationSchedul
         )
     }
 }
+
+private final class FakeBackupAssetStore: BackupAssetStore {
+    var assets: [String: Data]
+
+    init(assets: [String: Data] = [:]) {
+        self.assets = assets
+    }
+
+    func data(forBackupAssetName name: String) throws -> Data? {
+        assets[name]
+    }
+
+    func saveAssetData(_ data: Data, backupAssetName name: String) throws {
+        assets[name] = data
+    }
+}
+
+private let backupTestJSONEncoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    encoder.dateEncodingStrategy = .iso8601
+    return encoder
+}()
