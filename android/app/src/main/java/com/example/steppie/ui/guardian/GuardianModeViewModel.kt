@@ -9,6 +9,7 @@ import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineColorTokens
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.domain.model.newUuidV4
 import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.domain.repository.RoutineRepository
 import java.time.Instant
@@ -21,7 +22,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class GuardianDestination { Pin, Home, RoutineEdit, CardEdit, Security }
+enum class GuardianDestination { Pin, Home, RoutineEdit, CardEdit, RoutineSetCreate, Security }
 
 enum class GuardianPinMode { Enter, Setup, ChangeCurrent, ChangeNew }
 
@@ -36,6 +37,13 @@ data class RoutineDraft(
         get() = routineId == null
 }
 
+data class RoutineSetDraft(
+    val name: String = "",
+    val stepDraft: RoutineDraft = RoutineDraft(),
+    val steps: List<RoutineDraft> = emptyList(),
+    val editingStepIndex: Int? = null,
+)
+
 data class GuardianModeUiState(
     val isActive: Boolean = false,
     val isAuthenticated: Boolean = false,
@@ -44,11 +52,17 @@ data class GuardianModeUiState(
     val pinDigits: String = "",
     val pinError: String? = null,
     val hasGuardianPin: Boolean = false,
+    val routineSets: List<RoutineSet> = emptyList(),
     val activeRoutineSet: RoutineSet? = null,
     val routines: List<Routine> = emptyList(),
     val draft: RoutineDraft? = null,
+    val routineSetDraft: RoutineSetDraft? = null,
+    val routineSetListEditing: Boolean = false,
+    val editingRoutineSetId: String? = null,
+    val editingRoutineSetName: String = "",
     val draftError: String? = null,
     val pendingDeleteRoutineId: String? = null,
+    val pendingDeleteRoutineSetId: String? = null,
     val notice: String? = null,
     val interactionToken: Long = 0L,
 ) {
@@ -70,9 +84,10 @@ class GuardianModeViewModel(
                 appSettingsRepository.observeAppSettings(),
                 routineRepository.observeRoutineSets(),
             ) { settings, routineSets ->
-                settings.hasGuardianPin to routineSets.firstOrNull { it.isActive && it.deletedAt == null }
-            }.collect { (hasPin, activeSet) ->
+                settings.hasGuardianPin to routineSets.filter { it.deletedAt == null }
+            }.collect { (hasPin, visibleRoutineSets) ->
                 _uiState.update { state ->
+                    val activeSet = visibleRoutineSets.firstOrNull { it.isActive }
                     val resolvedPinMode = if (
                         state.isActive &&
                         !state.isAuthenticated &&
@@ -85,6 +100,7 @@ class GuardianModeViewModel(
                     state.copy(
                         hasGuardianPin = hasPin,
                         pinMode = resolvedPinMode,
+                        routineSets = visibleRoutineSets,
                         activeRoutineSet = activeSet,
                         routines = activeSet?.routines.orEmpty().sortedBy(Routine::order),
                     )
@@ -144,8 +160,13 @@ class GuardianModeViewModel(
             it.copy(
                 destination = GuardianDestination.Home,
                 draft = null,
+                routineSetDraft = null,
+                routineSetListEditing = false,
+                editingRoutineSetId = null,
+                editingRoutineSetName = "",
                 draftError = null,
                 pendingDeleteRoutineId = null,
+                pendingDeleteRoutineSetId = null,
                 notice = null,
                 interactionToken = it.interactionToken + 1,
             )
@@ -157,8 +178,10 @@ class GuardianModeViewModel(
             it.copy(
                 destination = GuardianDestination.RoutineEdit,
                 draft = null,
+                routineSetDraft = null,
                 draftError = null,
                 pendingDeleteRoutineId = null,
+                pendingDeleteRoutineSetId = null,
                 notice = null,
                 interactionToken = it.interactionToken + 1,
             )
@@ -169,6 +192,12 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.Security,
+                draft = null,
+                routineSetDraft = null,
+                routineSetListEditing = false,
+                editingRoutineSetId = null,
+                editingRoutineSetName = "",
+                draftError = null,
                 notice = null,
                 interactionToken = it.interactionToken + 1,
             )
@@ -193,6 +222,7 @@ class GuardianModeViewModel(
             it.copy(
                 destination = GuardianDestination.CardEdit,
                 draft = RoutineDraft(),
+                routineSetDraft = null,
                 draftError = null,
                 notice = null,
                 interactionToken = it.interactionToken + 1,
@@ -207,6 +237,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.CardEdit,
+                routineSetDraft = null,
                 draft = RoutineDraft(
                     routineId = routine.id,
                     title = title,
@@ -218,6 +249,95 @@ class GuardianModeViewModel(
                 notice = null,
                 interactionToken = it.interactionToken + 1,
             )
+        }
+    }
+
+    fun openRoutineSetCreate() {
+        _uiState.update {
+            it.copy(
+                destination = GuardianDestination.RoutineSetCreate,
+                draft = null,
+                routineSetDraft = RoutineSetDraft(),
+                draftError = null,
+                pendingDeleteRoutineId = null,
+                pendingDeleteRoutineSetId = null,
+                notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun toggleRoutineSetListEditing() {
+        _uiState.update {
+            it.copy(
+                routineSetListEditing = !it.routineSetListEditing,
+                editingRoutineSetId = null,
+                editingRoutineSetName = "",
+                pendingDeleteRoutineSetId = null,
+                draftError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun selectRoutineSet(routineSetId: String) {
+        val routineSet = _uiState.value.routineSets.firstOrNull { it.id == routineSetId } ?: return
+        if (routineSet.isActive) return
+        viewModelScope.launch {
+            routineRepository.updateRoutineSet(routineSet.copy(isActive = true, updatedAt = Instant.now()))
+        }
+    }
+
+    fun requestEditRoutineSetName(routineSetId: String) {
+        val routineSet = _uiState.value.routineSets.firstOrNull { it.id == routineSetId } ?: return
+        _uiState.update {
+            it.copy(
+                editingRoutineSetId = routineSet.id,
+                editingRoutineSetName = routineSet.name.resolve(null, Locale.getDefault().toLanguageTag()),
+                draftError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun updateEditingRoutineSetName(name: String) {
+        _uiState.update {
+            it.copy(
+                editingRoutineSetName = name,
+                draftError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun cancelEditRoutineSetName() {
+        _uiState.update {
+            it.copy(
+                editingRoutineSetId = null,
+                editingRoutineSetName = "",
+                draftError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun saveEditingRoutineSetName() {
+        val state = _uiState.value
+        val routineSetId = state.editingRoutineSetId ?: return
+        val routineSet = state.routineSets.firstOrNull { it.id == routineSetId } ?: return
+        val trimmedName = state.editingRoutineSetName.trim()
+        if (trimmedName.isBlank()) {
+            _uiState.update { it.copy(draftError = "루틴 세트 이름을 입력해 주세요.") }
+            return
+        }
+        viewModelScope.launch {
+            routineRepository.updateRoutineSet(
+                routineSet.copy(
+                    name = LocalizedText(mapOf(Locale.getDefault().toLanguageTag() to trimmedName)),
+                    updatedAt = Instant.now(),
+                ),
+            )
+            cancelEditRoutineSetName()
         }
     }
 
@@ -238,10 +358,115 @@ class GuardianModeViewModel(
         updateDraft { it.copy(scheduledTime = sanitized) }
     }
 
+    fun updateRoutineSetName(name: String) = updateRoutineSetDraft { it.copy(name = name) }
+
+    fun updateRoutineSetStepTitle(title: String) = updateRoutineSetDraft {
+        it.copy(stepDraft = it.stepDraft.copy(title = title))
+    }
+
+    fun updateRoutineSetStepIcon(iconName: String) {
+        if (iconName !in BuiltinIconNames.all) return
+        updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(iconName = iconName)) }
+    }
+
+    fun updateRoutineSetStepColor(colorToken: String) {
+        if (colorToken !in RoutineColorTokens.all) return
+        updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(colorToken = colorToken)) }
+    }
+
+    fun updateRoutineSetStepScheduledTime(value: String) {
+        val sanitized = value.filter { it.isDigit() || it == ':' }.take(5)
+        updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(scheduledTime = sanitized)) }
+    }
+
+    fun addRoutineSetStep() {
+        val draft = _uiState.value.routineSetDraft ?: return
+        val trimmedTitle = draft.stepDraft.title.trim()
+        if (trimmedTitle.isBlank()) {
+            _uiState.update { it.copy(draftError = "단계 이름을 입력해 주세요.") }
+            return
+        }
+        if (parseScheduledTime(draft.stepDraft.scheduledTime) == null && draft.stepDraft.scheduledTime.isNotBlank()) {
+            _uiState.update { it.copy(draftError = "예정 시각은 HH:mm 형식으로 입력해 주세요.") }
+            return
+        }
+        _uiState.update {
+            val currentDraft = it.routineSetDraft ?: return@update it
+            it.copy(
+                routineSetDraft = currentDraft.copy(
+                    stepDraft = RoutineDraft(),
+                    steps = currentDraft.editingStepIndex?.let { index ->
+                        currentDraft.steps.mapIndexed { stepIndex, step ->
+                            if (stepIndex == index) currentDraft.stepDraft.copy(title = trimmedTitle) else step
+                        }
+                    } ?: (currentDraft.steps + currentDraft.stepDraft.copy(title = trimmedTitle)),
+                    editingStepIndex = null,
+                ),
+                draftError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun editRoutineSetStep(index: Int) {
+        _uiState.update {
+            val currentDraft = it.routineSetDraft ?: return@update it
+            val step = currentDraft.steps.getOrNull(index) ?: return@update it
+            it.copy(
+                routineSetDraft = currentDraft.copy(
+                    stepDraft = step,
+                    editingStepIndex = index,
+                ),
+                draftError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun removeRoutineSetStep(index: Int) {
+        _uiState.update {
+            val currentDraft = it.routineSetDraft ?: return@update it
+            if (index !in currentDraft.steps.indices) return@update it
+            it.copy(
+                routineSetDraft = currentDraft.copy(
+                    steps = currentDraft.steps.filterIndexed { stepIndex, _ -> stepIndex != index },
+                    stepDraft = if (currentDraft.editingStepIndex == index) RoutineDraft() else currentDraft.stepDraft,
+                    editingStepIndex = null,
+                ),
+                draftError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun saveRoutineSetDraft() {
+        val draft = _uiState.value.routineSetDraft ?: return
+        val now = Instant.now()
+        val routineSet = runCatching {
+            buildRoutineSetFromDraft(
+                draft = draft,
+                now = now,
+                localeTag = Locale.getDefault().toLanguageTag(),
+            )
+        }.getOrElse { error ->
+            _uiState.update { it.copy(draftError = error.message ?: "루틴 세트를 저장할 수 없습니다.") }
+            return
+        }
+
+        viewModelScope.launch {
+            routineRepository.createRoutineSet(routineSet)
+            openRoutineEdit()
+        }
+    }
+
     fun saveDraft() {
         val state = _uiState.value
         val draft = state.draft ?: return
-        val activeSet = state.activeRoutineSet ?: return
+        val activeSet = state.activeRoutineSet
+        if (activeSet == null) {
+            _uiState.update { it.copy(draftError = "먼저 루틴 세트를 생성해 주세요.") }
+            return
+        }
         val trimmedTitle = draft.title.trim()
         if (trimmedTitle.isBlank()) {
             _uiState.update { it.copy(draftError = "활동 이름을 입력해 주세요.") }
@@ -294,8 +519,23 @@ class GuardianModeViewModel(
         }
     }
 
+    fun requestDeleteRoutineSet(routineSetId: String) {
+        _uiState.update {
+            it.copy(
+                pendingDeleteRoutineSetId = routineSetId,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
     fun cancelDelete() {
-        _uiState.update { it.copy(pendingDeleteRoutineId = null, interactionToken = it.interactionToken + 1) }
+        _uiState.update {
+            it.copy(
+                pendingDeleteRoutineId = null,
+                pendingDeleteRoutineSetId = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
     }
 
     fun confirmDelete() {
@@ -308,6 +548,37 @@ class GuardianModeViewModel(
                     draft = null,
                     draftError = null,
                     pendingDeleteRoutineId = null,
+                    interactionToken = it.interactionToken + 1,
+                )
+            }
+        }
+    }
+
+    fun confirmDeleteRoutineSet() {
+        val state = _uiState.value
+        val routineSetId = state.pendingDeleteRoutineSetId ?: return
+        val target = state.routineSets.firstOrNull { it.id == routineSetId } ?: return
+        if (state.routineSets.size <= 1) {
+            _uiState.update {
+                it.copy(
+                    pendingDeleteRoutineSetId = null,
+                    notice = "마지막 루틴 세트는 삭제할 수 없습니다.",
+                    interactionToken = it.interactionToken + 1,
+                )
+            }
+            return
+        }
+        viewModelScope.launch {
+            if (target.isActive) {
+                state.routineSets.firstOrNull { it.id != target.id }?.let { replacement ->
+                    routineRepository.updateRoutineSet(replacement.copy(isActive = true, updatedAt = Instant.now()))
+                }
+            }
+            routineRepository.deleteRoutineSet(target.id)
+            _uiState.update {
+                it.copy(
+                    pendingDeleteRoutineSetId = null,
+                    routineSetListEditing = true,
                     interactionToken = it.interactionToken + 1,
                 )
             }
@@ -428,6 +699,16 @@ class GuardianModeViewModel(
         }
     }
 
+    private fun updateRoutineSetDraft(transform: (RoutineSetDraft) -> RoutineSetDraft) {
+        _uiState.update {
+            it.copy(
+                routineSetDraft = it.routineSetDraft?.let(transform),
+                draftError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
     private fun parseScheduledTime(value: String): LocalTime? {
         if (value.isBlank()) return null
         return runCatching { LocalTime.parse(value) }.getOrNull()
@@ -446,4 +727,48 @@ class GuardianModeViewModel(
             }
         }
     }
+}
+
+internal fun buildRoutineSetFromDraft(
+    draft: RoutineSetDraft,
+    now: Instant,
+    localeTag: String,
+): RoutineSet {
+    val trimmedName = draft.name.trim()
+    require(trimmedName.isNotBlank()) { "루틴 제목을 입력해 주세요." }
+    require(draft.steps.isNotEmpty()) { "최소 1개 단계가 있어야 저장할 수 있습니다." }
+
+    val routineSetId = newUuidV4()
+    val routines = draft.steps.mapIndexed { index, step ->
+        val trimmedTitle = step.title.trim()
+        require(trimmedTitle.isNotBlank()) { "단계 이름을 입력해 주세요." }
+        val scheduledTime = parseDraftScheduledTime(step.scheduledTime)
+        require(scheduledTime != null || step.scheduledTime.isBlank()) {
+            "예정 시각은 HH:mm 형식으로 입력해 주세요."
+        }
+        Routine(
+            routineSetId = routineSetId,
+            title = LocalizedText(mapOf(localeTag to trimmedTitle)),
+            icon = IconRef.Builtin(step.iconName),
+            colorToken = step.colorToken,
+            order = index,
+            scheduledTime = scheduledTime,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+    return RoutineSet(
+        id = routineSetId,
+        name = LocalizedText(mapOf(localeTag to trimmedName)),
+        isActive = true,
+        createdAt = now,
+        updatedAt = now,
+        routines = routines,
+    )
+}
+
+private fun parseDraftScheduledTime(value: String): LocalTime? {
+    if (value.isBlank()) return null
+    return runCatching { LocalTime.parse(value) }.getOrNull()
+        ?.takeIf { it.second == 0 && it.nano == 0 }
 }
