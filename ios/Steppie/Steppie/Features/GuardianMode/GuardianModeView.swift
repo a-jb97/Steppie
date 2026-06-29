@@ -420,19 +420,13 @@ struct GuardianModeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
                 header(title: "보안", subtitle: "PIN, 복구 코드, 개인정보 설정")
-                securityCard(title: "PIN 변경", subtitle: "4자리 보호자 PIN 재설정", systemImage: "exclamationmark.triangle.fill") {
+                securityCard(title: "PIN 변경", subtitle: "4자리 보호자 PIN 재설정", assetName: "guardian-security-warning", iconSize: 55) {
                     NotificationCenter.default.post(name: .guardianPINChangeRequested, object: nil)
                     onInteraction()
                 }
-                securityCard(title: "복구 코드 확인", subtitle: "Sprint 7 이후 구현 예정", systemImage: "exclamationmark.triangle.fill") {}
-                    .opacity(0.62)
-                securityCard(title: "백업/복원", subtitle: "Sprint 7 이후 구현 예정", systemImage: "icloud.and.arrow.up.fill") {}
-                    .opacity(0.62)
-                labeledCard("v1.0 개인정보 원칙") {
-                    Text("광고, 인앱결제, 서버 계정 시스템은 없습니다. 핵심 루틴 기능은 오프라인에서 100% 동작합니다.")
-                        .steppieTextStyle(.guardianCaption)
-                        .foregroundStyle(Color.steppieTextPrimary)
-                }
+                securityCard(title: "복구 코드 확인", subtitle: "6자리 복구 코드. 원본은 저장하지 않음", assetName: "guardian-security-warning", iconSize: 55) {}
+                securityCard(title: "백업/복원", subtitle: "클라우드 백업과 Replace 복원", assetName: "guardian-security-backup", iconSize: 50) {}
+                privacyPolicyNote
                 SteppieButton("완료", role: .secondary, action: onDone)
                     .padding(.top, SteppieSpacing.large)
             }
@@ -453,15 +447,18 @@ struct GuardianModeView: View {
     private func securityCard(
         title: String,
         subtitle: String,
-        systemImage: String,
+        assetName: String,
+        iconSize: CGFloat,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             HStack(spacing: SteppieSpacing.small) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundStyle(systemImage.contains("icloud") ? Color.steppieFocusRing : Color.steppieWarning)
+                Image(assetName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: iconSize, height: iconSize)
                     .frame(width: 55, height: 55)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
                     Text(title)
                         .steppieTextStyle(.button)
@@ -482,6 +479,27 @@ struct GuardianModeView: View {
             .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
         }
         .buttonStyle(.plain)
+    }
+
+    private var privacyPolicyNote: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("v1.0 개인정보 원칙")
+                .steppieTextStyle(.button)
+                .foregroundStyle(Color.steppieTextSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("광고, 인앱결제, 서버 계정 시스템은 없습니다. 핵심 루틴 기능은 오프라인에서 100% 동작합니다.")
+                .steppieTextStyle(.guardianCaption)
+                .foregroundStyle(Color.steppieTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
+        .background(Color.steppieBackgroundPrimary)
+        .overlay {
+            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
+                .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
+        }
+        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
     }
 
     private func unavailableScreen(title: String, subtitle: String) -> some View {
