@@ -61,8 +61,10 @@ import com.example.steppie.domain.model.BuiltinIconNames
 import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineColorTokens
+import com.example.steppie.domain.model.RoutineSet
 import com.example.steppie.ui.child.RoutineIcon
 import com.example.steppie.ui.components.SteppieButton
+import com.example.steppie.ui.components.SteppieButtonState
 import com.example.steppie.ui.components.SteppieButtonStyle
 import com.example.steppie.ui.theme.SteppieCornerRadius
 import com.example.steppie.ui.theme.SteppieLayout
@@ -84,16 +86,34 @@ fun GuardianModeScreen(
     onOpenRoutineEdit: () -> Unit,
     onOpenSecurity: () -> Unit,
     onOpenPinChange: () -> Unit,
+    onOpenRoutineSetCreate: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
     onOpenRoutineEditor: (String) -> Unit,
+    onToggleRoutineSetListEditing: () -> Unit,
+    onSelectRoutineSet: (String) -> Unit,
+    onRequestEditRoutineSetName: (String) -> Unit,
+    onEditingRoutineSetNameChange: (String) -> Unit,
+    onCancelEditRoutineSetName: () -> Unit,
+    onSaveEditingRoutineSetName: () -> Unit,
     onDraftTitleChange: (String) -> Unit,
     onDraftIconChange: (String) -> Unit,
     onDraftColorChange: (String) -> Unit,
     onDraftScheduledTimeChange: (String) -> Unit,
     onSaveDraft: () -> Unit,
+    onRoutineSetNameChange: (String) -> Unit,
+    onRoutineSetStepTitleChange: (String) -> Unit,
+    onRoutineSetStepIconChange: (String) -> Unit,
+    onRoutineSetStepColorChange: (String) -> Unit,
+    onRoutineSetStepScheduledTimeChange: (String) -> Unit,
+    onAddRoutineSetStep: () -> Unit,
+    onEditRoutineSetStep: (Int) -> Unit,
+    onRemoveRoutineSetStep: (Int) -> Unit,
+    onSaveRoutineSetDraft: () -> Unit,
     onRequestDelete: (String) -> Unit,
+    onRequestDeleteRoutineSet: (String) -> Unit,
     onCancelDelete: () -> Unit,
     onConfirmDelete: () -> Unit,
+    onConfirmDeleteRoutineSet: () -> Unit,
     onMoveRoutine: (String, Int) -> Unit,
     onShowOutOfScopeNotice: () -> Unit,
     onClearNotice: () -> Unit,
@@ -121,6 +141,7 @@ fun GuardianModeScreen(
             )
             GuardianDestination.Home -> GuardianHomeScreen(
                 onCloseToChild = onCloseToChild,
+                onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                 onOpenRoutineEdit = onOpenRoutineEdit,
                 onOpenSecurity = onOpenSecurity,
                 onShowOutOfScopeNotice = onShowOutOfScopeNotice,
@@ -130,8 +151,13 @@ fun GuardianModeScreen(
                     GuardianRoutineSplitScreen(
                         state = state,
                         onOpenHome = onOpenHome,
+                        onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                         onOpenRoutineEditor = onOpenRoutineEditor,
+                        onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
+                        onSelectRoutineSet = onSelectRoutineSet,
+                        onRequestEditRoutineSetName = onRequestEditRoutineSetName,
+                        onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
                         onRequestDelete = onRequestDelete,
                         onMoveRoutine = onMoveRoutine,
                         onShowOutOfScopeNotice = onShowOutOfScopeNotice,
@@ -140,8 +166,13 @@ fun GuardianModeScreen(
                     GuardianRoutineEditScreen(
                         state = state,
                         onOpenHome = onOpenHome,
+                        onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                         onOpenRoutineEditor = onOpenRoutineEditor,
+                        onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
+                        onSelectRoutineSet = onSelectRoutineSet,
+                        onRequestEditRoutineSetName = onRequestEditRoutineSetName,
+                        onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
                         onRequestDelete = onRequestDelete,
                         onMoveRoutine = onMoveRoutine,
                         onShowOutOfScopeNotice = onShowOutOfScopeNotice,
@@ -157,6 +188,20 @@ fun GuardianModeScreen(
                 onDraftColorChange = onDraftColorChange,
                 onDraftScheduledTimeChange = onDraftScheduledTimeChange,
                 onSaveDraft = onSaveDraft,
+            )
+            GuardianDestination.RoutineSetCreate -> GuardianRoutineSetCreateScreen(
+                state = state,
+                useSplitLayout = maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight,
+                onOpenHome = onOpenHome,
+                onRoutineSetNameChange = onRoutineSetNameChange,
+                onRoutineSetStepTitleChange = onRoutineSetStepTitleChange,
+                onRoutineSetStepIconChange = onRoutineSetStepIconChange,
+                onRoutineSetStepColorChange = onRoutineSetStepColorChange,
+                onRoutineSetStepScheduledTimeChange = onRoutineSetStepScheduledTimeChange,
+                onAddRoutineSetStep = onAddRoutineSetStep,
+                onEditRoutineSetStep = onEditRoutineSetStep,
+                onRemoveRoutineSetStep = onRemoveRoutineSetStep,
+                onSaveRoutineSetDraft = onSaveRoutineSetDraft,
             )
             GuardianDestination.Security -> GuardianSecurityScreen(
                 onOpenHome = onOpenHome,
@@ -182,6 +227,59 @@ fun GuardianModeScreen(
                 SteppieButton(
                     label = stringResource(R.string.action_cancel),
                     onClick = onCancelDelete,
+                    style = SteppieButtonStyle.Secondary,
+                )
+            },
+        )
+    }
+
+    if (state.pendingDeleteRoutineSetId != null) {
+        AlertDialog(
+            onDismissRequest = onCancelDelete,
+            title = { Text(stringResource(R.string.guardian_delete_routine_set_title)) },
+            text = { Text(stringResource(R.string.guardian_delete_routine_set_body)) },
+            confirmButton = {
+                SteppieButton(
+                    label = stringResource(R.string.action_delete),
+                    onClick = onConfirmDeleteRoutineSet,
+                    style = SteppieButtonStyle.Danger,
+                )
+            },
+            dismissButton = {
+                SteppieButton(
+                    label = stringResource(R.string.action_cancel),
+                    onClick = onCancelDelete,
+                    style = SteppieButtonStyle.Secondary,
+                )
+            },
+        )
+    }
+
+    if (state.editingRoutineSetId != null) {
+        AlertDialog(
+            onDismissRequest = onCancelEditRoutineSetName,
+            title = { Text(stringResource(R.string.guardian_routine_set_rename_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small)) {
+                    OutlinedTextField(
+                        value = state.editingRoutineSetName,
+                        onValueChange = onEditingRoutineSetNameChange,
+                        label = { Text(stringResource(R.string.guardian_field_routine_set_name)) },
+                        singleLine = true,
+                    )
+                    state.draftError?.let { ErrorMessage(it) }
+                }
+            },
+            confirmButton = {
+                SteppieButton(
+                    label = stringResource(R.string.action_save),
+                    onClick = onSaveEditingRoutineSetName,
+                )
+            },
+            dismissButton = {
+                SteppieButton(
+                    label = stringResource(R.string.action_cancel),
+                    onClick = onCancelEditRoutineSetName,
                     style = SteppieButtonStyle.Secondary,
                 )
             },
@@ -297,6 +395,7 @@ private fun PinKeypad(onDigit: (Int) -> Unit, onDelete: () -> Unit) {
 @Composable
 private fun GuardianHomeScreen(
     onCloseToChild: () -> Unit,
+    onOpenRoutineSetCreate: () -> Unit,
     onOpenRoutineEdit: () -> Unit,
     onOpenSecurity: () -> Unit,
     onShowOutOfScopeNotice: () -> Unit,
@@ -312,6 +411,7 @@ private fun GuardianHomeScreen(
             )
         },
     ) {
+        GuardianMenuCard(R.drawable.ic_guardian_menu_routine, stringResource(R.string.guardian_menu_create_routine_set), stringResource(R.string.guardian_menu_create_routine_set_desc), onOpenRoutineSetCreate)
         GuardianMenuCard(R.drawable.ic_guardian_menu_routine, stringResource(R.string.guardian_menu_routine), stringResource(R.string.guardian_menu_routine_desc), onOpenRoutineEdit)
         GuardianMenuCard(R.drawable.ic_guardian_menu_settings, stringResource(R.string.guardian_menu_feedback), stringResource(R.string.guardian_menu_feedback_desc), onShowOutOfScopeNotice)
         GuardianMenuCard(R.drawable.ic_guardian_menu_records, stringResource(R.string.guardian_menu_records), stringResource(R.string.guardian_menu_records_desc), onShowOutOfScopeNotice)
@@ -323,32 +423,84 @@ private fun GuardianHomeScreen(
 private fun GuardianRoutineEditScreen(
     state: GuardianModeUiState,
     onOpenHome: () -> Unit,
+    onOpenRoutineSetCreate: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
     onOpenRoutineEditor: (String) -> Unit,
+    onToggleRoutineSetListEditing: () -> Unit,
+    onSelectRoutineSet: (String) -> Unit,
+    onRequestEditRoutineSetName: (String) -> Unit,
+    onRequestDeleteRoutineSet: (String) -> Unit,
     onRequestDelete: (String) -> Unit,
     onMoveRoutine: (String, Int) -> Unit,
     onShowOutOfScopeNotice: () -> Unit,
 ) {
     GuardianScaffold(
-        title = stringResource(R.string.guardian_routine_edit_title, state.title.ifBlank { stringResource(R.string.guardian_routine_default_title) }),
+        title = stringResource(R.string.guardian_menu_routine),
         subtitle = stringResource(R.string.guardian_routine_edit_subtitle),
         onBack = onOpenHome,
+        topActionLabel = stringResource(
+            if (state.routineSetListEditing) R.string.action_done_editing else R.string.action_edit,
+        ),
+        onTopAction = onToggleRoutineSetListEditing,
         bottom = {
             Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small)) {
-                SteppieButton(
-                    label = stringResource(R.string.guardian_template_action),
-                    onClick = onShowOutOfScopeNotice,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = SteppieButtonStyle.Secondary,
-                )
-                SteppieButton(
-                    label = stringResource(R.string.guardian_add_routine),
-                    onClick = onOpenNewRoutineEditor,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (state.activeRoutineSet == null) {
+                    SteppieButton(
+                        label = stringResource(R.string.guardian_menu_create_routine_set),
+                        onClick = onOpenRoutineSetCreate,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    SteppieButton(
+                        label = stringResource(R.string.guardian_template_action),
+                        onClick = onShowOutOfScopeNotice,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = SteppieButtonStyle.Secondary,
+                    )
+                    SteppieButton(
+                        label = stringResource(R.string.guardian_add_routine),
+                        onClick = onOpenNewRoutineEditor,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         },
     ) {
+        if (state.activeRoutineSet == null) {
+            EmptyRoutineSetPanel(onOpenNewRoutineSet = onOpenRoutineSetCreate)
+        }
+        RoutineSetList(
+            routineSets = state.routineSets,
+            activeRoutineSetId = state.activeRoutineSet?.id,
+            editing = state.routineSetListEditing,
+            onSelectRoutineSet = onSelectRoutineSet,
+            onRequestEditRoutineSetName = onRequestEditRoutineSetName,
+            onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
+        )
+        if (state.activeRoutineSet != null) {
+            Column(
+                modifier = Modifier.padding(top = SteppieSpacing.Medium + SteppieSpacing.TwoExtraSmall),
+                verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = SteppieLayout.GuardianMinimumTouchTarget),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.guardian_active_routine_steps_title, state.title),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = SteppieTheme.typography.guardianTitle,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.guardian_active_routine_steps_desc),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = SteppieTheme.typography.guardianCaption,
+                )
+            }
+        }
         state.routines.forEach { routine ->
             EditableRoutineRow(
                 routine = routine,
@@ -361,11 +513,378 @@ private fun GuardianRoutineEditScreen(
 }
 
 @Composable
+private fun RoutineSetList(
+    routineSets: List<RoutineSet>,
+    activeRoutineSetId: String?,
+    editing: Boolean,
+    onSelectRoutineSet: (String) -> Unit,
+    onRequestEditRoutineSetName: (String) -> Unit,
+    onRequestDeleteRoutineSet: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+    ) {
+        routineSets.forEach { routineSet ->
+            RoutineSetRow(
+                routineSet = routineSet,
+                active = routineSet.id == activeRoutineSetId,
+                editing = editing,
+                onSelect = { onSelectRoutineSet(routineSet.id) },
+                onEdit = { onRequestEditRoutineSetName(routineSet.id) },
+                onDelete = { onRequestDeleteRoutineSet(routineSet.id) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RoutineSetRow(
+    routineSet: RoutineSet,
+    active: Boolean,
+    editing: Boolean,
+    onSelect: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val borderColor = if (active) SteppieTheme.colors.warning else MaterialTheme.colorScheme.outline
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 96.dp)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                if (active) 2.dp else SteppieStroke.Divider,
+                borderColor,
+                RoundedCornerShape(SteppieCornerRadius.Card),
+            )
+            .clickable(role = Role.Button, enabled = !editing, onClick = onSelect)
+            .padding(horizontal = SteppieSpacing.Large, vertical = SteppieSpacing.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
+    ) {
+        RoutineSetSelectionMark(active = active)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall)) {
+            Text(
+                text = routineSet.name.resolve(null, Locale.getDefault().toLanguageTag()),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.button,
+                maxLines = 2,
+            )
+            Text(
+                text = stringResource(
+                    if (active) R.string.guardian_routine_set_active_meta else R.string.guardian_routine_set_meta,
+                    routineSet.routines.size,
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.guardianCaption,
+            )
+        }
+        if (editing) {
+            IconTextButton(
+                label = stringResource(R.string.action_edit),
+                text = "✎",
+                onClick = onEdit,
+                danger = false,
+            )
+            IconTextButton(
+                label = stringResource(R.string.action_delete),
+                text = "-",
+                onClick = onDelete,
+                danger = true,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RoutineSetSelectionMark(active: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(if (active) SteppieTheme.colors.warning else Color.Transparent)
+            .border(3.dp, SteppieTheme.colors.warning, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (active) {
+            Text(
+                text = "✓",
+                color = MaterialTheme.colorScheme.onError,
+                style = SteppieTheme.typography.button,
+            )
+        }
+    }
+}
+
+@Composable
+private fun IconTextButton(
+    label: String,
+    text: String,
+    onClick: () -> Unit,
+    danger: Boolean,
+) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surface)
+            .border(
+                SteppieStroke.Divider,
+                if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
+                CircleShape,
+            )
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            color = if (danger) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface,
+            style = SteppieTheme.typography.guardianSection,
+        )
+    }
+}
+
+@Composable
+private fun GuardianRoutineSetCreateScreen(
+    state: GuardianModeUiState,
+    useSplitLayout: Boolean,
+    onOpenHome: () -> Unit,
+    onRoutineSetNameChange: (String) -> Unit,
+    onRoutineSetStepTitleChange: (String) -> Unit,
+    onRoutineSetStepIconChange: (String) -> Unit,
+    onRoutineSetStepColorChange: (String) -> Unit,
+    onRoutineSetStepScheduledTimeChange: (String) -> Unit,
+    onAddRoutineSetStep: () -> Unit,
+    onEditRoutineSetStep: (Int) -> Unit,
+    onRemoveRoutineSetStep: (Int) -> Unit,
+    onSaveRoutineSetDraft: () -> Unit,
+) {
+    val draft = state.routineSetDraft ?: return
+    GuardianScaffold(
+        title = stringResource(R.string.guardian_routine_set_create_title),
+        subtitle = stringResource(R.string.guardian_routine_set_create_subtitle),
+        onBack = onOpenHome,
+        bottom = {
+            Row(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium)) {
+                SteppieButton(
+                    label = stringResource(R.string.action_cancel),
+                    onClick = onOpenHome,
+                    modifier = Modifier.weight(1f),
+                    style = SteppieButtonStyle.Secondary,
+                )
+                SteppieButton(
+                    label = stringResource(R.string.action_save),
+                    onClick = onSaveRoutineSetDraft,
+                    modifier = Modifier.weight(1f),
+                    state = if (draft.steps.isEmpty()) SteppieButtonState.Disabled else SteppieButtonState.Enabled,
+                )
+            }
+        },
+    ) {
+        if (useSplitLayout) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("guardian_routine_set_create_split"),
+                horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Large),
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+                ) {
+                    RoutineSetNameField(draft.name, onRoutineSetNameChange)
+                    RoutineSetStepList(draft.steps, onEditRoutineSetStep, onRemoveRoutineSetStep)
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+                ) {
+                    RoutineSetStepEditor(
+                        draft = draft.stepDraft,
+                        onTitleChange = onRoutineSetStepTitleChange,
+                        onIconChange = onRoutineSetStepIconChange,
+                        onColorChange = onRoutineSetStepColorChange,
+                        onScheduledTimeChange = onRoutineSetStepScheduledTimeChange,
+                        onAddStep = onAddRoutineSetStep,
+                        isEditing = draft.editingStepIndex != null,
+                    )
+                    state.draftError?.let { ErrorMessage(it) }
+                    WarningMessage(stringResource(R.string.guardian_unsaved_warning))
+                }
+            }
+        } else {
+            RoutineSetNameField(draft.name, onRoutineSetNameChange)
+            RoutineSetStepEditor(
+                draft = draft.stepDraft,
+                onTitleChange = onRoutineSetStepTitleChange,
+                onIconChange = onRoutineSetStepIconChange,
+                onColorChange = onRoutineSetStepColorChange,
+                onScheduledTimeChange = onRoutineSetStepScheduledTimeChange,
+                onAddStep = onAddRoutineSetStep,
+                isEditing = draft.editingStepIndex != null,
+            )
+            RoutineSetStepList(draft.steps, onEditRoutineSetStep, onRemoveRoutineSetStep)
+            state.draftError?.let { ErrorMessage(it) }
+            WarningMessage(stringResource(R.string.guardian_unsaved_warning))
+        }
+    }
+}
+
+@Composable
+private fun RoutineSetNameField(
+    name: String,
+    onNameChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = name,
+        onValueChange = onNameChange,
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(stringResource(R.string.guardian_field_routine_set_name)) },
+        singleLine = true,
+    )
+}
+
+@Composable
+private fun RoutineSetStepEditor(
+    draft: RoutineDraft,
+    onTitleChange: (String) -> Unit,
+    onIconChange: (String) -> Unit,
+    onColorChange: (String) -> Unit,
+    onScheduledTimeChange: (String) -> Unit,
+    onAddStep: () -> Unit,
+    isEditing: Boolean,
+) {
+    GuardianPanel(title = stringResource(R.string.guardian_step_editor_title)) {
+        OutlinedTextField(
+            value = draft.title,
+            onValueChange = onTitleChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.guardian_field_step_title)) },
+            singleLine = true,
+        )
+        IconPicker(selectedIcon = draft.iconName, onSelected = onIconChange)
+        ColorPicker(selectedColorToken = draft.colorToken, onSelected = onColorChange)
+        OutlinedTextField(
+            value = draft.scheduledTime,
+            onValueChange = onScheduledTimeChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.guardian_field_time)) },
+            placeholder = { Text(stringResource(R.string.guardian_time_placeholder)) },
+            singleLine = true,
+        )
+        SteppieButton(
+            label = stringResource(if (isEditing) R.string.guardian_update_step else R.string.guardian_add_step),
+            onClick = onAddStep,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun RoutineSetStepList(
+    steps: List<RoutineDraft>,
+    onEditStep: (Int) -> Unit,
+    onRemoveStep: (Int) -> Unit,
+) {
+    GuardianPanel(title = stringResource(R.string.guardian_step_list_title, steps.size)) {
+        if (steps.isEmpty()) {
+            Text(
+                text = stringResource(R.string.guardian_step_list_empty),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianCaption,
+            )
+        } else {
+            steps.forEachIndexed { index, step ->
+                RoutineSetStepRow(
+                    index = index,
+                    step = step,
+                    onEdit = { onEditStep(index) },
+                    onRemove = { onRemoveStep(index) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RoutineSetStepRow(
+    index: Int,
+    step: RoutineDraft,
+    onEdit: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 68.dp)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Control))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(SteppieSpacing.Small),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+    ) {
+        Box(
+            modifier = Modifier.size(44.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            RoutineIcon(IconRef.Builtin(step.iconName), focus = false, modifier = Modifier.size(40.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.guardian_step_order_title, index + 1, step.title),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.button,
+                maxLines = 2,
+            )
+            Text(
+                text = step.scheduledTime.ifBlank { stringResource(R.string.guardian_time_none) },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.guardianCaption,
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
+            SteppieButton(
+                label = stringResource(R.string.action_edit),
+                onClick = onEdit,
+                style = SteppieButtonStyle.Secondary,
+            )
+            SteppieButton(
+                label = stringResource(R.string.action_delete),
+                onClick = onRemove,
+                style = SteppieButtonStyle.Danger,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyRoutineSetPanel(onOpenNewRoutineSet: () -> Unit) {
+    GuardianPanel(
+        title = stringResource(R.string.guardian_empty_routine_set_title),
+        body = stringResource(R.string.guardian_empty_routine_set_body),
+    ) {
+        SteppieButton(
+            label = stringResource(R.string.guardian_menu_create_routine_set),
+            onClick = onOpenNewRoutineSet,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
 private fun GuardianRoutineSplitScreen(
     state: GuardianModeUiState,
     onOpenHome: () -> Unit,
+    onOpenRoutineSetCreate: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
     onOpenRoutineEditor: (String) -> Unit,
+    onToggleRoutineSetListEditing: () -> Unit,
+    onSelectRoutineSet: (String) -> Unit,
+    onRequestEditRoutineSetName: (String) -> Unit,
+    onRequestDeleteRoutineSet: (String) -> Unit,
     onRequestDelete: (String) -> Unit,
     onMoveRoutine: (String, Int) -> Unit,
     onShowOutOfScopeNotice: () -> Unit,
@@ -379,8 +898,13 @@ private fun GuardianRoutineSplitScreen(
             GuardianRoutineEditScreen(
                 state = state,
                 onOpenHome = onOpenHome,
+                onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                 onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                 onOpenRoutineEditor = onOpenRoutineEditor,
+                onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
+                onSelectRoutineSet = onSelectRoutineSet,
+                onRequestEditRoutineSetName = onRequestEditRoutineSetName,
+                onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
                 onRequestDelete = onRequestDelete,
                 onMoveRoutine = onMoveRoutine,
                 onShowOutOfScopeNotice = onShowOutOfScopeNotice,
@@ -497,6 +1021,8 @@ private fun GuardianScaffold(
     subtitle: String,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
+    topActionLabel: String? = null,
+    onTopAction: (() -> Unit)? = null,
     bottom: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -507,7 +1033,13 @@ private fun GuardianScaffold(
             .padding(SteppieLayout.GuardianScreenPadding),
         verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
     ) {
-        GuardianTopBar(title = title, subtitle = subtitle, onBack = onBack)
+        GuardianTopBar(
+            title = title,
+            subtitle = subtitle,
+            onBack = onBack,
+            topActionLabel = topActionLabel,
+            onTopAction = onTopAction,
+        )
         Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small), content = content)
         Spacer(Modifier.height(SteppieSpacing.Large))
         bottom?.invoke()
@@ -519,6 +1051,8 @@ private fun GuardianTopBar(
     title: String,
     subtitle: String,
     onBack: (() -> Unit)? = null,
+    topActionLabel: String? = null,
+    onTopAction: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier
@@ -536,7 +1070,29 @@ private fun GuardianTopBar(
                 style = SteppieTheme.typography.button,
             )
         }
-        Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, style = SteppieTheme.typography.guardianTitle)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+        ) {
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.guardianTitle,
+            )
+            if (topActionLabel != null && onTopAction != null) {
+                Text(
+                    text = topActionLabel,
+                    modifier = Modifier
+                        .heightIn(min = SteppieLayout.GuardianMinimumTouchTarget)
+                        .clickable(role = Role.Button, onClick = onTopAction)
+                        .padding(horizontal = SteppieSpacing.ExtraSmall),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = SteppieTheme.typography.button,
+                )
+            }
+        }
         Text(subtitle, color = MaterialTheme.colorScheme.onSurface, style = SteppieTheme.typography.guardianCaption)
     }
 }

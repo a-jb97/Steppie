@@ -21,12 +21,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.steppie.data.local.SteppieDatabase
 import com.example.steppie.data.repository.DataStoreAppSettingsRepository
 import com.example.steppie.data.repository.RoomRoutineRepository
-import com.example.steppie.data.sample.RoutineSampleData
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.notifications.ACTION_OPEN_ROUTINE
 import com.example.steppie.notifications.AndroidRoutineNotificationScheduler
@@ -40,7 +38,6 @@ import com.example.steppie.ui.theme.SteppieTheme
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val routineRepository by lazy {
@@ -56,9 +53,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         notificationRoutineId.value = intent.notificationRoutineId()
         feedbackController = AndroidFeedbackController(this)
-        lifecycleScope.launch {
-            RoutineSampleData.seedRepositoryIfEmpty(routineRepository)
-        }
         enableEdgeToEdge()
         setContent {
             SteppieTheme {
@@ -128,16 +122,34 @@ class MainActivity : ComponentActivity() {
                         onOpenRoutineEdit = guardianViewModel::openRoutineEdit,
                         onOpenSecurity = guardianViewModel::openSecurity,
                         onOpenPinChange = guardianViewModel::openPinChange,
+                        onOpenRoutineSetCreate = guardianViewModel::openRoutineSetCreate,
                         onOpenNewRoutineEditor = guardianViewModel::openNewRoutineEditor,
                         onOpenRoutineEditor = guardianViewModel::openRoutineEditor,
+                        onToggleRoutineSetListEditing = guardianViewModel::toggleRoutineSetListEditing,
+                        onSelectRoutineSet = guardianViewModel::selectRoutineSet,
+                        onRequestEditRoutineSetName = guardianViewModel::requestEditRoutineSetName,
+                        onEditingRoutineSetNameChange = guardianViewModel::updateEditingRoutineSetName,
+                        onCancelEditRoutineSetName = guardianViewModel::cancelEditRoutineSetName,
+                        onSaveEditingRoutineSetName = guardianViewModel::saveEditingRoutineSetName,
                         onDraftTitleChange = guardianViewModel::updateDraftTitle,
                         onDraftIconChange = guardianViewModel::updateDraftIcon,
                         onDraftColorChange = guardianViewModel::updateDraftColor,
                         onDraftScheduledTimeChange = guardianViewModel::updateDraftScheduledTime,
                         onSaveDraft = guardianViewModel::saveDraft,
+                        onRoutineSetNameChange = guardianViewModel::updateRoutineSetName,
+                        onRoutineSetStepTitleChange = guardianViewModel::updateRoutineSetStepTitle,
+                        onRoutineSetStepIconChange = guardianViewModel::updateRoutineSetStepIcon,
+                        onRoutineSetStepColorChange = guardianViewModel::updateRoutineSetStepColor,
+                        onRoutineSetStepScheduledTimeChange = guardianViewModel::updateRoutineSetStepScheduledTime,
+                        onAddRoutineSetStep = guardianViewModel::addRoutineSetStep,
+                        onEditRoutineSetStep = guardianViewModel::editRoutineSetStep,
+                        onRemoveRoutineSetStep = guardianViewModel::removeRoutineSetStep,
+                        onSaveRoutineSetDraft = guardianViewModel::saveRoutineSetDraft,
                         onRequestDelete = guardianViewModel::requestDelete,
+                        onRequestDeleteRoutineSet = guardianViewModel::requestDeleteRoutineSet,
                         onCancelDelete = guardianViewModel::cancelDelete,
                         onConfirmDelete = guardianViewModel::confirmDelete,
+                        onConfirmDeleteRoutineSet = guardianViewModel::confirmDeleteRoutineSet,
                         onMoveRoutine = guardianViewModel::moveRoutine,
                         onShowOutOfScopeNotice = guardianViewModel::showOutOfScopeNotice,
                         onClearNotice = guardianViewModel::clearNotice,

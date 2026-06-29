@@ -142,6 +142,25 @@ class RoomRoutineRepositoryTest {
         assertNull(repository.getRoutineSet(first.id))
     }
 
+    @Test
+    fun createRoutineSet_persistsInitialRoutinesAndMakesNewSetActive() = runBlocking {
+        val first = repository.createRoutineSet(testSet(active = true))
+        val secondId = "30000000-0000-4000-8000-000000000003"
+        val created = repository.createRoutineSet(
+            testSet(id = secondId, active = true).copy(
+                routines = listOf(
+                    testRoutine(11).copy(routineSetId = secondId, order = 0),
+                    testRoutine(12).copy(routineSetId = secondId, order = 1),
+                ),
+            ),
+        )
+
+        assertEquals(false, repository.getRoutineSet(first.id)?.isActive)
+        assertEquals(true, created.isActive)
+        assertEquals(listOf(0, 1), created.routines.map { it.order })
+        assertEquals(listOf(secondId, secondId), created.routines.map { it.routineSetId })
+    }
+
     private fun testSet(id: String = routineSetId, active: Boolean = true): RoutineSet = RoutineSet(
         id = id,
         name = LocalizedText(mapOf("ko" to "테스트 루틴", "en" to "Test routine")),
