@@ -2,6 +2,7 @@ import Foundation
 import Observation
 
 enum GuardianDestination: Hashable {
+    case routineSetCreator
     case routineEditor
     case feedbackSettings
     case records
@@ -29,7 +30,57 @@ struct RoutineDraft: Equatable, Identifiable {
     var scheduledTime: LocalTime?
 
     var isNew: Bool { id == nil }
-    var isValid: Bool { !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    var isValid: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && Routine.allowedColorTokens.contains(colorToken)
+    }
+}
+
+struct RoutineSetStepDraft: Equatable, Identifiable {
+    let id: UUID
+    var title: String
+    var iconName: RoutineIconName
+    var colorToken: String
+    var scheduledTime: LocalTime?
+
+    init(
+        id: UUID = UUID(),
+        title: String = "",
+        iconName: RoutineIconName = .star,
+        colorToken: String = Routine.defaultColorToken,
+        scheduledTime: LocalTime? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.iconName = iconName
+        self.colorToken = colorToken
+        self.scheduledTime = scheduledTime
+    }
+
+    var isValid: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && Routine.allowedColorTokens.contains(colorToken)
+    }
+}
+
+struct RoutineSetDraft: Equatable {
+    var name: String
+    var steps: [RoutineSetStepDraft]
+
+    var isValid: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !steps.isEmpty
+            && steps.allSatisfy(\.isValid)
+    }
+}
+
+struct RoutineSetNameDraft: Equatable, Identifiable {
+    let id: UUID
+    var name: String
+
+    var isValid: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
 
 @MainActor
@@ -40,15 +91,23 @@ final class GuardianModeViewModel {
     private let onDataChanged: () -> Void
 
     private(set) var loadState: GuardianLoadState = .idle
+    private(set) var routineSets: [RoutineSet] = []
     private(set) var activeRoutineSet: RoutineSet?
     private(set) var routines: [Routine] = []
     private(set) var settings: AppSettings?
     private(set) var errorMessage: String?
 
     var selectedDestination: GuardianDestination?
+    var selectedRoutineSetID: UUID?
     var selectedRoutineID: UUID?
     var draft: RoutineDraft?
+    var routineSetDraft: RoutineSetDraft?
+    var selectedRoutineSetStepID: UUID?
+    var routineSetStepDraft: RoutineSetStepDraft?
+    var isEditingRoutineSets = false
+    var routineSetNameDraft: RoutineSetNameDraft?
     var pendingDeleteRoutine: Routine?
+    var pendingDeleteRoutineSet: RoutineSet?
 
     init(
         repository: any RoutineRepository,
@@ -65,6 +124,15 @@ final class GuardianModeViewModel {
         return routines.first { $0.id == selectedRoutineID } ?? routines.first
     }
 
+    var selectedRoutineSet: RoutineSet? {
+        guard let selectedRoutineSetID else { return routineSets.first }
+        return routineSets.first { $0.id == selectedRoutineSetID } ?? routineSets.first
+    }
+
+    var hasRoutineSets: Bool {
+        !routineSets.isEmpty
+    }
+
     var hasUnsavedDraft: Bool {
         guard let draft else { return false }
         if draft.isNew { return draft.isValid }
@@ -75,6 +143,23 @@ final class GuardianModeViewModel {
             || draft.scheduledTime != original.scheduledTime
     }
 
+    var canSaveRoutineSetDraft: Bool {
+        routineSetDraft?.isValid == true
+    }
+
+    var selectedRoutineSetStep: RoutineSetStepDraft? {
+        guard let routineSetDraft else { return nil }
+        guard let selectedRoutineSetStepID else { return routineSetDraft.steps.first }
+        return routineSetDraft.steps.first { $0.id == selectedRoutineSetStepID } ?? routineSetDraft.steps.first
+    }
+
+    var hasUnsavedRoutineSetDraft: Bool {
+        guard let routineSetDraft else { return false }
+        return !routineSetDraft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !routineSetDraft.steps.isEmpty
+            || routineSetStepDraft?.isValid == true
+    }
+
     func loadIfNeeded() {
         guard loadState == .idle else { return }
         load()
@@ -83,14 +168,31 @@ final class GuardianModeViewModel {
     func load() {
         do {
             settings = try repository.appSettings()
-            guard let activeSet = try repository.routineSets().first(where: \.isActive) else {
+            let fetchedRoutineSets = try repository.routineSets()
+            routineSets = fetchedRoutineSets
+            activeRoutineSet = fetchedRoutineSets.first(where: \.isActive)
+
+            guard !fetchedRoutineSets.isEmpty else {
                 activeRoutineSet = nil
                 routines = []
+                selectedRoutineSetID = nil
+                selectedRoutineID = nil
                 loadState = .empty
                 return
             }
-            activeRoutineSet = activeSet
-            routines = try repository.routines(in: activeSet.id)
+
+            if selectedRoutineSetID.map({ id in !fetchedRoutineSets.contains { $0.id == id } }) != false {
+                selectedRoutineSetID = activeRoutineSet?.id ?? fetchedRoutineSets.first?.id
+            }
+
+            guard let selectedRoutineSetID else {
+                routines = []
+                selectedRoutineID = nil
+                loadState = .empty
+                return
+            }
+
+            routines = try repository.routines(in: selectedRoutineSetID)
             if selectedRoutineID.map({ id in !routines.contains { $0.id == id } }) != false {
                 selectedRoutineID = routines.first?.id
             }
@@ -101,7 +203,104 @@ final class GuardianModeViewModel {
         }
     }
 
+    func beginCreateRoutineSet() {
+        routineSetDraft = RoutineSetDraft(name: "", steps: [])
+        selectedRoutineSetStepID = nil
+        routineSetStepDraft = nil
+        isEditingRoutineSets = false
+        selectedDestination = .routineSetCreator
+    }
+
+    func cancelRoutineSetDraft() {
+        routineSetDraft = nil
+        selectedRoutineSetStepID = nil
+        routineSetStepDraft = nil
+    }
+
+    func beginAddRoutineSetStep() {
+        routineSetStepDraft = RoutineSetStepDraft()
+        selectedRoutineSetStepID = nil
+    }
+
+    func beginEditRoutineSetStep(_ step: RoutineSetStepDraft) {
+        selectedRoutineSetStepID = step.id
+        routineSetStepDraft = step
+    }
+
+    func cancelRoutineSetStepDraft() {
+        routineSetStepDraft = nil
+    }
+
+    func saveRoutineSetStepDraft() {
+        guard let routineSetStepDraft, routineSetStepDraft.isValid else { return }
+        if let index = routineSetDraft?.steps.firstIndex(where: { $0.id == routineSetStepDraft.id }) {
+            routineSetDraft?.steps[index] = routineSetStepDraft
+        } else {
+            routineSetDraft?.steps.append(routineSetStepDraft)
+        }
+        selectedRoutineSetStepID = routineSetStepDraft.id
+        self.routineSetStepDraft = nil
+    }
+
+    func deleteRoutineSetStep(_ step: RoutineSetStepDraft) {
+        routineSetDraft?.steps.removeAll { $0.id == step.id }
+        if selectedRoutineSetStepID == step.id {
+            selectedRoutineSetStepID = routineSetDraft?.steps.first?.id
+        }
+        if routineSetStepDraft?.id == step.id {
+            routineSetStepDraft = nil
+        }
+    }
+
+    func moveRoutineSetStep(_ step: RoutineSetStepDraft, direction: Int) {
+        guard var steps = routineSetDraft?.steps,
+              let index = steps.firstIndex(where: { $0.id == step.id }) else { return }
+        let destination = index + direction
+        guard steps.indices.contains(destination) else { return }
+        steps.swapAt(index, destination)
+        routineSetDraft?.steps = steps
+    }
+
+    func saveRoutineSetDraft(localeIdentifier: String) {
+        guard let routineSetDraft, routineSetDraft.isValid else { return }
+        do {
+            let createdAt = now()
+            let routineSet = try RoutineSet(
+                name: LocalizedText([localeIdentifier: routineSetDraft.name]),
+                isActive: true,
+                createdAt: createdAt,
+                updatedAt: createdAt
+            )
+            try repository.createRoutineSet(routineSet)
+
+            for (order, step) in routineSetDraft.steps.enumerated() {
+                let routine = try Routine(
+                    routineSetID: routineSet.id,
+                    title: LocalizedText([localeIdentifier: step.title]),
+                    icon: IconRef.builtin(name: step.iconName.rawValue),
+                    colorToken: step.colorToken,
+                    order: order,
+                    scheduledTime: step.scheduledTime,
+                    createdAt: createdAt,
+                    updatedAt: createdAt
+                )
+                try repository.createRoutine(routine)
+            }
+
+            self.routineSetDraft = nil
+            selectedRoutineSetStepID = nil
+            routineSetStepDraft = nil
+            selectedRoutineSetID = routineSet.id
+            selectedDestination = .routineEditor
+            load()
+            onDataChanged()
+        } catch {
+            errorMessage = "루틴 세트를 저장하지 못했어요."
+        }
+    }
+
     func beginAddRoutine() {
+        guard selectedRoutineSet != nil else { return }
         selectedRoutineID = nil
         draft = RoutineDraft(
             id: nil,
@@ -128,7 +327,7 @@ final class GuardianModeViewModel {
     }
 
     func saveDraft(localeIdentifier: String) {
-        guard let activeRoutineSet, let draft, draft.isValid else { return }
+        guard let selectedRoutineSet, let draft, draft.isValid else { return }
         do {
             let updatedAt = now()
             let title = try LocalizedText([localeIdentifier: draft.title])
@@ -151,7 +350,7 @@ final class GuardianModeViewModel {
                 try repository.updateRoutine(updated)
             } else {
                 let routine = try Routine(
-                    routineSetID: activeRoutineSet.id,
+                    routineSetID: selectedRoutineSet.id,
                     title: title,
                     icon: icon,
                     colorToken: draft.colorToken,
@@ -188,8 +387,14 @@ final class GuardianModeViewModel {
         }
     }
 
+    func toggleRoutineSetEditing() {
+        isEditingRoutineSets.toggle()
+        routineSetNameDraft = nil
+        pendingDeleteRoutineSet = nil
+    }
+
     func moveRoutines(from source: IndexSet, to destination: Int) {
-        guard let activeRoutineSet else { return }
+        guard let selectedRoutineSet else { return }
         var moved = routines
         let moving = source.sorted().map { moved[$0] }
         for index in source.sorted(by: >) {
@@ -197,28 +402,107 @@ final class GuardianModeViewModel {
         }
         let adjustedDestination = destination - source.filter { $0 < destination }.count
         moved.insert(contentsOf: moving, at: adjustedDestination)
-        saveRoutineOrder(moved, in: activeRoutineSet.id)
+        saveRoutineOrder(moved, in: selectedRoutineSet.id)
     }
 
     func moveRoutine(_ routine: Routine, direction: Int) {
-        guard let activeRoutineSet,
+        guard let selectedRoutineSet,
               let index = routines.firstIndex(where: { $0.id == routine.id }) else { return }
         let destination = index + direction
         guard routines.indices.contains(destination) else { return }
         var moved = routines
         moved.swapAt(index, destination)
-        saveRoutineOrder(moved, in: activeRoutineSet.id)
+        saveRoutineOrder(moved, in: selectedRoutineSet.id)
     }
 
     func moveRoutine(_ routine: Routine, to destination: Int) {
-        guard let activeRoutineSet,
+        guard let selectedRoutineSet,
               let index = routines.firstIndex(where: { $0.id == routine.id }),
               routines.indices.contains(destination),
               index != destination else { return }
         var moved = routines
         let item = moved.remove(at: index)
         moved.insert(item, at: destination)
-        saveRoutineOrder(moved, in: activeRoutineSet.id)
+        saveRoutineOrder(moved, in: selectedRoutineSet.id)
+    }
+
+    func selectRoutineSet(_ routineSet: RoutineSet) {
+        guard routineSets.contains(where: { $0.id == routineSet.id }) else { return }
+        selectedRoutineSetID = routineSet.id
+        selectedRoutineID = nil
+        draft = nil
+        load()
+    }
+
+    func beginRenameRoutineSet(_ routineSet: RoutineSet) {
+        routineSetNameDraft = RoutineSetNameDraft(
+            id: routineSet.id,
+            name: localizedTitle(for: routineSet)
+        )
+    }
+
+    func cancelRoutineSetRename() {
+        routineSetNameDraft = nil
+    }
+
+    func saveRoutineSetName(localeIdentifier: String) {
+        guard let routineSetNameDraft,
+              routineSetNameDraft.isValid,
+              let original = try? repository.routineSet(id: routineSetNameDraft.id) else { return }
+        do {
+            let updated = try RoutineSet(
+                id: original.id,
+                name: LocalizedText([localeIdentifier: routineSetNameDraft.name]),
+                isActive: original.isActive,
+                createdAt: original.createdAt,
+                updatedAt: now(),
+                deletedAt: original.deletedAt
+            )
+            try repository.updateRoutineSet(updated)
+            self.routineSetNameDraft = nil
+            load()
+            onDataChanged()
+        } catch {
+            errorMessage = "루틴 세트 이름을 저장하지 못했어요."
+        }
+    }
+
+    func requestDeleteRoutineSet(_ routineSet: RoutineSet) {
+        pendingDeleteRoutineSet = routineSet
+    }
+
+    func confirmDeleteRoutineSet() {
+        guard let routineSet = pendingDeleteRoutineSet else { return }
+        do {
+            let visibleSets = try repository.routineSets()
+            if routineSet.isActive {
+                guard let nextActiveSet = visibleSets.first(where: { $0.id != routineSet.id }) else {
+                    errorMessage = "마지막 루틴 세트는 삭제할 수 없어요."
+                    pendingDeleteRoutineSet = nil
+                    return
+                }
+                let activated = try RoutineSet(
+                    id: nextActiveSet.id,
+                    name: nextActiveSet.name,
+                    isActive: true,
+                    createdAt: nextActiveSet.createdAt,
+                    updatedAt: now(),
+                    deletedAt: nextActiveSet.deletedAt
+                )
+                try repository.updateRoutineSet(activated)
+            }
+
+            try repository.deleteRoutineSet(id: routineSet.id, at: now())
+            if selectedRoutineSetID == routineSet.id {
+                selectedRoutineSetID = nil
+            }
+            pendingDeleteRoutineSet = nil
+            draft = nil
+            load()
+            onDataChanged()
+        } catch {
+            errorMessage = "루틴 세트를 삭제하지 못했어요."
+        }
     }
 
     private func saveRoutineOrder(_ moved: [Routine], in routineSetID: UUID) {
@@ -275,6 +559,13 @@ final class GuardianModeViewModel {
 
     func localizedTitle(for routine: Routine) -> String {
         routine.title.resolved(
+            appLocale: Locale.autoupdatingCurrent.identifier,
+            systemLanguages: Locale.preferredLanguages
+        )
+    }
+
+    func localizedTitle(for routineSet: RoutineSet) -> String {
+        routineSet.name.resolved(
             appLocale: Locale.autoupdatingCurrent.identifier,
             systemLanguages: Locale.preferredLanguages
         )

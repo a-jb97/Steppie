@@ -85,6 +85,9 @@ final class PreviewRoutineRepository: RoutineRepository {
     }
 
     func createRoutineSet(_ routineSet: RoutineSet) throws {
+        if routineSet.isActive {
+            try deactivateOtherRoutineSets(except: routineSet.id, at: routineSet.updatedAt)
+        }
         routineSets.append(routineSet)
     }
 
@@ -98,6 +101,9 @@ final class PreviewRoutineRepository: RoutineRepository {
 
     func updateRoutineSet(_ routineSet: RoutineSet) throws {
         guard let index = routineSets.firstIndex(where: { $0.id == routineSet.id }) else { return }
+        if routineSet.isActive {
+            try deactivateOtherRoutineSets(except: routineSet.id, at: routineSet.updatedAt)
+        }
         routineSets[index] = routineSet
     }
 
@@ -255,6 +261,20 @@ final class PreviewRoutineRepository: RoutineRepository {
                 createdAt: routine.createdAt,
                 updatedAt: date,
                 deletedAt: routine.deletedAt
+            )
+        }
+    }
+
+    private func deactivateOtherRoutineSets(except id: UUID, at date: Date) throws {
+        for index in routineSets.indices where routineSets[index].id != id && routineSets[index].isActive {
+            let original = routineSets[index]
+            routineSets[index] = try RoutineSet(
+                id: original.id,
+                name: original.name,
+                isActive: false,
+                createdAt: original.createdAt,
+                updatedAt: max(date, original.createdAt),
+                deletedAt: original.deletedAt
             )
         }
     }
