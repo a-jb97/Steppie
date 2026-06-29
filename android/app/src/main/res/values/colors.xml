@@ -7,4 +7,7 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="steppie_color_background_primary">#F6EFEE</color>
+    <color name="steppie_color_background_secondary">#EFE6E1</color>
+    <color name="steppie_color_border_subtle">#D7CCC8</color>
 </resources>
