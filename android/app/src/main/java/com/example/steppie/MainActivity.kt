@@ -22,6 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.steppie.data.backup.AndroidBackupRepository
+import com.example.steppie.data.backup.BackupDataSource
 import com.example.steppie.data.local.SteppieDatabase
 import com.example.steppie.data.repository.DataStoreAppSettingsRepository
 import com.example.steppie.data.repository.RoomRoutineRepository
@@ -44,6 +46,12 @@ class MainActivity : ComponentActivity() {
         RoomRoutineRepository(SteppieDatabase.getInstance(this))
     }
     private val appSettingsRepository by lazy { DataStoreAppSettingsRepository(this) }
+    private val backupRepository by lazy {
+        AndroidBackupRepository(
+            context = this,
+            dataSource = BackupDataSource(SteppieDatabase.getInstance(this), appSettingsRepository),
+        )
+    }
     private val notificationScheduler by lazy { AndroidRoutineNotificationScheduler(this) }
     private val notificationRoutineId = MutableStateFlow<String?>(null)
     private lateinit var feedbackController: AndroidFeedbackController
@@ -60,7 +68,11 @@ class MainActivity : ComponentActivity() {
                     factory = ChildRoutineViewModel.factory(routineRepository),
                 )
                 val guardianViewModel: GuardianModeViewModel = viewModel(
-                    factory = GuardianModeViewModel.factory(routineRepository, appSettingsRepository),
+                    factory = GuardianModeViewModel.factory(
+                        routineRepository,
+                        appSettingsRepository,
+                        backupRepository,
+                    ),
                 )
                 val childState by childViewModel.uiState.collectAsStateWithLifecycle()
                 val guardianState by guardianViewModel.uiState.collectAsStateWithLifecycle()
@@ -72,6 +84,16 @@ class MainActivity : ComponentActivity() {
                     ActivityResultContracts.RequestPermission(),
                 ) {
                     notificationPermissionRefresh += 1
+                }
+                val createBackupLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument("application/zip"),
+                ) { uri ->
+                    uri?.let(guardianViewModel::exportBackup)
+                }
+                val openBackupLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument(),
+                ) { uri ->
+                    uri?.let(guardianViewModel::previewRestoreBackup)
                 }
 
                 LaunchedEffect(Unit) {
@@ -121,6 +143,7 @@ class MainActivity : ComponentActivity() {
                         onOpenHome = guardianViewModel::openHome,
                         onOpenRoutineEdit = guardianViewModel::openRoutineEdit,
                         onOpenSecurity = guardianViewModel::openSecurity,
+                        onOpenBackupRestore = guardianViewModel::openBackupRestore,
                         onOpenPinChange = guardianViewModel::openPinChange,
                         onOpenRoutineSetCreate = guardianViewModel::openRoutineSetCreate,
                         onOpenNewRoutineEditor = guardianViewModel::openNewRoutineEditor,
@@ -152,6 +175,15 @@ class MainActivity : ComponentActivity() {
                         onConfirmDeleteRoutineSet = guardianViewModel::confirmDeleteRoutineSet,
                         onMoveRoutine = guardianViewModel::moveRoutine,
                         onShowOutOfScopeNotice = guardianViewModel::showOutOfScopeNotice,
+                        onCreateBackupFile = {
+                            createBackupLauncher.launch(AndroidBackupRepository.defaultFileName())
+                        },
+                        onOpenRestoreFile = {
+                            openBackupLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
+                        },
+                        onRestorePinDigit = guardianViewModel::inputRestorePinDigit,
+                        onDeleteRestorePinDigit = guardianViewModel::deleteRestorePinDigit,
+                        onCancelRestore = guardianViewModel::cancelRestore,
                         onClearNotice = guardianViewModel::clearNotice,
                     )
                 } else {

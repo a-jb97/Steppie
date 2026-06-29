@@ -1,8 +1,12 @@
 package com.example.steppie.ui.guardian
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.steppie.data.backup.BackupImportPreview
+import com.example.steppie.data.backup.BackupProvider
+import com.example.steppie.data.backup.BackupValidationException
 import com.example.steppie.domain.model.BuiltinIconNames
 import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.LocalizedText
@@ -22,7 +26,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class GuardianDestination { Pin, Home, RoutineEdit, CardEdit, RoutineSetCreate, Security }
+enum class GuardianDestination { Pin, Home, RoutineEdit, CardEdit, RoutineSetCreate, Security, BackupRestore }
 
 enum class GuardianPinMode { Enter, Setup, ChangeCurrent, ChangeNew }
 
@@ -63,6 +67,12 @@ data class GuardianModeUiState(
     val draftError: String? = null,
     val pendingDeleteRoutineId: String? = null,
     val pendingDeleteRoutineSetId: String? = null,
+    val backupInProgress: Boolean = false,
+    val backupMessage: String? = null,
+    val backupError: String? = null,
+    val pendingRestoreUri: Uri? = null,
+    val pendingRestorePreview: BackupImportPreview? = null,
+    val restorePinDigits: String = "",
     val notice: String? = null,
     val interactionToken: Long = 0L,
 ) {
@@ -73,6 +83,7 @@ data class GuardianModeUiState(
 class GuardianModeViewModel(
     private val routineRepository: RoutineRepository,
     private val appSettingsRepository: AppSettingsRepository,
+    private val backupProvider: BackupProvider? = null,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(GuardianModeUiState())
     val uiState: StateFlow<GuardianModeUiState> = _uiState.asStateFlow()
@@ -198,6 +209,29 @@ class GuardianModeViewModel(
                 editingRoutineSetId = null,
                 editingRoutineSetName = "",
                 draftError = null,
+                backupError = null,
+                backupMessage = null,
+                notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun openBackupRestore() {
+        _uiState.update {
+            it.copy(
+                destination = GuardianDestination.BackupRestore,
+                draft = null,
+                routineSetDraft = null,
+                routineSetListEditing = false,
+                editingRoutineSetId = null,
+                editingRoutineSetName = "",
+                draftError = null,
+                backupError = null,
+                backupMessage = null,
+                pendingRestoreUri = null,
+                pendingRestorePreview = null,
+                restorePinDigits = "",
                 notice = null,
                 interactionToken = it.interactionToken + 1,
             )
@@ -612,6 +646,159 @@ class GuardianModeViewModel(
         _uiState.update { it.copy(notice = null) }
     }
 
+    fun exportBackup(uri: Uri) {
+        val provider = backupProvider ?: run {
+            _uiState.update { it.copy(backupError = "백업 기능을 사용할 수 없습니다.") }
+            return
+        }
+        _uiState.update {
+            it.copy(
+                backupInProgress = true,
+                backupError = null,
+                backupMessage = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+        viewModelScope.launch {
+            runCatching { provider.exportTo(uri) }
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            backupInProgress = false,
+                            backupMessage = "백업 파일을 저장했습니다.",
+                            interactionToken = it.interactionToken + 1,
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            backupInProgress = false,
+                            backupError = backupErrorMessage(error),
+                            interactionToken = it.interactionToken + 1,
+                        )
+                    }
+                }
+        }
+    }
+
+    fun previewRestoreBackup(uri: Uri) {
+        val provider = backupProvider ?: run {
+            _uiState.update { it.copy(backupError = "복원 기능을 사용할 수 없습니다.") }
+            return
+        }
+        _uiState.update {
+            it.copy(
+                backupInProgress = true,
+                backupError = null,
+                backupMessage = null,
+                pendingRestoreUri = null,
+                pendingRestorePreview = null,
+                restorePinDigits = "",
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+        viewModelScope.launch {
+            runCatching { provider.previewImport(uri) }
+                .onSuccess { preview ->
+                    _uiState.update {
+                        it.copy(
+                            backupInProgress = false,
+                            pendingRestoreUri = uri,
+                            pendingRestorePreview = preview,
+                            restorePinDigits = "",
+                            interactionToken = it.interactionToken + 1,
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            backupInProgress = false,
+                            backupError = backupErrorMessage(error),
+                            interactionToken = it.interactionToken + 1,
+                        )
+                    }
+                }
+        }
+    }
+
+    fun inputRestorePinDigit(digit: Int) {
+        require(digit in 0..9)
+        val current = _uiState.value
+        if (current.restorePinDigits.length >= 4) return
+        val nextDigits = current.restorePinDigits + digit.toString()
+        _uiState.update {
+            it.copy(
+                restorePinDigits = nextDigits,
+                backupError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+        if (nextDigits.length == 4) restoreWithPin(nextDigits)
+    }
+
+    fun deleteRestorePinDigit() {
+        _uiState.update {
+            it.copy(
+                restorePinDigits = it.restorePinDigits.dropLast(1),
+                backupError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun cancelRestore() {
+        _uiState.update {
+            it.copy(
+                pendingRestoreUri = null,
+                pendingRestorePreview = null,
+                restorePinDigits = "",
+                backupError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    private fun restoreWithPin(pin: String) {
+        val provider = backupProvider ?: return
+        val uri = _uiState.value.pendingRestoreUri ?: return
+        _uiState.update { it.copy(backupInProgress = true, backupError = null) }
+        viewModelScope.launch {
+            if (!appSettingsRepository.verifyGuardianPin(pin)) {
+                _uiState.update {
+                    it.copy(
+                        backupInProgress = false,
+                        restorePinDigits = "",
+                        backupError = "PIN이 맞지 않아요. 다시 입력해 주세요.",
+                        interactionToken = it.interactionToken + 1,
+                    )
+                }
+                return@launch
+            }
+            runCatching { provider.restoreReplace(uri) }
+                .onSuccess {
+                    _uiState.update {
+                        GuardianModeUiState(
+                            hasGuardianPin = it.hasGuardianPin,
+                            backupMessage = "백업 파일에서 복원했습니다.",
+                            interactionToken = it.interactionToken + 1,
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            backupInProgress = false,
+                            restorePinDigits = "",
+                            backupError = backupErrorMessage(error),
+                            interactionToken = it.interactionToken + 1,
+                        )
+                    }
+                }
+        }
+    }
+
     private fun handleCompletePin(pin: String) {
         viewModelScope.launch {
             when (_uiState.value.pinMode) {
@@ -719,14 +906,20 @@ class GuardianModeViewModel(
         fun factory(
             routineRepository: RoutineRepository,
             appSettingsRepository: AppSettingsRepository,
+            backupProvider: BackupProvider? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 require(modelClass.isAssignableFrom(GuardianModeViewModel::class.java))
-                return GuardianModeViewModel(routineRepository, appSettingsRepository) as T
+                return GuardianModeViewModel(routineRepository, appSettingsRepository, backupProvider) as T
             }
         }
     }
+}
+
+private fun backupErrorMessage(error: Throwable): String = when (error) {
+    is BackupValidationException -> error.message ?: "백업 파일을 확인할 수 없습니다."
+    else -> error.message ?: "백업/복원 중 오류가 발생했습니다."
 }
 
 internal fun buildRoutineSetFromDraft(
