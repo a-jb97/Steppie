@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.steppie.data.sample.RoutineSampleData
 import com.example.steppie.ui.theme.SteppieTheme
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -84,6 +85,7 @@ class GuardianModeScreenTest {
     fun homeMenuRoutesRoutineAndSecurityCards() {
         var routineClicks = 0
         var environmentClicks = 0
+        var recordsClicks = 0
         var securityClicks = 0
 
         composeRule.setContent {
@@ -101,6 +103,7 @@ class GuardianModeScreenTest {
                     onOpenHome = {},
                     onOpenRoutineEdit = { routineClicks += 1 },
                     onOpenEnvironmentSettings = { environmentClicks += 1 },
+                    onOpenRecords = { recordsClicks += 1 },
                     onOpenSecurity = { securityClicks += 1 },
                     onOpenPinChange = {},
                     onOpenRoutineSetCreate = {},
@@ -140,13 +143,106 @@ class GuardianModeScreenTest {
 
         composeRule.onNodeWithText("루틴 관리").performClick()
         composeRule.onNodeWithText("환경 설정").performClick()
+        composeRule.onNodeWithText("진행 기록").performClick()
         composeRule.onNodeWithText("보안").performClick()
 
         composeRule.runOnIdle {
             assertEquals(1, routineClicks)
             assertEquals(1, environmentClicks)
+            assertEquals(1, recordsClicks)
             assertEquals(1, securityClicks)
         }
+    }
+
+    @Test
+    fun recordsScreenShowsSummaryAndRoutineStatus() {
+        val date = LocalDate.parse("2026-06-30")
+        val selectedDay = GuardianRecordDay(
+            date = date,
+            completedCount = 2,
+            totalCount = 3,
+            hasRecords = true,
+        )
+
+        composeRule.setContent {
+            SteppieTheme {
+                GuardianModeScreen(
+                    state = GuardianModeUiState(
+                        isActive = true,
+                        isAuthenticated = true,
+                        destination = GuardianDestination.Records,
+                        selectedRecordsDate = date,
+                        recordDays = listOf(selectedDay),
+                        selectedRecordSummary = selectedDay,
+                        selectedRecordRoutines = listOf(
+                            GuardianRecordRoutine(
+                                routineId = "40000000-0000-4000-8000-000000000001",
+                                title = "양치하기",
+                                isCompleted = true,
+                                completedAt = null,
+                                isDeleted = false,
+                                isInactive = false,
+                                isMissing = false,
+                            ),
+                            GuardianRecordRoutine(
+                                routineId = "40000000-0000-4000-8000-000000000002",
+                                title = "가방 챙기기",
+                                isCompleted = false,
+                                completedAt = null,
+                                isDeleted = true,
+                                isInactive = false,
+                                isMissing = false,
+                            ),
+                        ),
+                    ),
+                    onDigit = {},
+                    onDeletePinDigit = {},
+                    onCloseToChild = {},
+                    onInteraction = {},
+                    onOpenHome = {},
+                    onOpenRoutineEdit = {},
+                    onOpenSecurity = {},
+                    onOpenPinChange = {},
+                    onOpenRoutineSetCreate = {},
+                    onOpenNewRoutineEditor = {},
+                    onOpenRoutineEditor = {},
+                    onToggleRoutineSetListEditing = {},
+                    onSelectRoutineSet = {},
+                    onRequestEditRoutineSetName = {},
+                    onEditingRoutineSetNameChange = {},
+                    onCancelEditRoutineSetName = {},
+                    onSaveEditingRoutineSetName = {},
+                    onDraftTitleChange = {},
+                    onDraftIconChange = {},
+                    onDraftColorChange = {},
+                    onDraftScheduledTimeChange = {},
+                    onSaveDraft = {},
+                    onRoutineSetNameChange = {},
+                    onRoutineSetStepTitleChange = {},
+                    onRoutineSetStepIconChange = {},
+                    onRoutineSetStepColorChange = {},
+                    onRoutineSetStepScheduledTimeChange = {},
+                    onAddRoutineSetStep = {},
+                    onEditRoutineSetStep = {},
+                    onRemoveRoutineSetStep = {},
+                    onSaveRoutineSetDraft = {},
+                    onRequestDelete = {},
+                    onRequestDeleteRoutineSet = {},
+                    onCancelDelete = {},
+                    onConfirmDelete = {},
+                    onConfirmDeleteRoutineSet = {},
+                    onMoveRoutine = { _, _ -> },
+                    onShowOutOfScopeNotice = {},
+                    onClearNotice = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("진행 기록").assertIsDisplayed()
+        composeRule.onNodeWithText("2/3 완료 · 66%").assertIsDisplayed()
+        composeRule.onNodeWithText("양치하기").assertIsDisplayed()
+        composeRule.onNodeWithText("가방 챙기기").assertIsDisplayed()
+        composeRule.onNodeWithText("미완료 · 삭제된 활동").assertIsDisplayed()
     }
 
     @Test
