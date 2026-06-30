@@ -37,6 +37,49 @@ struct RoutineDraft: Equatable, Identifiable {
     }
 }
 
+extension AppSettings {
+    func replacing(
+        feedbackIntensity: FeedbackIntensity? = nil,
+        soundEnabled: Bool? = nil,
+        ttsEnabled: Bool? = nil,
+        ttsRate: Double? = nil,
+        ttsVolume: Double? = nil,
+        hapticEnabled: Bool? = nil,
+        notificationLeadTimes: [Int]? = nil,
+        quietHours: (LocalTime?, LocalTime?)? = nil,
+        updatedAt: Date = .now
+    ) throws -> AppSettings {
+        let resolvedQuietHoursStart: LocalTime?
+        let resolvedQuietHoursEnd: LocalTime?
+        if let quietHours {
+            resolvedQuietHoursStart = quietHours.0
+            resolvedQuietHoursEnd = quietHours.1
+        } else {
+            resolvedQuietHoursStart = quietHoursStart
+            resolvedQuietHoursEnd = quietHoursEnd
+        }
+
+        return try AppSettings(
+            id: id,
+            guardianPinHash: guardianPinHash,
+            recoveryCodeHash: recoveryCodeHash,
+            feedbackIntensity: feedbackIntensity ?? self.feedbackIntensity,
+            soundEnabled: soundEnabled ?? self.soundEnabled,
+            ttsEnabled: ttsEnabled ?? self.ttsEnabled,
+            ttsRate: ttsRate ?? self.ttsRate,
+            ttsVolume: ttsVolume ?? self.ttsVolume,
+            hapticEnabled: hapticEnabled ?? self.hapticEnabled,
+            undoDurationSeconds: undoDurationSeconds,
+            notificationLeadTimes: notificationLeadTimes ?? self.notificationLeadTimes,
+            quietHoursStart: resolvedQuietHoursStart,
+            quietHoursEnd: resolvedQuietHoursEnd,
+            locale: locale,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
 struct RoutineSetStepDraft: Equatable, Identifiable {
     let id: UUID
     var title: String
