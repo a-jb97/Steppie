@@ -53,9 +53,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onClick as semanticOnClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.steppie.R
@@ -319,7 +323,16 @@ fun GuardianModeScreen(
                         text = stringResource(R.string.guardian_restore_pin_prompt),
                         style = SteppieTheme.typography.guardianBody,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val restorePinProgressDescription = stringResource(
+                        R.string.a11y_pin_progress,
+                        state.restorePinDigits.length,
+                    )
+                    Row(
+                        modifier = Modifier.semantics {
+                            contentDescription = restorePinProgressDescription
+                        },
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                         repeat(4) { index ->
                             Box(
                                 modifier = Modifier
@@ -368,12 +381,18 @@ private fun GuardianPinScreen(
     onDigit: (Int) -> Unit,
     onDeletePinDigit: () -> Unit,
 ) {
+    val pinProgressDescription = stringResource(R.string.a11y_pin_progress, state.pinDigits.length)
     Column(
         modifier = Modifier
             .fillMaxSize()
             .testTag("guardian_pin")
             .verticalScroll(rememberScrollState())
-            .padding(SteppieLayout.ChildScreenPadding),
+            .padding(
+                start = SteppieLayout.ChildScreenPadding,
+                top = SteppieLayout.GuardianScreenPadding,
+                end = SteppieLayout.ChildScreenPadding,
+                bottom = SteppieLayout.ChildScreenPadding,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         GuardianTopBar(
@@ -390,8 +409,13 @@ private fun GuardianPinScreen(
                 GuardianPinMode.ChangeNew -> stringResource(R.string.guardian_pin_change_new_subtitle)
             },
         )
-        Spacer(Modifier.height(36.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Spacer(Modifier.height(SteppieSpacing.Large))
+        Row(
+            modifier = Modifier.semantics {
+                contentDescription = pinProgressDescription
+            },
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             repeat(4) { index ->
                 Box(
                     modifier = Modifier
@@ -407,7 +431,7 @@ private fun GuardianPinScreen(
                 )
             }
         }
-        Spacer(Modifier.height(50.dp))
+        Spacer(Modifier.height(SteppieSpacing.Large))
         PinKeypad(onDigit = onDigit, onDelete = onDeletePinDigit)
         if (state.pinError != null) {
             Spacer(Modifier.height(28.dp))
@@ -435,11 +459,16 @@ private fun PinKeypad(onDigit: (Int) -> Unit, onDelete: () -> Unit) {
                                 .size(width = 90.dp, height = SteppieLayout.ChildMinimumTouchTarget)
                                 .clip(RoundedCornerShape(SteppieCornerRadius.Card))
                                 .background(MaterialTheme.colorScheme.surface)
+                                .clearAndSetSemantics {
+                                    contentDescription = if (label == "⌫") deleteDescription else label
+                                    role = Role.Button
+                                    semanticOnClick {
+                                        if (label == "⌫") onDelete() else onDigit(label.toInt())
+                                        true
+                                    }
+                                }
                                 .clickable(role = Role.Button) {
                                     if (label == "⌫") onDelete() else onDigit(label.toInt())
-                                }
-                                .semantics {
-                                    contentDescription = if (label == "⌫") deleteDescription else label
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
@@ -476,11 +505,16 @@ private fun CompactPinKeypad(onDigit: (Int) -> Unit, onDelete: () -> Unit) {
                                 .size(width = 64.dp, height = 56.dp)
                                 .clip(RoundedCornerShape(SteppieCornerRadius.Control))
                                 .background(MaterialTheme.colorScheme.surface)
+                                .clearAndSetSemantics {
+                                    contentDescription = if (label == "⌫") deleteDescription else label
+                                    role = Role.Button
+                                    semanticOnClick {
+                                        if (label == "⌫") onDelete() else onDigit(label.toInt())
+                                        true
+                                    }
+                                }
                                 .clickable(role = Role.Button) {
                                     if (label == "⌫") onDelete() else onDigit(label.toInt())
-                                }
-                                .semantics {
-                                    contentDescription = if (label == "⌫") deleteDescription else label
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
@@ -653,6 +687,13 @@ private fun RoutineSetRow(
     onDelete: () -> Unit,
 ) {
     val borderColor = if (active) SteppieTheme.colors.warning else MaterialTheme.colorScheme.outline
+    val routineSetName = routineSet.name.resolve(null, Locale.getDefault().toLanguageTag())
+    val meta = stringResource(
+        if (active) R.string.guardian_routine_set_active_meta else R.string.guardian_routine_set_meta,
+        routineSet.routines.size,
+    )
+    val selectionState = stringResource(if (active) R.string.a11y_selected else R.string.a11y_not_selected)
+    val accessibilityDescription = stringResource(R.string.a11y_routine_set_row, routineSetName, meta)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -664,6 +705,24 @@ private fun RoutineSetRow(
                 borderColor,
                 RoundedCornerShape(SteppieCornerRadius.Card),
             )
+            .then(
+                if (editing) {
+                    Modifier.semantics {
+                        contentDescription = accessibilityDescription
+                        stateDescription = selectionState
+                    }
+                } else {
+                    Modifier.clearAndSetSemantics {
+                        contentDescription = accessibilityDescription
+                        stateDescription = selectionState
+                        role = Role.Button
+                        semanticOnClick {
+                            onSelect()
+                            true
+                        }
+                    }
+                },
+            )
             .clickable(role = Role.Button, enabled = !editing, onClick = onSelect)
             .padding(horizontal = SteppieSpacing.Large, vertical = SteppieSpacing.Medium),
         verticalAlignment = Alignment.CenterVertically,
@@ -672,29 +731,26 @@ private fun RoutineSetRow(
         RoutineSetSelectionMark(active = active)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall)) {
             Text(
-                text = routineSet.name.resolve(null, Locale.getDefault().toLanguageTag()),
+                text = routineSetName,
                 color = MaterialTheme.colorScheme.onSurface,
                 style = SteppieTheme.typography.button,
                 maxLines = 2,
             )
             Text(
-                text = stringResource(
-                    if (active) R.string.guardian_routine_set_active_meta else R.string.guardian_routine_set_meta,
-                    routineSet.routines.size,
-                ),
+                text = meta,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = SteppieTheme.typography.guardianCaption,
             )
         }
         if (editing) {
             IconTextButton(
-                label = stringResource(R.string.action_edit),
+                label = stringResource(R.string.a11y_item_action, routineSetName, stringResource(R.string.action_edit)),
                 text = "✎",
                 onClick = onEdit,
                 danger = false,
             )
             IconTextButton(
-                label = stringResource(R.string.action_delete),
+                label = stringResource(R.string.a11y_item_action, routineSetName, stringResource(R.string.action_delete)),
                 text = "-",
                 onClick = onDelete,
                 danger = true,
@@ -822,6 +878,7 @@ private fun GuardianRoutineSetCreateScreen(
             }
         } else {
             RoutineSetNameField(draft.name, onRoutineSetNameChange)
+            RoutineSetStepList(draft.steps, onEditRoutineSetStep, onRemoveRoutineSetStep)
             RoutineSetStepEditor(
                 draft = draft.stepDraft,
                 onTitleChange = onRoutineSetStepTitleChange,
@@ -831,7 +888,6 @@ private fun GuardianRoutineSetCreateScreen(
                 onAddStep = onAddRoutineSetStep,
                 isEditing = draft.editingStepIndex != null,
             )
-            RoutineSetStepList(draft.steps, onEditRoutineSetStep, onRemoveRoutineSetStep)
             state.draftError?.let { ErrorMessage(it) }
             WarningMessage(stringResource(R.string.guardian_unsaved_warning))
         }
@@ -1242,6 +1298,7 @@ private fun GuardianMenuCard(
     body: String,
     onClick: () -> Unit,
 ) {
+    val description = stringResource(R.string.a11y_guardian_menu_card, title, body)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1249,6 +1306,14 @@ private fun GuardianMenuCard(
             .clip(RoundedCornerShape(SteppieCornerRadius.Card))
             .background(MaterialTheme.colorScheme.surface)
             .border(SteppieStroke.Divider, MaterialTheme.colorScheme.outline, RoundedCornerShape(SteppieCornerRadius.Card))
+            .clearAndSetSemantics {
+                contentDescription = description
+                role = Role.Button
+                semanticOnClick {
+                    onClick()
+                    true
+                }
+            }
             .clickable(role = Role.Button, onClick = onClick)
             .padding(SteppieSpacing.Medium),
         verticalAlignment = Alignment.CenterVertically,
@@ -1267,7 +1332,10 @@ private fun GuardianMenuCard(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall)) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
+        ) {
             Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, style = SteppieTheme.typography.guardianSection)
             Text(body, color = MaterialTheme.colorScheme.onSurface, style = SteppieTheme.typography.guardianCaption)
         }
@@ -1283,6 +1351,9 @@ private fun EditableRoutineRow(
 ) {
     val maxRevealPx = with(LocalDensity.current) { 76.dp.toPx() }
     var swipeOffsetPx by remember(routine.id) { mutableFloatStateOf(0f) }
+    val routineTitle = routine.title.resolve(null, Locale.getDefault().toLanguageTag())
+    val routineMeta = routine.scheduledTime?.toString() ?: stringResource(R.string.guardian_time_none)
+    val rowDescription = stringResource(R.string.a11y_routine_edit_row, routineTitle, routineMeta)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1290,6 +1361,7 @@ private fun EditableRoutineRow(
     ) {
         if (swipeOffsetPx < -1f) {
             SwipeDeleteAction(
+                label = stringResource(R.string.a11y_item_action, routineTitle, stringResource(R.string.action_delete)),
                 onClick = onDelete,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -1313,6 +1385,9 @@ private fun EditableRoutineRow(
                         swipeOffsetPx = if (swipeOffsetPx <= -maxRevealPx / 2f) -maxRevealPx else 0f
                     },
                 )
+                .semantics {
+                    contentDescription = rowDescription
+                }
                 .clickable(role = Role.Button, onClick = onClick)
                 .padding(SteppieSpacing.Small),
             verticalAlignment = Alignment.CenterVertically,
@@ -1330,19 +1405,24 @@ private fun EditableRoutineRow(
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall)) {
                 Text(
-                    text = routine.title.resolve(null, Locale.getDefault().toLanguageTag()),
+                    text = routineTitle,
                     color = MaterialTheme.colorScheme.onSurface,
                     style = SteppieTheme.typography.button,
                     maxLines = 2,
                 )
                 Text(
-                    text = routine.scheduledTime?.toString() ?: stringResource(R.string.guardian_time_none),
+                    text = routineMeta,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = SteppieTheme.typography.guardianCaption,
                 )
             }
             DragHandle(
                 onMove = onMove,
+                contentDescription = stringResource(
+                    R.string.a11y_item_action,
+                    routineTitle,
+                    stringResource(R.string.a11y_reorder_routine),
+                ),
                 modifier = Modifier.testTag("routine_drag_${routine.id}"),
             )
         }
@@ -1351,14 +1431,14 @@ private fun EditableRoutineRow(
 
 @Composable
 private fun SwipeDeleteAction(
+    label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val label = stringResource(R.string.action_delete)
+    val visualLabel = stringResource(R.string.action_delete)
     Column(
         modifier = modifier
-            .width(60.dp)
-            .semantics { contentDescription = label },
+            .width(60.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -1367,6 +1447,14 @@ private fun SwipeDeleteAction(
                 .size(50.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.error)
+                .clearAndSetSemantics {
+                    contentDescription = label
+                    role = Role.Button
+                    semanticOnClick {
+                        onClick()
+                        true
+                    }
+                }
                 .clickable(role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
@@ -1378,7 +1466,7 @@ private fun SwipeDeleteAction(
         }
         Spacer(Modifier.height(SteppieSpacing.TwoExtraSmall))
         Text(
-            text = label,
+            text = visualLabel,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = SteppieTheme.typography.guardianCaption,
         )
@@ -1388,17 +1476,17 @@ private fun SwipeDeleteAction(
 @Composable
 private fun DragHandle(
     onMove: (Int) -> Unit,
+    contentDescription: String,
     modifier: Modifier = Modifier,
 ) {
     val thresholdPx = with(LocalDensity.current) { 56.dp.toPx() }
-    val reorderDescription = stringResource(R.string.a11y_reorder_routine)
     var dragDistance by remember { mutableFloatStateOf(0f) }
     Box(
         modifier = modifier
             .size(52.dp)
             .clip(RoundedCornerShape(SteppieCornerRadius.Control))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .semantics { contentDescription = reorderDescription }
+            .clearAndSetSemantics { this.contentDescription = contentDescription }
             .draggable(
                 orientation = Orientation.Vertical,
                 state = rememberDraggableState { delta ->
@@ -1427,6 +1515,10 @@ private fun IconPicker(selectedIcon: String, onSelected: (String) -> Unit) {
     GuardianPanel(title = stringResource(R.string.guardian_icon_picker_title), body = stringResource(R.string.guardian_icon_picker_body)) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
             items(BuiltinIconNames.all.toList()) { iconName ->
+                val selectionState = stringResource(
+                    if (iconName == selectedIcon) R.string.a11y_selected else R.string.a11y_not_selected,
+                )
+                val description = stringResource(R.string.a11y_icon_option, iconName, selectionState)
                 Box(
                     modifier = Modifier
                         .size(64.dp)
@@ -1436,6 +1528,15 @@ private fun IconPicker(selectedIcon: String, onSelected: (String) -> Unit) {
                             if (iconName == selectedIcon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                             RoundedCornerShape(SteppieCornerRadius.Control),
                         )
+                        .clearAndSetSemantics {
+                            contentDescription = description
+                            stateDescription = selectionState
+                            role = Role.Button
+                            semanticOnClick {
+                                onSelected(iconName)
+                                true
+                            }
+                        }
                         .clickable(role = Role.Button) { onSelected(iconName) }
                         .padding(SteppieSpacing.ExtraSmall),
                     contentAlignment = Alignment.Center,
@@ -1452,6 +1553,15 @@ private fun ColorPicker(selectedColorToken: String, onSelected: (String) -> Unit
     GuardianPanel(title = stringResource(R.string.guardian_color_picker_title)) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
             items(RoutineColorTokens.all.toList()) { colorToken ->
+                val selectionState = stringResource(
+                    if (selectedColorToken == colorToken) R.string.a11y_selected else R.string.a11y_not_selected,
+                )
+                val colorLabel = colorAccessibilityLabel(colorToken)
+                val description = stringResource(
+                    R.string.a11y_color_option,
+                    colorLabel,
+                    selectionState,
+                )
                 Box(
                     modifier = Modifier
                         .size(54.dp)
@@ -1461,6 +1571,15 @@ private fun ColorPicker(selectedColorToken: String, onSelected: (String) -> Unit
                             if (selectedColorToken == colorToken) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                             CircleShape,
                         )
+                        .clearAndSetSemantics {
+                            contentDescription = description
+                            stateDescription = selectionState
+                            role = Role.Button
+                            semanticOnClick {
+                                onSelected(colorToken)
+                                true
+                            }
+                        }
                         .clickable(role = Role.Button) { onSelected(colorToken) }
                         .padding(7.dp),
                     contentAlignment = Alignment.Center,
@@ -1551,7 +1670,7 @@ private fun GuardianPrivacyNote() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(148.dp)
+            .heightIn(min = 148.dp)
             .clip(RoundedCornerShape(SteppieCornerRadius.Card))
             .background(SteppieTheme.colors.cardLemon)
             .border(SteppieStroke.Divider, SteppieTheme.colors.warning, RoundedCornerShape(SteppieCornerRadius.Card))
@@ -1569,6 +1688,16 @@ private fun GuardianPrivacyNote() {
             style = SteppieTheme.typography.guardianCaption,
         )
     }
+}
+
+@Composable
+private fun colorAccessibilityLabel(token: String): String = when (token) {
+    "color.card.mint" -> stringResource(R.string.a11y_color_mint)
+    "color.card.lemon" -> stringResource(R.string.a11y_color_lemon)
+    "color.card.peach" -> stringResource(R.string.a11y_color_peach)
+    "color.card.lavender" -> stringResource(R.string.a11y_color_lavender)
+    "color.card.rose" -> stringResource(R.string.a11y_color_rose)
+    else -> stringResource(R.string.a11y_color_sky)
 }
 
 @Composable
