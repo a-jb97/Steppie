@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChildRoutineView: View {
     @Environment(\.locale) private var locale
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let viewModel: ChildRoutineViewModel
     let onGuardianEntryRequested: () -> Void
 
@@ -238,22 +239,26 @@ struct ChildRoutineView: View {
     }
 
     private var progressDots: some View {
-        HStack(spacing: SteppieSpacing.extraSmall) {
-            ForEach(0..<viewModel.totalCount, id: \.self) { index in
-                Circle()
-                    .fill(
-                        index < viewModel.completedCount
-                            ? Color.steppieFocusRing
-                            : Color.steppieBorderSubtle
-                    )
-                    .frame(width: 24, height: 24)
-                    .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: SteppieSpacing.extraSmall) {
+            if !dynamicTypeSize.isAccessibilitySize {
+                HStack(spacing: SteppieSpacing.extraSmall) {
+                    ForEach(0..<viewModel.totalCount, id: \.self) { index in
+                        Circle()
+                            .fill(
+                                index < viewModel.completedCount
+                                    ? Color.steppieFocusRing
+                                    : Color.steppieBorderSubtle
+                            )
+                            .frame(width: 24, height: 24)
+                            .accessibilityHidden(true)
+                    }
+                }
             }
 
             Text(verbatim: "\(viewModel.completedCount)/\(viewModel.totalCount)")
                 .steppieTextStyle(.childProgress)
                 .foregroundStyle(Color.steppieTextSecondary)
-                .fixedSize()
+                .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
@@ -427,7 +432,7 @@ struct ChildRoutineView: View {
     private var nextRoutinePreview: some View {
         if let nextRoutine = viewModel.nextRoutineAfterFeedback {
             Button(action: viewModel.proceedAfterCompletionFeedback) {
-                HStack(spacing: SteppieSpacing.small) {
+                adaptivePreviewStack {
                     RoutineVisualView(icon: nextRoutine.icon, size: .list)
                         .frame(width: 52, height: 52)
                         .accessibilityHidden(true)
@@ -437,7 +442,7 @@ struct ChildRoutineView: View {
                 }
                 .steppieTextStyle(.childListTitle)
                 .foregroundStyle(Color.steppieTextPrimary)
-                .lineLimit(2)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, minHeight: SteppieLayout.childMinimumTouchTarget, alignment: .leading)
                 .padding(.horizontal, SteppieSpacing.medium)
@@ -449,7 +454,7 @@ struct ChildRoutineView: View {
             .accessibilityLabel(Text("screen.feedback.nextPrefix") + Text(verbatim: localizedTitle(for: nextRoutine)))
         } else if viewModel.isAllCompleted {
             Button(action: viewModel.proceedAfterCompletionFeedback) {
-                HStack(spacing: SteppieSpacing.small) {
+                adaptivePreviewStack {
                     Image("routine-all-done-stamp")
                         .resizable()
                         .scaledToFit()
@@ -465,7 +470,7 @@ struct ChildRoutineView: View {
                 }
                 .steppieTextStyle(.childListTitle)
                 .foregroundStyle(Color.steppieTextPrimary)
-                .lineLimit(2)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, minHeight: SteppieLayout.childMinimumTouchTarget, alignment: .leading)
                 .padding(.horizontal, SteppieSpacing.medium)
@@ -475,6 +480,7 @@ struct ChildRoutineView: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text("screen.allDone.title"))
+            .accessibilityValue(Text("screen.allDone.subtitle"))
         }
     }
 
@@ -577,6 +583,17 @@ struct ChildRoutineView: View {
                       value.translation.height > 60 else { return }
                 action()
             }
+    }
+
+    @ViewBuilder
+    private func adaptivePreviewStack<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: SteppieSpacing.small, content: content)
+        } else {
+            HStack(spacing: SteppieSpacing.small, content: content)
+        }
     }
 }
 

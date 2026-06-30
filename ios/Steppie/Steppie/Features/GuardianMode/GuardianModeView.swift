@@ -3,6 +3,7 @@ import SwiftUI
 struct GuardianModeView: View {
     @Environment(\.locale) private var locale
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var draggedRoutineID: UUID?
     @State private var dragStartIndex: Int?
     @State private var lastDragStep = 0
@@ -172,7 +173,7 @@ struct GuardianModeView: View {
             viewModel.selectedDestination = destination
             onInteraction()
         } label: {
-            HStack(spacing: 14) {
+            adaptiveCardStack(spacing: 14) {
                 Image(assetName)
                     .resizable()
                     .scaledToFit()
@@ -182,15 +183,20 @@ struct GuardianModeView: View {
                     Text(title)
                         .steppieTextStyle(.guardianSection)
                         .foregroundStyle(Color.steppieTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(subtitle)
                         .steppieTextStyle(.guardianCaption)
                         .foregroundStyle(Color.steppieTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer()
+                }
                 if !isEnabled {
                     Text("준비 중")
                         .steppieTextStyle(.guardianCaption)
                         .foregroundStyle(Color.steppieTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(SteppieSpacing.medium)
@@ -206,6 +212,8 @@ struct GuardianModeView: View {
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(Text(subtitle))
         .accessibilityHint(isEnabled ? Text("열기") : Text("아직 구현되지 않았습니다"))
     }
 
@@ -348,26 +356,31 @@ struct GuardianModeView: View {
     }
 
     private func routineSetStepRow(_ step: RoutineSetStepDraft) -> some View {
-        HStack(spacing: SteppieSpacing.small) {
+        adaptiveCardStack(spacing: SteppieSpacing.small) {
             RoundedRectangle(cornerRadius: 10)
                 .fill(SteppieCardColor(colorToken: step.colorToken).color)
-                .frame(width: 20, height: 68)
+                .frame(width: dynamicTypeSize.isAccessibilitySize ? 68 : 20, height: dynamicTypeSize.isAccessibilitySize ? 20 : 68)
+                .accessibilityHidden(true)
             SteppieRoutineIcon(step.iconName, size: .list)
                 .frame(width: 52, height: 52)
             VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
                 Text(step.title)
                     .steppieTextStyle(.button)
                     .foregroundStyle(Color.steppieTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(step.scheduledTime?.description ?? "시간 없음")
                     .steppieTextStyle(.guardianCaption)
                     .foregroundStyle(Color.steppieTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .contentShape(.rect)
             .onTapGesture {
                 viewModel.beginEditRoutineSetStep(step)
                 onInteraction()
             }
-            Spacer()
+            if !dynamicTypeSize.isAccessibilitySize {
+                Spacer()
+            }
             VStack(spacing: SteppieSpacing.twoExtraSmall) {
                 Button {
                     viewModel.moveRoutineSetStep(step, direction: -1)
@@ -405,6 +418,10 @@ struct GuardianModeView: View {
                 .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
         }
         .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(step.title))
+        .accessibilityValue(Text(step.scheduledTime?.description ?? "시간 없음"))
+        .accessibilityHint(Text("a11y.guardian.step.editOrReorderHint"))
         .contextMenu {
             Button("수정") { viewModel.beginEditRoutineSetStep(step) }
             Button("삭제", role: .destructive) { viewModel.deleteRoutineSetStep(step) }
@@ -473,23 +490,29 @@ struct GuardianModeView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(Text(color.accessibilityName))
+                            .accessibilityValue(Text(color.token == stepDraft.colorToken ? "a11y.selection.selected" : "a11y.selection.notSelected"))
+                            .accessibilityHint(Text("a11y.guardian.cardColor.selectHint"))
                         }
                     }
                 }
                 labeledCard("예정 시각") {
-                    HStack {
+                    adaptiveControlStack {
                         DatePicker(
                             "예정 시각",
                             selection: routineSetStepScheduledDateBinding,
                             displayedComponents: .hourAndMinute
                         )
-                        .labelsHidden()
-                        Spacer()
+                        .accessibilityHint(Text("a11y.guardian.scheduledTime.selectHint"))
+                        if !dynamicTypeSize.isAccessibilitySize {
+                            Spacer()
+                        }
                         Button("시간 없음") {
                             viewModel.routineSetStepDraft?.scheduledTime = nil
                             onInteraction()
                         }
                         .buttonStyle(.borderless)
+                        .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                        .accessibilityHint(Text("a11y.guardian.scheduledTime.clearHint"))
                     }
                 }
                 HStack(spacing: SteppieSpacing.medium) {
@@ -740,32 +763,38 @@ struct GuardianModeView: View {
     }
 
     private func editableRoutineRow(_ routine: Routine, isWide: Bool) -> some View {
-        HStack(spacing: SteppieSpacing.small) {
+        adaptiveCardStack(spacing: SteppieSpacing.small) {
             Button {
                 viewModel.beginEditRoutine(routine)
                 onInteraction()
             } label: {
-                HStack(spacing: SteppieSpacing.small) {
+                adaptiveCardStack(spacing: SteppieSpacing.small) {
                     RoundedRectangle(cornerRadius: 10)
                         .fill(SteppieCardColor(colorToken: routine.colorToken).color)
-                        .frame(width: 20, height: 68)
+                        .frame(width: dynamicTypeSize.isAccessibilitySize ? 68 : 20, height: dynamicTypeSize.isAccessibilitySize ? 20 : 68)
+                        .accessibilityHidden(true)
                     RoutineVisualView(icon: routine.icon, size: .list)
                         .frame(width: 52, height: 52)
                     VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
                         Text(viewModel.localizedTitle(for: routine))
                             .steppieTextStyle(.button)
                             .foregroundStyle(Color.steppieTextPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(routine.scheduledTime?.description ?? "시간 없음")
                             .steppieTextStyle(.guardianCaption)
                             .foregroundStyle(Color.steppieTextSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    Spacer()
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Spacer()
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(viewModel.localizedTitle(for: routine)))
+            .accessibilityValue(Text(routine.scheduledTime?.description ?? "시간 없음"))
             .accessibilityHint(Text("이 루틴을 수정합니다"))
             Image(systemName: "line.3.horizontal")
                 .font(.title3.weight(.semibold))
@@ -849,23 +878,29 @@ struct GuardianModeView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(Text(color.accessibilityName))
+                            .accessibilityValue(Text(color.token == draft.colorToken ? "a11y.selection.selected" : "a11y.selection.notSelected"))
+                            .accessibilityHint(Text("a11y.guardian.cardColor.selectHint"))
                         }
                     }
                 }
                 labeledCard("예정 시각") {
-                    HStack {
+                    adaptiveControlStack {
                         DatePicker(
                             "예정 시각",
                             selection: scheduledDateBinding,
                             displayedComponents: .hourAndMinute
                         )
-                        .labelsHidden()
-                        Spacer()
+                        .accessibilityHint(Text("a11y.guardian.scheduledTime.selectHint"))
+                        if !dynamicTypeSize.isAccessibilitySize {
+                            Spacer()
+                        }
                         Button("시간 없음") {
                             viewModel.draft?.scheduledTime = nil
                             onInteraction()
                         }
                         .buttonStyle(.borderless)
+                        .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                        .accessibilityHint(Text("a11y.guardian.scheduledTime.clearHint"))
                     }
                 }
                 if viewModel.hasUnsavedDraft {
@@ -934,7 +969,7 @@ struct GuardianModeView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: SteppieSpacing.small) {
+            adaptiveCardStack(spacing: SteppieSpacing.small) {
                 Image(assetName)
                     .resizable()
                     .scaledToFit()
@@ -945,11 +980,15 @@ struct GuardianModeView: View {
                     Text(title)
                         .steppieTextStyle(.button)
                         .foregroundStyle(Color.steppieTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(subtitle)
                         .steppieTextStyle(.guardianCaption)
                         .foregroundStyle(Color.steppieTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer()
+                }
             }
             .padding(14)
             .frame(maxWidth: .infinity, minHeight: 96)
@@ -961,6 +1000,10 @@ struct GuardianModeView: View {
             .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(Text(subtitle))
+        .accessibilityHint(Text("열기"))
     }
 
     private var privacyPolicyNote: some View {
@@ -1046,9 +1089,11 @@ struct GuardianModeView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(Color.steppieWarning)
                 .font(.title2)
+                .accessibilityHidden(true)
             Text(text)
                 .steppieTextStyle(.guardianCaption)
                 .foregroundStyle(Color.steppieTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(SteppieSpacing.small)
         .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
@@ -1058,6 +1103,30 @@ struct GuardianModeView: View {
                 .stroke(Color.steppieWarning, lineWidth: SteppieStroke.divider)
         }
         .clipShape(.rect(cornerRadius: SteppieCornerRadius.control))
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func adaptiveCardStack<Content: View>(
+        spacing: CGFloat,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: spacing, content: content)
+        } else {
+            HStack(spacing: spacing, content: content)
+        }
+    }
+
+    @ViewBuilder
+    private func adaptiveControlStack<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: SteppieSpacing.small, content: content)
+        } else {
+            HStack(content: content)
+        }
     }
 
     private func messageState(title: String, message: String) -> some View {

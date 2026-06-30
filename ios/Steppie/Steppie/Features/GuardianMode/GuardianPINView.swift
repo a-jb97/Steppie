@@ -56,10 +56,12 @@ struct GuardianPINView: View {
             Text(title)
                 .steppieTextStyle(.childScreenTitle)
                 .foregroundStyle(Color.steppieTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             Text(subtitle)
                 .steppieTextStyle(.guardianCaption)
                 .foregroundStyle(Color.steppieTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -74,6 +76,7 @@ struct GuardianPINView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("PIN \(enteredPIN.count)자리 입력됨"))
+        .accessibilityHint(Text(subtitle))
     }
 
     private var keypad: some View {
@@ -133,6 +136,7 @@ struct GuardianPINView: View {
                 .steppieTextStyle(.guardianSection)
             Text(message)
                 .steppieTextStyle(.guardianCaption)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(Color.steppieDanger)
         .padding(.horizontal, 14)
@@ -182,6 +186,7 @@ struct GuardianPINView: View {
             firstPIN = enteredPIN
             enteredPIN = ""
             step = .confirm
+            announcePINStep()
         case .confirm:
             guard enteredPIN == firstPIN else {
                 firstPIN = ""
@@ -205,10 +210,12 @@ struct GuardianPINView: View {
             currentPIN = enteredPIN
             enteredPIN = ""
             step = .new
+            announcePINStep()
         case .new:
             firstPIN = enteredPIN
             enteredPIN = ""
             step = .confirm
+            announcePINStep()
         case .confirm:
             guard enteredPIN == firstPIN else {
                 firstPIN = ""
@@ -225,6 +232,10 @@ struct GuardianPINView: View {
         errorMessage = message
         UIAccessibility.post(notification: .announcement, argument: message)
         errorFocused = true
+    }
+
+    private func announcePINStep() {
+        UIAccessibility.post(notification: .announcement, argument: subtitle)
     }
 
     private var title: String {

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct BackupRestoreView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let viewModel: GuardianModeViewModel
     let onDone: () -> Void
     let onInteraction: () -> Void
@@ -48,6 +50,12 @@ struct BackupRestoreView: View {
         ) { result in
             handleImport(result)
         }
+        .onChange(of: viewModel.backupStatusMessage) { _, message in
+            postAccessibilityAnnouncement(message)
+        }
+        .onChange(of: viewModel.errorMessage) { _, message in
+            postAccessibilityAnnouncement(message)
+        }
     }
 
     private var backupSection: some View {
@@ -92,7 +100,7 @@ struct BackupRestoreView: View {
                     .background(Color.steppieBackgroundSecondary)
                     .clipShape(.rect(cornerRadius: SteppieCornerRadius.control))
                     .accessibilityLabel(Text("보호자 PIN"))
-                HStack(spacing: SteppieSpacing.medium) {
+                adaptiveActionStack {
                     SteppieButton("취소", role: .secondary) {
                         viewModel.cancelRestore()
                         onInteraction()
@@ -105,6 +113,7 @@ struct BackupRestoreView: View {
                         viewModel.confirmRestore()
                         onInteraction()
                     }
+                    .accessibilityHint(Text("a11y.backup.restore.replaceHint"))
                 }
             }
         }
@@ -162,6 +171,7 @@ struct BackupRestoreView: View {
             Text(title)
                 .steppieTextStyle(.button)
                 .foregroundStyle(Color.steppieTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
             content()
         }
         .padding(14)
@@ -182,6 +192,8 @@ struct BackupRestoreView: View {
             .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
             .background(Color.steppieCardMint)
             .clipShape(.rect(cornerRadius: SteppieCornerRadius.control))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(Text(text))
     }
 
     private func warningNote(_ text: String) -> some View {
@@ -193,6 +205,7 @@ struct BackupRestoreView: View {
             Text(text)
                 .steppieTextStyle(.guardianCaption)
                 .foregroundStyle(Color.steppieTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(SteppieSpacing.small)
         .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
@@ -202,5 +215,23 @@ struct BackupRestoreView: View {
                 .stroke(Color.steppieWarning, lineWidth: SteppieStroke.divider)
         }
         .clipShape(.rect(cornerRadius: SteppieCornerRadius.control))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(text))
+    }
+
+    private func postAccessibilityAnnouncement(_ message: String?) {
+        guard let message, !message.isEmpty else { return }
+        UIAccessibility.post(notification: .announcement, argument: message)
+    }
+
+    @ViewBuilder
+    private func adaptiveActionStack<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: SteppieSpacing.medium, content: content)
+        } else {
+            HStack(spacing: SteppieSpacing.medium, content: content)
+        }
     }
 }
