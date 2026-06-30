@@ -26,6 +26,10 @@ class InMemoryRoutineRepository(
         .map { sets -> sets.values.filter { it.deletedAt == null }.sortedBy { it.createdAt }.map(::visible) }
         .distinctUntilChanged()
 
+    override fun observeRoutineSetsForRecords(): Flow<List<RoutineSet>> = state
+        .map { sets -> sets.values.sortedBy { it.createdAt } }
+        .distinctUntilChanged()
+
     override fun observeRoutineSet(id: String): Flow<RoutineSet?> {
         requireUuidV4(id, "RoutineSet.id")
         return state.map { it[id]?.takeIf { set -> set.deletedAt == null }?.let(::visible) }.distinctUntilChanged()
@@ -147,6 +151,14 @@ class InMemoryRoutineRepository(
             source.values
                 .filter { it.date == date }
                 .sortedWith(compareBy<DailyLog> { it.updatedAt }.thenBy { it.id })
+        }
+        .distinctUntilChanged()
+
+    override fun observeDailyLogs(startDate: LocalDate, endDate: LocalDate): Flow<List<DailyLog>> = logs
+        .map { source ->
+            source.values
+                .filter { !it.date.isBefore(startDate) && !it.date.isAfter(endDate) }
+                .sortedWith(compareByDescending<DailyLog> { it.date }.thenBy { it.updatedAt }.thenBy { it.id })
         }
         .distinctUntilChanged()
 

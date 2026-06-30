@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface RoutineRepository {
     fun observeRoutineSets(): Flow<List<RoutineSet>>
+    fun observeRoutineSetsForRecords(): Flow<List<RoutineSet>>
     fun observeRoutineSet(id: String): Flow<RoutineSet?>
     suspend fun getRoutineSet(id: String): RoutineSet?
     suspend fun createRoutineSet(routineSet: RoutineSet): RoutineSet
@@ -26,6 +27,7 @@ interface RoutineRepository {
     )
 
     fun observeDailyLogs(date: LocalDate): Flow<List<DailyLog>>
+    fun observeDailyLogs(startDate: LocalDate, endDate: LocalDate): Flow<List<DailyLog>>
     suspend fun completeRoutine(
         routineId: String,
         date: LocalDate = LocalDate.now(),

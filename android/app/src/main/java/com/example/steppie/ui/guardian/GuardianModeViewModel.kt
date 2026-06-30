@@ -9,9 +9,11 @@ import com.example.steppie.data.backup.BackupProvider
 import com.example.steppie.data.backup.BackupValidationException
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.BuiltinIconNames
+import com.example.steppie.domain.model.DailyLog
 import com.example.steppie.domain.model.FeedbackIntensity
 import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.LocalizedText
+import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineColorTokens
 import com.example.steppie.domain.model.RoutineSet
@@ -19,16 +21,20 @@ import com.example.steppie.domain.model.newUuidV4
 import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.domain.repository.RoutineRepository
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
 import java.util.Locale
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class GuardianDestination { Pin, Home, RoutineEdit, CardEdit, RoutineSetCreate, EnvironmentSettings, Security, BackupRestore }
+enum class GuardianDestination { Pin, Home, RoutineEdit, CardEdit, RoutineSetCreate, EnvironmentSettings, Records, Security, BackupRestore }
 
 enum class GuardianPinMode { Enter, Setup, ChangeCurrent, ChangeNew }
 
@@ -50,6 +56,29 @@ data class RoutineSetDraft(
     val editingStepIndex: Int? = null,
 )
 
+data class GuardianRecordDay(
+    val date: LocalDate,
+    val completedCount: Int,
+    val totalCount: Int,
+    val hasRecords: Boolean,
+) {
+    val completionPercent: Int
+        get() = if (totalCount == 0) 0 else (completedCount * 100) / totalCount
+
+    val remainingCount: Int
+        get() = (totalCount - completedCount).coerceAtLeast(0)
+}
+
+data class GuardianRecordRoutine(
+    val routineId: String,
+    val title: String?,
+    val isCompleted: Boolean,
+    val completedAt: Instant?,
+    val isDeleted: Boolean,
+    val isInactive: Boolean,
+    val isMissing: Boolean,
+)
+
 data class GuardianModeUiState(
     val isActive: Boolean = false,
     val isAuthenticated: Boolean = false,
@@ -65,6 +94,10 @@ data class GuardianModeUiState(
     val draft: RoutineDraft? = null,
     val routineSetDraft: RoutineSetDraft? = null,
     val routineSetListEditing: Boolean = false,
+    val selectedRecordsDate: LocalDate = LocalDate.now(),
+    val recordDays: List<GuardianRecordDay> = emptyList(),
+    val selectedRecordRoutines: List<GuardianRecordRoutine> = emptyList(),
+    val selectedRecordSummary: GuardianRecordDay = GuardianRecordDay(LocalDate.now(), 0, 0, false),
     val editingRoutineSetId: String? = null,
     val editingRoutineSetName: String = "",
     val draftError: String? = null,
@@ -83,41 +116,68 @@ data class GuardianModeUiState(
         get() = activeRoutineSet?.name?.resolve(null, Locale.getDefault().toLanguageTag()).orEmpty()
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class GuardianModeViewModel(
     private val routineRepository: RoutineRepository,
     private val appSettingsRepository: AppSettingsRepository,
     private val backupProvider: BackupProvider? = null,
 ) : ViewModel() {
+    private val recordsEndDate = MutableStateFlow(LocalDate.now())
     private val _uiState = MutableStateFlow(GuardianModeUiState())
     val uiState: StateFlow<GuardianModeUiState> = _uiState.asStateFlow()
     private var verifiedPinForChange: String? = null
+    private var recordRoutineSetsCache: List<RoutineSet> = emptyList()
+    private var dailyLogsCache: List<DailyLog> = emptyList()
 
     init {
         viewModelScope.launch {
             combine(
                 appSettingsRepository.observeAppSettings(),
                 routineRepository.observeRoutineSets(),
-            ) { settings, routineSets ->
-                settings to routineSets.filter { it.deletedAt == null }
-            }.collect { (settings, visibleRoutineSets) ->
+                routineRepository.observeRoutineSetsForRecords(),
+                recordsEndDate.flatMapLatest { endDate ->
+                    routineRepository.observeDailyLogs(endDate.minusDays(6), endDate)
+                        .map { dailyLogs -> endDate to dailyLogs }
+                },
+            ) { settings, routineSets, recordRoutineSets, records ->
+                val (endDate, dailyLogs) = records
+                GuardianRepositorySnapshot(
+                    settings = settings,
+                    visibleRoutineSets = routineSets.filter { it.deletedAt == null },
+                    recordRoutineSets = recordRoutineSets,
+                    dailyLogs = dailyLogs,
+                    recordsEndDate = endDate,
+                )
+            }.collect { snapshot ->
+                recordRoutineSetsCache = snapshot.recordRoutineSets
+                dailyLogsCache = snapshot.dailyLogs
                 _uiState.update { state ->
-                    val activeSet = visibleRoutineSets.firstOrNull { it.isActive }
+                    val activeSet = snapshot.visibleRoutineSets.firstOrNull { it.isActive }
+                    val records = buildGuardianRecords(
+                        selectedDate = state.selectedRecordsDate,
+                        endDate = snapshot.recordsEndDate,
+                        routineSets = snapshot.recordRoutineSets,
+                        dailyLogs = snapshot.dailyLogs,
+                    )
                     val resolvedPinMode = if (
                         state.isActive &&
                         !state.isAuthenticated &&
                         state.destination == GuardianDestination.Pin
                     ) {
-                        if (settings.hasGuardianPin) GuardianPinMode.Enter else GuardianPinMode.Setup
+                        if (snapshot.settings.hasGuardianPin) GuardianPinMode.Enter else GuardianPinMode.Setup
                     } else {
                         state.pinMode
                     }
                     state.copy(
-                        hasGuardianPin = settings.hasGuardianPin,
-                        appSettings = settings,
+                        hasGuardianPin = snapshot.settings.hasGuardianPin,
+                        appSettings = snapshot.settings,
                         pinMode = resolvedPinMode,
-                        routineSets = visibleRoutineSets,
+                        routineSets = snapshot.visibleRoutineSets,
                         activeRoutineSet = activeSet,
                         routines = activeSet?.routines.orEmpty().sortedBy(Routine::order),
+                        recordDays = records.days,
+                        selectedRecordRoutines = records.routines,
+                        selectedRecordSummary = records.summary,
                     )
                 }
             }
@@ -234,6 +294,47 @@ class GuardianModeViewModel(
                 pendingDeleteRoutineId = null,
                 pendingDeleteRoutineSetId = null,
                 notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun openRecords() {
+        val today = LocalDate.now()
+        recordsEndDate.value = today
+        _uiState.update {
+            it.copy(
+                destination = GuardianDestination.Records,
+                selectedRecordsDate = today,
+                draft = null,
+                routineSetDraft = null,
+                routineSetListEditing = false,
+                editingRoutineSetId = null,
+                editingRoutineSetName = "",
+                draftError = null,
+                pendingDeleteRoutineId = null,
+                pendingDeleteRoutineSetId = null,
+                notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun selectRecordsDate(date: LocalDate) {
+        val current = _uiState.value
+        if (current.recordDays.none { it.date == date }) return
+        val records = buildGuardianRecords(
+            selectedDate = date,
+            endDate = recordsEndDate.value,
+            routineSets = recordRoutineSetsCache,
+            dailyLogs = dailyLogsCache,
+        )
+        _uiState.update {
+            it.copy(
+                selectedRecordsDate = date,
+                recordDays = records.days,
+                selectedRecordRoutines = records.routines,
+                selectedRecordSummary = records.summary,
                 interactionToken = it.interactionToken + 1,
             )
         }
@@ -1013,6 +1114,111 @@ class GuardianModeViewModel(
 private fun backupErrorMessage(error: Throwable): String = when (error) {
     is BackupValidationException -> error.message ?: "백업 파일을 확인할 수 없습니다."
     else -> error.message ?: "백업/복원 중 오류가 발생했습니다."
+}
+
+private data class GuardianRepositorySnapshot(
+    val settings: AppSettings,
+    val visibleRoutineSets: List<RoutineSet>,
+    val recordRoutineSets: List<RoutineSet>,
+    val dailyLogs: List<DailyLog>,
+    val recordsEndDate: LocalDate,
+)
+
+private data class GuardianRecordsResult(
+    val days: List<GuardianRecordDay>,
+    val routines: List<GuardianRecordRoutine>,
+    val summary: GuardianRecordDay,
+)
+
+private fun buildGuardianRecords(
+    selectedDate: LocalDate,
+    endDate: LocalDate,
+    routineSets: List<RoutineSet>,
+    dailyLogs: List<DailyLog>,
+): GuardianRecordsResult {
+    val startDate = endDate.minusDays(6)
+    val logsByDate = dailyLogs.groupBy(DailyLog::date)
+    val routinesById = routineSets
+        .flatMap(RoutineSet::routines)
+        .associateBy(Routine::id)
+    val routineSetsById = routineSets.associateBy(RoutineSet::id)
+    val dates = generateSequence(endDate) { previous ->
+        previous.minusDays(1).takeIf { !it.isBefore(startDate) }
+    }.toList()
+    val detailsByDate = dates.associateWith { date ->
+        buildGuardianRecordRoutines(
+            date = date,
+            logs = logsByDate[date].orEmpty(),
+            routineSetsById = routineSetsById,
+            routinesById = routinesById,
+        )
+    }
+    val days = dates.map { date ->
+        val logs = logsByDate[date].orEmpty()
+        val routines = detailsByDate[date].orEmpty()
+        GuardianRecordDay(
+            date = date,
+            completedCount = routines.count(GuardianRecordRoutine::isCompleted),
+            totalCount = routines.size,
+            hasRecords = logs.isNotEmpty(),
+        )
+    }
+    val summary = days.firstOrNull { it.date == selectedDate }
+        ?: GuardianRecordDay(selectedDate, 0, 0, false)
+    return GuardianRecordsResult(
+        days = days,
+        routines = detailsByDate[selectedDate].orEmpty(),
+        summary = summary,
+    )
+}
+
+private fun buildGuardianRecordRoutines(
+    date: LocalDate,
+    logs: List<DailyLog>,
+    routineSetsById: Map<String, RoutineSet>,
+    routinesById: Map<String, Routine>,
+): List<GuardianRecordRoutine> {
+    if (logs.isEmpty()) return emptyList()
+    val logsByRoutineId = logs.associateBy(DailyLog::routineId)
+    val loggedRoutineSetRoutines = logs
+        .mapNotNull { routineSetsById[it.routineSetId] }
+        .flatMap(RoutineSet::routines)
+        .filter { it.existedOn(date) }
+    val loggedRoutines = logs.mapNotNull { routinesById[it.routineId] }
+    val missingLogRows = logs
+        .filter { it.routineId !in routinesById }
+        .map { log ->
+            GuardianRecordRoutine(
+                routineId = log.routineId,
+                title = null,
+                isCompleted = log.status == LogStatus.Completed,
+                completedAt = log.completedAt,
+                isDeleted = true,
+                isInactive = false,
+                isMissing = true,
+            )
+        }
+    val routineRows = (loggedRoutineSetRoutines + loggedRoutines)
+        .distinctBy(Routine::id)
+        .sortedWith(compareBy<Routine> { it.order }.thenBy { it.createdAt }.thenBy { it.id })
+        .map { routine ->
+            val log = logsByRoutineId[routine.id]
+            GuardianRecordRoutine(
+                routineId = routine.id,
+                title = routine.title.resolve(null, Locale.getDefault().toLanguageTag()),
+                isCompleted = log?.status == LogStatus.Completed,
+                completedAt = log?.completedAt,
+                isDeleted = routine.deletedAt != null,
+                isInactive = !routine.isActive && routine.deletedAt == null,
+                isMissing = false,
+            )
+        }
+    return routineRows + missingLogRows
+}
+
+private fun Routine.existedOn(date: LocalDate): Boolean {
+    val zone = java.time.ZoneId.systemDefault()
+    return !createdAt.atZone(zone).toLocalDate().isAfter(date)
 }
 
 internal fun buildRoutineSetFromDraft(

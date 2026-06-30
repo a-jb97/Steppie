@@ -13,6 +13,7 @@ import com.example.steppie.domain.model.RoutineSet
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -126,6 +127,26 @@ class RoomRoutineRepositoryTest {
         assertEquals(completed.id, undone.id)
         assertEquals("undone", undone.status.storageValue)
         assertNull(undone.completedAt)
+    }
+
+    @Test
+    fun recordsReadsDateRangeAndDeletedRoutineMetadata() = runBlocking {
+        repository.createRoutineSet(testSet())
+        val first = repository.createRoutine(testRoutine(1))
+        val second = repository.createRoutine(testRoutine(2))
+        val firstDate = LocalDate.parse("2026-01-02")
+        val secondDate = LocalDate.parse("2026-01-03")
+
+        repository.completeRoutine(first.id, firstDate, Instant.parse("2026-01-02T08:00:00Z"))
+        repository.completeRoutine(second.id, secondDate, Instant.parse("2026-01-03T08:00:00Z"))
+        repository.deleteRoutine(second.id, Instant.parse("2026-01-04T00:00:00Z"))
+
+        val logs = repository.observeDailyLogs(firstDate, secondDate).first()
+        val recordSets = repository.observeRoutineSetsForRecords().first()
+
+        assertEquals(listOf(secondDate, firstDate), logs.map { it.date })
+        assertEquals(listOf(first.id, second.id), recordSets.single().routines.map { it.id })
+        assertEquals(true, recordSets.single().routines.single { it.id == second.id }.deletedAt != null)
     }
 
 
