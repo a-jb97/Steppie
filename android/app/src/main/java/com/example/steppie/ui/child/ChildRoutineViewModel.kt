@@ -3,8 +3,11 @@ package com.example.steppie.ui.child
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.steppie.domain.model.AppSettings
+import com.example.steppie.domain.model.FeedbackIntensity
 import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.model.Routine
+import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.domain.repository.RoutineRepository
 import java.time.LocalDate
 import java.util.Locale
@@ -50,8 +53,11 @@ data class ChildRoutineUiState(
 }
 
 data class ChildRoutineFeedbackEvent(
-    val spokenText: String,
+    val spokenText: String?,
     val vibrate: Boolean,
+    val sound: Boolean,
+    val ttsRate: Float,
+    val ttsVolume: Float,
 )
 
 internal fun childRoutineState(
@@ -86,6 +92,7 @@ internal fun childRoutineState(
 
 class ChildRoutineViewModel(
     private val repository: RoutineRepository,
+    private val appSettingsRepository: AppSettingsRepository,
 ) : ViewModel() {
     private val today = LocalDate.now()
 
@@ -93,8 +100,15 @@ class ChildRoutineViewModel(
     val uiState: StateFlow<ChildRoutineUiState> = _uiState.asStateFlow()
     private val _feedbackEvents = MutableSharedFlow<ChildRoutineFeedbackEvent>()
     val feedbackEvents: SharedFlow<ChildRoutineFeedbackEvent> = _feedbackEvents.asSharedFlow()
+    private val settings = MutableStateFlow(AppSettings())
+    private var lastGuidedRoutineId: String? = null
 
     init {
+        viewModelScope.launch {
+            appSettingsRepository.observeAppSettings().collectLatest { appSettings ->
+                settings.value = appSettings
+            }
+        }
         viewModelScope.launch {
             combine(
                 repository.observeRoutineSets(),
@@ -114,6 +128,7 @@ class ChildRoutineViewModel(
                 )
             }.collectLatest { state ->
                 _uiState.value = state
+                announceSelectedRoutineIfNeeded(state)
             }
         }
     }
@@ -128,10 +143,12 @@ class ChildRoutineViewModel(
 
     fun selectRoutine(routineId: String) {
         if (_uiState.value.routines.none { it.id == routineId }) return
-        _uiState.value = _uiState.value.copy(
+        val nextState = _uiState.value.copy(
             selectedRoutineId = routineId,
             singlePane = ChildSinglePane.Focus,
         )
+        _uiState.value = nextState
+        announceSelectedRoutineIfNeeded(nextState)
     }
 
     fun completeSelectedRoutine() {
@@ -147,10 +164,18 @@ class ChildRoutineViewModel(
 
         viewModelScope.launch {
             repository.completeRoutine(routine.id, today)
+            val appSettings = settings.value
             _feedbackEvents.emit(
                 ChildRoutineFeedbackEvent(
-                    spokenText = "${routine.localizedTitleForDevice()} 완료! 잘했어요!",
-                    vibrate = true,
+                    spokenText = if (appSettings.ttsEnabled) {
+                        "${routine.localizedTitleForDevice(appSettings)} 완료! 잘했어요!"
+                    } else {
+                        null
+                    },
+                    vibrate = appSettings.hapticEnabled && appSettings.feedbackIntensity.allowsHaptic(),
+                    sound = appSettings.soundEnabled && appSettings.feedbackIntensity.allowsSound(),
+                    ttsRate = appSettings.ttsRate.toFloat(),
+                    ttsVolume = appSettings.ttsVolume.toFloat(),
                 ),
             )
         }
@@ -165,6 +190,7 @@ class ChildRoutineViewModel(
             undoRoutineId = null,
             singlePane = ChildSinglePane.Focus,
         )
+        announceSelectedRoutineIfNeeded(_uiState.value)
     }
 
     fun undoLastCompletion() {
@@ -180,17 +206,41 @@ class ChildRoutineViewModel(
         }
     }
 
-    private fun Routine.localizedTitleForDevice(): String =
-        title.resolve(appLocale = null, systemLocale = Locale.getDefault().toLanguageTag())
+    private fun announceSelectedRoutineIfNeeded(state: ChildRoutineUiState) {
+        if (state.feedbackRoutineId != null) return
+        val routine = state.selectedRoutine ?: return
+        if (routine.id == lastGuidedRoutineId) return
+        val appSettings = settings.value
+        if (!appSettings.ttsEnabled) return
+        lastGuidedRoutineId = routine.id
+        viewModelScope.launch {
+            _feedbackEvents.emit(
+                ChildRoutineFeedbackEvent(
+                    spokenText = routine.localizedTitleForDevice(appSettings),
+                    vibrate = false,
+                    sound = false,
+                    ttsRate = appSettings.ttsRate.toFloat(),
+                    ttsVolume = appSettings.ttsVolume.toFloat(),
+                ),
+            )
+        }
+    }
+
+    private fun Routine.localizedTitleForDevice(settings: AppSettings): String =
+        title.resolve(appLocale = settings.locale, systemLocale = Locale.getDefault().toLanguageTag())
 
     companion object {
-        fun factory(repository: RoutineRepository): ViewModelProvider.Factory =
+        fun factory(repository: RoutineRepository, appSettingsRepository: AppSettingsRepository): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     require(modelClass.isAssignableFrom(ChildRoutineViewModel::class.java))
-                    return ChildRoutineViewModel(repository) as T
+                    return ChildRoutineViewModel(repository, appSettingsRepository) as T
                 }
             }
     }
 }
+
+private fun FeedbackIntensity.allowsHaptic(): Boolean = this == FeedbackIntensity.Strong || this == FeedbackIntensity.Normal
+
+private fun FeedbackIntensity.allowsSound(): Boolean = this == FeedbackIntensity.Strong || this == FeedbackIntensity.Normal

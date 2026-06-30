@@ -3,6 +3,8 @@ package com.example.steppie
 import android.Manifest
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -65,7 +67,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             SteppieTheme {
                 val childViewModel: ChildRoutineViewModel = viewModel(
-                    factory = ChildRoutineViewModel.factory(routineRepository),
+                    factory = ChildRoutineViewModel.factory(routineRepository, appSettingsRepository),
                 )
                 val guardianViewModel: GuardianModeViewModel = viewModel(
                     factory = GuardianModeViewModel.factory(
@@ -142,6 +144,7 @@ class MainActivity : ComponentActivity() {
                         onInteraction = guardianViewModel::markInteraction,
                         onOpenHome = guardianViewModel::openHome,
                         onOpenRoutineEdit = guardianViewModel::openRoutineEdit,
+                        onOpenEnvironmentSettings = guardianViewModel::openEnvironmentSettings,
                         onOpenSecurity = guardianViewModel::openSecurity,
                         onOpenBackupRestore = guardianViewModel::openBackupRestore,
                         onOpenPinChange = guardianViewModel::openPinChange,
@@ -175,6 +178,16 @@ class MainActivity : ComponentActivity() {
                         onConfirmDeleteRoutineSet = guardianViewModel::confirmDeleteRoutineSet,
                         onMoveRoutine = guardianViewModel::moveRoutine,
                         onShowOutOfScopeNotice = guardianViewModel::showOutOfScopeNotice,
+                        onFeedbackIntensityChange = guardianViewModel::updateFeedbackIntensity,
+                        onTtsEnabledChange = guardianViewModel::updateTtsEnabled,
+                        onTtsRateChange = guardianViewModel::updateTtsRate,
+                        onTtsVolumeChange = guardianViewModel::updateTtsVolume,
+                        onSoundEnabledChange = guardianViewModel::updateSoundEnabled,
+                        onHapticEnabledChange = guardianViewModel::updateHapticEnabled,
+                        onNotificationLeadTimeChange = guardianViewModel::updateNotificationLeadTime,
+                        onQuietHoursEnabledChange = guardianViewModel::updateQuietHoursEnabled,
+                        onQuietHoursStartChange = guardianViewModel::updateQuietHoursStart,
+                        onQuietHoursEndChange = guardianViewModel::updateQuietHoursEnd,
                         onCreateBackupFile = {
                             createBackupLauncher.launch(AndroidBackupRepository.defaultFileName())
                         },
@@ -230,6 +243,7 @@ private class AndroidFeedbackController(
 ) {
     private var ttsReady = false
     private var tts: TextToSpeech? = null
+    private val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 40)
 
     init {
         tts = TextToSpeech(activity) { status ->
@@ -243,9 +257,17 @@ private class AndroidFeedbackController(
 
     fun play(event: ChildRoutineFeedbackEvent) {
         if (event.vibrate) vibrate()
-        if (ttsReady) {
+        if (event.sound) {
+            toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 120)
+        }
+        val spokenText = event.spokenText
+        if (ttsReady && spokenText != null) {
             tts?.stop()
-            tts?.speak(event.spokenText, TextToSpeech.QUEUE_FLUSH, null, "routine-complete")
+            tts?.setSpeechRate(event.ttsRate)
+            val params = Bundle().apply {
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, event.ttsVolume)
+            }
+            tts?.speak(spokenText, TextToSpeech.QUEUE_FLUSH, params, "routine-complete")
         }
     }
 
@@ -253,6 +275,7 @@ private class AndroidFeedbackController(
         tts?.stop()
         tts?.shutdown()
         tts = null
+        toneGenerator.release()
     }
 
     private fun vibrate() {
