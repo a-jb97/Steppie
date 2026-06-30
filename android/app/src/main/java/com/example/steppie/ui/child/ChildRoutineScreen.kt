@@ -47,7 +47,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick as semanticOnClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -133,8 +136,11 @@ fun ChildRoutineScreen(
 
 @Composable
 private fun LoadingContent() {
+    val description = stringResource(R.string.state_loading)
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator()
@@ -516,10 +522,18 @@ private fun UndoFeedbackButton(
     Row(
         modifier = modifier
             .widthIn(min = 198.dp)
-            .heightIn(min = SteppieLayout.GuardianMinimumTouchTarget)
+            .heightIn(min = SteppieLayout.ChildMinimumTouchTarget)
             .clip(RoundedCornerShape(18.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .border(2.dp, Color(0xFF5D4037), RoundedCornerShape(18.dp))
+            .clearAndSetSemantics {
+                contentDescription = label
+                role = Role.Button
+                semanticOnClick {
+                    onClick()
+                    true
+                }
+            }
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.TwoExtraSmall),
         horizontalArrangement = Arrangement.Center,
@@ -552,8 +566,13 @@ private fun NextRoutinePreview(
             .heightIn(min = SteppieLayout.ChildMinimumTouchTarget)
             .clip(RoundedCornerShape(SteppieCornerRadius.Card))
             .background(routine.previewColor())
-            .semantics(mergeDescendants = true) {
+            .clearAndSetSemantics {
                 contentDescription = description
+                role = Role.Button
+                semanticOnClick {
+                    onClick()
+                    true
+                }
             }
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.Small),
@@ -577,15 +596,20 @@ private fun NextRoutinePreview(
 
 @Composable
 private fun AllCompletePreview(onClick: () -> Unit) {
-    val description = stringResource(R.string.child_all_complete_title)
+    val description = stringResource(R.string.a11y_all_complete)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = SteppieLayout.ChildMinimumTouchTarget)
             .clip(RoundedCornerShape(SteppieCornerRadius.Card))
             .background(SteppieTheme.colors.cardSky)
-            .semantics(mergeDescendants = true) {
+            .clearAndSetSemantics {
                 contentDescription = description
+                role = Role.Button
+                semanticOnClick {
+                    onClick()
+                    true
+                }
             }
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.Small),
@@ -604,7 +628,6 @@ private fun AllCompletePreview(onClick: () -> Unit) {
                 text = stringResource(R.string.child_all_complete_title),
                 color = MaterialTheme.colorScheme.onSurface,
                 style = SteppieTheme.typography.button,
-                maxLines = 1,
             )
             Text(
                 text = stringResource(R.string.child_all_complete_subtitle),
@@ -618,12 +641,16 @@ private fun AllCompletePreview(onClick: () -> Unit) {
 
 @Composable
 private fun AllCompleteContent(modifier: Modifier = Modifier) {
+    val description = stringResource(R.string.a11y_all_complete)
     Column(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 620.dp)
             .clip(RoundedCornerShape(SteppieCornerRadius.Sheet))
             .background(SteppieTheme.colors.cardSky)
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+            }
             .padding(SteppieSpacing.ExtraLarge),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -669,8 +696,13 @@ private fun FocusListNavigation(
             .heightIn(min = SteppieLayout.ChildMinimumTouchTarget)
             .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .semantics(mergeDescendants = true) {
+            .clearAndSetSemantics {
                 contentDescription = actionDescription
+                role = Role.Button
+                semanticOnClick {
+                    onClick()
+                    true
+                }
             }
             .clickable(role = Role.Button, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
