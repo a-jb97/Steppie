@@ -264,6 +264,80 @@ struct SteppieTests {
         #expect(try repository.appSettings().guardianPinHash != "1234")
     }
 
+    @Test("보호자 환경 설정은 AppSettings에 저장되고 변경 콜백을 호출한다")
+    func guardianFeedbackSettingsPersist() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        var changeCount = 0
+        let viewModel = GuardianModeViewModel(repository: repository) {
+            changeCount += 1
+        }
+        viewModel.load()
+
+        viewModel.updateFeedbackSettings {
+            try $0.replacing(
+                feedbackIntensity: .quiet,
+                soundEnabled: false,
+                ttsEnabled: false,
+                ttsRate: 0.8,
+                ttsVolume: 0.4,
+                hapticEnabled: false
+            )
+        }
+
+        let settings = try repository.appSettings()
+        #expect(settings.feedbackIntensity == .quiet)
+        #expect(!settings.soundEnabled)
+        #expect(!settings.ttsEnabled)
+        #expect(settings.ttsRate == 0.8)
+        #expect(settings.ttsVolume == 0.4)
+        #expect(!settings.hapticEnabled)
+        #expect(changeCount == 1)
+    }
+
+    @Test("보호자 환경 설정은 알림 리드타임 조합과 방해 금지 시간을 저장한다")
+    func guardianNotificationSettingsPersist() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+        viewModel.load()
+
+        viewModel.updateFeedbackSettings {
+            try $0.replacing(notificationLeadTimes: [10])
+        }
+        #expect(try repository.appSettings().notificationLeadTimes == [10])
+
+        viewModel.updateFeedbackSettings {
+            try $0.replacing(notificationLeadTimes: [5])
+        }
+        #expect(try repository.appSettings().notificationLeadTimes == [5])
+
+        viewModel.updateFeedbackSettings {
+            try $0.replacing(notificationLeadTimes: [10, 5])
+        }
+        #expect(try repository.appSettings().notificationLeadTimes == [10, 5])
+
+        viewModel.updateFeedbackSettings {
+            try $0.replacing(notificationLeadTimes: [])
+        }
+        #expect(try repository.appSettings().notificationLeadTimes.isEmpty)
+
+        viewModel.updateFeedbackSettings {
+            try $0.replacing(
+                quietHours: (
+                    try LocalTime(hour: 21, minute: 0),
+                    try LocalTime(hour: 7, minute: 0)
+                )
+            )
+        }
+        #expect(try repository.appSettings().quietHoursStart?.description == "21:00")
+        #expect(try repository.appSettings().quietHoursEnd?.description == "07:00")
+
+        viewModel.updateFeedbackSettings {
+            try $0.replacing(quietHours: (nil, nil))
+        }
+        #expect(try repository.appSettings().quietHoursStart == nil)
+        #expect(try repository.appSettings().quietHoursEnd == nil)
+    }
+
     @Test("보호자 루틴 편집은 추가 수정 삭제 순서 변경을 Repository와 연결한다")
     func guardianRoutineEditing() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
