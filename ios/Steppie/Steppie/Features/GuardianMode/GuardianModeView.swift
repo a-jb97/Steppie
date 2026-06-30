@@ -104,7 +104,7 @@ struct GuardianModeView: View {
                     subtitle: "날짜별 완료 현황",
                     assetName: "guardian-menu-records",
                     destination: .records,
-                    isEnabled: false
+                    isEnabled: true
                 )
                 menuCard(
                     title: "보안",
@@ -135,7 +135,7 @@ struct GuardianModeView: View {
             case .feedbackSettings:
                 feedbackSettingsScreen(isWide: isWide)
             case .records:
-                unavailableScreen(title: "진행 기록", subtitle: "Sprint 7 이후 상세 구현 예정입니다")
+                recordsScreen(isWide: isWide)
             case .security:
                 securityScreen(isWide: isWide)
             case .backupRestore:
@@ -1104,6 +1104,279 @@ struct GuardianModeView: View {
         .accessibilityElement(children: .combine)
     }
 
+    private func recordsScreen(isWide: Bool) -> some View {
+        GeometryReader { proxy in
+            let useSplit = proxy.size.width >= 720 && !dynamicTypeSize.isAccessibilitySize
+            Group {
+                if useSplit {
+                    HStack(spacing: 0) {
+                        recordSummaryPane
+                            .frame(width: 330)
+                        Rectangle()
+                            .fill(Color.steppieBorderSubtle)
+                            .frame(width: SteppieStroke.divider)
+                        recordDetailPane
+                            .frame(maxWidth: .infinity)
+                    }
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
+                            recordSummaryContent
+                            recordDetailContent
+                        }
+                        .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
+                        .frame(maxWidth: .infinity)
+                        .padding(SteppieLayout.guardianScreenPadding)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.steppieBackgroundSecondary)
+        }
+        .toolbar {
+            if !isWide {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("뒤로") { viewModel.selectedDestination = nil }
+                }
+            }
+        }
+    }
+
+    private var recordSummaryPane: some View {
+        ScrollView {
+            recordSummaryContent
+                .padding(SteppieLayout.guardianScreenPadding)
+        }
+        .background(Color.steppieBackgroundSecondary)
+    }
+
+    private var recordDetailPane: some View {
+        ScrollView {
+            recordDetailContent
+                .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
+                .frame(maxWidth: .infinity)
+                .padding(SteppieLayout.guardianScreenPadding)
+        }
+        .background(Color.steppieBackgroundSecondary)
+    }
+
+    private var recordSummaryContent: some View {
+        VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
+            header(title: "진행 기록", subtitle: "날짜별 완료 수와 루틴 상태를 함께 봅니다")
+            VStack(spacing: SteppieSpacing.small) {
+                ForEach(viewModel.recordSummaries) { summary in
+                    recordSummaryRow(summary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var recordDetailContent: some View {
+        if let detail = viewModel.selectedRecordDetail {
+            VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
+                recordStats(detail)
+                if detail.isEmpty {
+                    recordEmptyState(date: detail.date)
+                } else {
+                    VStack(alignment: .leading, spacing: SteppieSpacing.small) {
+                        Text("루틴별 상태")
+                            .steppieTextStyle(.guardianSection)
+                            .foregroundStyle(Color.steppieTextSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        ForEach(detail.rows) { row in
+                            recordRoutineRow(row)
+                        }
+                    }
+                }
+            }
+        } else {
+            messageState(title: "기록을 불러오지 못했어요", message: "잠시 후 다시 시도해 주세요.")
+        }
+    }
+
+    private func recordSummaryRow(_ summary: GuardianRecordSummary) -> some View {
+        let isSelected = summary.date == viewModel.selectedRecordDate
+        return Button {
+            viewModel.selectRecordDate(summary.date)
+            onInteraction()
+        } label: {
+            adaptiveCardStack(spacing: SteppieSpacing.small) {
+                VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
+                    Text(summary.weekdaySymbol)
+                        .steppieTextStyle(.guardianSection)
+                        .foregroundStyle(Color.steppieTextSecondary)
+                    Text(shortDateText(summary.date))
+                        .steppieTextStyle(.guardianCaption)
+                        .foregroundStyle(Color.steppieTextPrimary)
+                }
+                .frame(minWidth: dynamicTypeSize.isAccessibilitySize ? 0 : 48, alignment: .leading)
+
+                recordProgressSegments(completedCount: summary.completedCount, totalCount: summary.totalCount)
+                    .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : 168, alignment: .leading)
+
+                Text(summary.statusText)
+                    .steppieTextStyle(.guardianCaption)
+                    .foregroundStyle(Color.steppieTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer()
+                }
+            }
+            .padding(.horizontal, SteppieSpacing.medium)
+            .padding(.vertical, SteppieSpacing.small)
+            .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+            .background(Color.steppieBackgroundPrimary)
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(
+                        isSelected ? Color.steppieFocusRing : Color.steppieBorderSubtle,
+                        lineWidth: isSelected ? SteppieStroke.focus : SteppieStroke.divider
+                    )
+            }
+            .clipShape(.rect(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("\(summary.date) 진행 기록"))
+        .accessibilityValue(Text("\(summary.completedCount)개 완료, 전체 \(summary.totalCount)개, \(summary.percentage)퍼센트, \(summary.statusText)"))
+        .accessibilityHint(Text("날짜 기록 보기"))
+    }
+
+    private func recordStats(_ detail: GuardianRecordDetail) -> some View {
+        VStack(alignment: .leading, spacing: SteppieSpacing.small) {
+            header(title: fullDateText(detail.date), subtitle: "\(detail.completedCount)/\(detail.totalCount) 완료, 완료율 \(detail.percentage)%")
+            adaptiveCardStack(spacing: SteppieSpacing.small) {
+                recordStatTile(title: "완료 수", value: "\(detail.completedCount)")
+                recordStatTile(title: "전체 수", value: "\(detail.totalCount)")
+                recordStatTile(title: "완료율", value: "\(detail.percentage)%")
+            }
+            recordProgressSegments(completedCount: detail.completedCount, totalCount: detail.totalCount)
+                .padding(.top, SteppieSpacing.twoExtraSmall)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private func recordStatTile(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
+            Text(title)
+                .steppieTextStyle(.guardianCaption)
+                .foregroundStyle(Color.steppieTextPrimary)
+            Text(value)
+                .steppieTextStyle(.guardianSection)
+                .foregroundStyle(Color.steppieTextSecondary)
+        }
+        .padding(SteppieSpacing.small)
+        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+        .background(Color.steppieBackgroundPrimary)
+        .overlay {
+            RoundedRectangle(cornerRadius: SteppieCornerRadius.control)
+                .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
+        }
+        .clipShape(.rect(cornerRadius: SteppieCornerRadius.control))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func recordRoutineRow(_ row: GuardianRecordRoutineRow) -> some View {
+        adaptiveCardStack(spacing: SteppieSpacing.small) {
+            Image(systemName: row.isCompleted ? "checkmark.circle.fill" : "circle")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(row.isCompleted ? Color.steppieSuccess : Color.steppieTextSecondary)
+                .frame(
+                    width: SteppieLayout.guardianMinimumTouchTarget,
+                    height: SteppieLayout.guardianMinimumTouchTarget
+                )
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
+                Text(row.title)
+                    .steppieTextStyle(.button)
+                    .foregroundStyle(Color.steppieTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(recordRoutineMeta(row))
+                    .steppieTextStyle(.guardianCaption)
+                    .foregroundStyle(Color.steppieTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !dynamicTypeSize.isAccessibilitySize {
+                Spacer()
+            }
+            Text(row.statusText)
+                .steppieTextStyle(.guardianCaption)
+                .foregroundStyle(row.isCompleted ? Color.steppieSuccess : Color.steppieTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(SteppieSpacing.small)
+        .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
+        .background(Color.steppieBackgroundPrimary)
+        .overlay {
+            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
+                .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
+        }
+        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(row.title))
+        .accessibilityValue(Text(recordRoutineAccessibilityValue(row)))
+    }
+
+    @ViewBuilder
+    private func recordProgressSegments(completedCount: Int, totalCount: Int) -> some View {
+        let visibleCompletedCount = min(max(completedCount, 0), max(totalCount, 0))
+        if totalCount <= 0 {
+            Color.clear
+                .frame(height: 20)
+                .frame(maxWidth: .infinity)
+        } else if totalCount <= 8 {
+            HStack(spacing: SteppieSpacing.twoExtraSmall) {
+                ForEach(0..<totalCount, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(index < visibleCompletedCount ? Color.steppieFocusRing : Color.steppieBorderSubtle)
+                        .frame(height: 20)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        } else {
+            GeometryReader { proxy in
+                let ratio = Double(visibleCompletedCount) / Double(totalCount)
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color.steppieBorderSubtle)
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color.steppieFocusRing)
+                        .frame(width: proxy.size.width * ratio)
+                }
+            }
+            .frame(height: 20)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func recordEmptyState(date: String) -> some View {
+        VStack(alignment: .leading, spacing: SteppieSpacing.small) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(Color.steppieTextSecondary)
+                .accessibilityHidden(true)
+            Text("기록이 없어요")
+                .steppieTextStyle(.guardianSection)
+                .foregroundStyle(Color.steppieTextSecondary)
+            Text("\(fullDateText(date))에는 완료 기록이 없습니다.")
+                .steppieTextStyle(.guardianBody)
+                .foregroundStyle(Color.steppieTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(SteppieSpacing.medium)
+        .frame(maxWidth: .infinity, minHeight: 148, alignment: .leading)
+        .background(Color.steppieBackgroundPrimary)
+        .overlay {
+            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
+                .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
+        }
+        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
+        .accessibilityElement(children: .combine)
+    }
+
     private func securityScreen(isWide: Bool) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
@@ -1480,6 +1753,67 @@ struct GuardianModeView: View {
         }
         return "\(start)-\(end)"
     }
+
+    private func shortDateText(_ localDate: String) -> String {
+        guard let date = Self.localDateFormatter.date(from: localDate) else {
+            return localDate
+        }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "M/d"
+        return formatter.string(from: date)
+    }
+
+    private func fullDateText(_ localDate: String) -> String {
+        guard let date = Self.localDateFormatter.date(from: localDate) else {
+            return localDate
+        }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy년 M월 d일"
+        return formatter.string(from: date)
+    }
+
+    private func recordRoutineMeta(_ row: GuardianRecordRoutineRow) -> String {
+        var parts = [row.statusText]
+        if let completedAt = row.completedAt {
+            parts.append("\(timeText(completedAt)) 완료")
+        }
+        if let availabilityText = row.availabilityText {
+            parts.append(availabilityText)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func recordRoutineAccessibilityValue(_ row: GuardianRecordRoutineRow) -> String {
+        var parts = [row.statusText]
+        if let availabilityText = row.availabilityText {
+            parts.append(availabilityText)
+        }
+        if let completedAt = row.completedAt {
+            parts.append("\(timeText(completedAt))에 완료")
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    private func timeText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
+        return formatter.string(from: date)
+    }
+
+    private static let localDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
     private func updateSettings(_ transform: @escaping (AppSettings) throws -> AppSettings) {
         viewModel.updateFeedbackSettings(transform)

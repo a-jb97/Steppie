@@ -522,6 +522,104 @@ struct SteppieTests {
         #expect(viewModel.selectedRoutineSet?.id == originalSet.id)
     }
 
+    @Test("진행 기록은 DailyLog가 없는 날짜를 빈 상태로 표시한다")
+    func guardianRecordsShowEmptyDateWhenNoDailyLogExists() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let now = Date(timeIntervalSince1970: 1_767_225_600)
+        let viewModel = GuardianModeViewModel(
+            repository: repository,
+            now: { now }
+        ) {}
+
+        viewModel.load()
+
+        let detail = try #require(viewModel.selectedRecordDetail)
+        #expect(detail.date == DailyLog.localDateString(for: now))
+        #expect(detail.isEmpty)
+        #expect(detail.completedCount == 0)
+        #expect(detail.totalCount == 0)
+    }
+
+    @Test("진행 기록은 선택 날짜의 완료 수 전체 수 완료율을 DailyLog 기준으로 계산한다")
+    func guardianRecordsCalculateSelectedDateProgress() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let routineSet = try #require(try repository.routineSets().first)
+        let routines = try repository.routines(in: routineSet.id)
+        let logDate = "2026-01-01"
+        let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
+        try repository.setRoutineCompleted(
+            routineID: routines[0].id,
+            routineSetID: routineSet.id,
+            on: logDate,
+            at: completedAt
+        )
+        try repository.setRoutineCompleted(
+            routineID: routines[1].id,
+            routineSetID: routineSet.id,
+            on: logDate,
+            at: completedAt
+        )
+        let addedAfterLogDate = try Routine(
+            routineSetID: routineSet.id,
+            title: LocalizedText(["ko": "다음 날 추가"]),
+            icon: try IconRef.builtin(name: RoutineIconName.star.rawValue),
+            colorToken: "color.card.rose",
+            order: routines.count,
+            createdAt: Date(timeIntervalSince1970: 1_767_312_000),
+            updatedAt: Date(timeIntervalSince1970: 1_767_312_000)
+        )
+        try repository.createRoutine(addedAfterLogDate)
+        let viewModel = GuardianModeViewModel(
+            repository: repository,
+            now: { Date(timeIntervalSince1970: 1_767_744_000) }
+        ) {}
+
+        viewModel.load()
+        viewModel.selectRecordDate(logDate)
+
+        let summary = try #require(viewModel.recordSummaries.first { $0.date == logDate })
+        let detail = try #require(viewModel.selectedRecordDetail)
+        #expect(summary.completedCount == 2)
+        #expect(summary.totalCount == 3)
+        #expect(summary.remainingCount == 1)
+        #expect(summary.percentage == 67)
+        #expect(detail.rows.map(\.status) == [.completed, .completed, .undone])
+        #expect(!detail.rows.map(\.title).contains("다음 날 추가"))
+    }
+
+    @Test("진행 기록은 삭제된 루틴의 완료 이력을 이해 가능한 상태로 유지한다")
+    func guardianRecordsKeepDeletedRoutineHistoryVisible() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let routineSet = try #require(try repository.routineSets().first)
+        let routine = try #require(try repository.routines(in: routineSet.id).first)
+        let logDate = "2026-01-01"
+        let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
+        try repository.setRoutineCompleted(
+            routineID: routine.id,
+            routineSetID: routineSet.id,
+            on: logDate,
+            at: completedAt
+        )
+        try repository.deleteRoutine(
+            id: routine.id,
+            at: Date(timeIntervalSince1970: 1_767_312_000)
+        )
+        let viewModel = GuardianModeViewModel(
+            repository: repository,
+            now: { Date(timeIntervalSince1970: 1_767_744_000) }
+        ) {}
+
+        viewModel.load()
+        viewModel.selectRecordDate(logDate)
+
+        let detail = try #require(viewModel.selectedRecordDetail)
+        let deletedRow = try #require(detail.rows.first { $0.id == routine.id })
+        #expect(deletedRow.title == "일어나기")
+        #expect(deletedRow.isDeleted)
+        #expect(deletedRow.isCompleted)
+        #expect(deletedRow.availabilityText == "삭제된 활동")
+    }
+
     @Test("새 루틴 세트 생성 후 아이 모드는 새 활성 세트를 읽는다")
     func childRoutineLoadsNewlyCreatedRoutineSet() throws {
         let repository = try RoutinePreviewStore.makeRepository()
