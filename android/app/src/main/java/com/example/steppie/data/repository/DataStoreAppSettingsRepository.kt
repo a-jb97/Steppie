@@ -54,6 +54,10 @@ class DataStoreAppSettingsRepository(
 
     suspend fun getAppSettings(): AppSettings = observeAppSettings().first()
 
+    override suspend fun updateAppSettings(settings: AppSettings) {
+        replaceAppSettings(settings)
+    }
+
     suspend fun replaceAppSettings(settings: AppSettings) {
         dataStore.edit { preferences ->
             preferences.clear()
@@ -157,9 +161,10 @@ object PinHashing {
 
 private fun generateRecoveryCode(): String = (SecureRandom().nextInt(900_000) + 100_000).toString()
 
-private fun String.toLeadTimes(): List<Int> = split(',')
-    .mapNotNull { it.trim().takeIf(String::isNotEmpty)?.toIntOrNull() }
-    .distinct()
-    .filter { it > 0 }
-    .takeIf(List<Int>::isNotEmpty)
-    ?: AppSettings().notificationLeadTimes
+private fun String.toLeadTimes(): List<Int> {
+    if (isBlank()) return emptyList()
+    return split(',')
+        .mapNotNull { it.trim().takeIf(String::isNotEmpty)?.toIntOrNull() }
+        .distinct()
+        .filter { it > 0 }
+}
