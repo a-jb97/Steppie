@@ -44,7 +44,7 @@ class AndroidRoutineNotificationScheduler(
         now: Instant,
         date: LocalDate,
     ) {
-        cancelKnownRequests(routines, settings)
+        cancelKnownRequests(routines)
         if (!appContext.canPostNotifications()) return
 
         planner.requestsForToday(
@@ -64,9 +64,9 @@ class AndroidRoutineNotificationScheduler(
         )
     }
 
-    private fun cancelKnownRequests(routines: List<Routine>, settings: AppSettings) {
+    private fun cancelKnownRequests(routines: List<Routine>) {
         routines.forEach { routine ->
-            settings.notificationLeadTimes.forEach { leadMinutes ->
+            KnownLeadMinutes.forEach { leadMinutes ->
                 alarmManager.cancel(
                     pendingIntentFor(
                         routineId = routine.id,
@@ -105,6 +105,8 @@ class AndroidRoutineNotificationScheduler(
         )
     }
 }
+
+private val KnownLeadMinutes = listOf(10, 5)
 
 class RoutineNotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

@@ -7,7 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.steppie.data.backup.BackupImportPreview
 import com.example.steppie.data.backup.BackupProvider
 import com.example.steppie.data.backup.BackupValidationException
+import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.BuiltinIconNames
+import com.example.steppie.domain.model.FeedbackIntensity
 import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.Routine
@@ -26,7 +28,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class GuardianDestination { Pin, Home, RoutineEdit, CardEdit, RoutineSetCreate, Security, BackupRestore }
+enum class GuardianDestination { Pin, Home, RoutineEdit, CardEdit, RoutineSetCreate, EnvironmentSettings, Security, BackupRestore }
 
 enum class GuardianPinMode { Enter, Setup, ChangeCurrent, ChangeNew }
 
@@ -56,6 +58,7 @@ data class GuardianModeUiState(
     val pinDigits: String = "",
     val pinError: String? = null,
     val hasGuardianPin: Boolean = false,
+    val appSettings: AppSettings = AppSettings(),
     val routineSets: List<RoutineSet> = emptyList(),
     val activeRoutineSet: RoutineSet? = null,
     val routines: List<Routine> = emptyList(),
@@ -95,8 +98,8 @@ class GuardianModeViewModel(
                 appSettingsRepository.observeAppSettings(),
                 routineRepository.observeRoutineSets(),
             ) { settings, routineSets ->
-                settings.hasGuardianPin to routineSets.filter { it.deletedAt == null }
-            }.collect { (hasPin, visibleRoutineSets) ->
+                settings to routineSets.filter { it.deletedAt == null }
+            }.collect { (settings, visibleRoutineSets) ->
                 _uiState.update { state ->
                     val activeSet = visibleRoutineSets.firstOrNull { it.isActive }
                     val resolvedPinMode = if (
@@ -104,12 +107,13 @@ class GuardianModeViewModel(
                         !state.isAuthenticated &&
                         state.destination == GuardianDestination.Pin
                     ) {
-                        if (hasPin) GuardianPinMode.Enter else GuardianPinMode.Setup
+                        if (settings.hasGuardianPin) GuardianPinMode.Enter else GuardianPinMode.Setup
                     } else {
                         state.pinMode
                     }
                     state.copy(
-                        hasGuardianPin = hasPin,
+                        hasGuardianPin = settings.hasGuardianPin,
+                        appSettings = settings,
                         pinMode = resolvedPinMode,
                         routineSets = visibleRoutineSets,
                         activeRoutineSet = activeSet,
@@ -138,7 +142,7 @@ class GuardianModeViewModel(
 
     fun closeToChild() {
         verifiedPinForChange = null
-        _uiState.update { GuardianModeUiState(hasGuardianPin = it.hasGuardianPin) }
+        _uiState.update { GuardianModeUiState(hasGuardianPin = it.hasGuardianPin, appSettings = it.appSettings) }
     }
 
     fun markInteraction() {
@@ -215,6 +219,81 @@ class GuardianModeViewModel(
                 interactionToken = it.interactionToken + 1,
             )
         }
+    }
+
+    fun openEnvironmentSettings() {
+        _uiState.update {
+            it.copy(
+                destination = GuardianDestination.EnvironmentSettings,
+                draft = null,
+                routineSetDraft = null,
+                routineSetListEditing = false,
+                editingRoutineSetId = null,
+                editingRoutineSetName = "",
+                draftError = null,
+                pendingDeleteRoutineId = null,
+                pendingDeleteRoutineSetId = null,
+                notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun updateFeedbackIntensity(intensity: FeedbackIntensity) = updateSettings {
+        it.copy(feedbackIntensity = intensity)
+    }
+
+    fun updateTtsEnabled(enabled: Boolean) = updateSettings {
+        it.copy(ttsEnabled = enabled)
+    }
+
+    fun updateTtsRate(rate: Double) = updateSettings {
+        it.copy(ttsRate = rate)
+    }
+
+    fun updateTtsVolume(volume: Double) = updateSettings {
+        it.copy(ttsVolume = volume)
+    }
+
+    fun updateSoundEnabled(enabled: Boolean) = updateSettings {
+        it.copy(soundEnabled = enabled)
+    }
+
+    fun updateHapticEnabled(enabled: Boolean) = updateSettings {
+        it.copy(hapticEnabled = enabled)
+    }
+
+    fun updateNotificationLeadTime(leadMinutes: Int, enabled: Boolean) {
+        require(leadMinutes in setOf(10, 5))
+        updateSettings { settings ->
+            val leadTimes = if (enabled) {
+                (settings.notificationLeadTimes + leadMinutes).distinct()
+            } else {
+                settings.notificationLeadTimes.filterNot { it == leadMinutes }
+            }.sortedDescending()
+            settings.copy(notificationLeadTimes = leadTimes)
+        }
+    }
+
+    fun updateQuietHoursEnabled(enabled: Boolean) = updateSettings {
+        if (enabled) {
+            it.copy(
+                quietHoursStart = it.quietHoursStart ?: LocalTime.of(21, 0),
+                quietHoursEnd = it.quietHoursEnd ?: LocalTime.of(7, 0),
+            )
+        } else {
+            it.copy(quietHoursStart = null, quietHoursEnd = null)
+        }
+    }
+
+    fun updateQuietHoursStart(value: String) {
+        val time = parseScheduledTime(value) ?: return
+        updateSettings { it.copy(quietHoursStart = time) }
+    }
+
+    fun updateQuietHoursEnd(value: String) {
+        val time = parseScheduledTime(value) ?: return
+        updateSettings { it.copy(quietHoursEnd = time) }
     }
 
     fun openBackupRestore() {
@@ -781,6 +860,7 @@ class GuardianModeViewModel(
                     _uiState.update {
                         GuardianModeUiState(
                             hasGuardianPin = it.hasGuardianPin,
+                            appSettings = it.appSettings,
                             backupMessage = "백업 파일에서 복원했습니다.",
                             interactionToken = it.interactionToken + 1,
                         )
@@ -893,6 +973,19 @@ class GuardianModeViewModel(
                 draftError = null,
                 interactionToken = it.interactionToken + 1,
             )
+        }
+    }
+
+    private fun updateSettings(transform: (AppSettings) -> AppSettings) {
+        val nextSettings = transform(_uiState.value.appSettings)
+        _uiState.update {
+            it.copy(
+                appSettings = nextSettings,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+        viewModelScope.launch {
+            appSettingsRepository.updateAppSettings(nextSettings)
         }
     }
 
