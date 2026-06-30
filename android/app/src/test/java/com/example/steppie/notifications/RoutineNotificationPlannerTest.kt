@@ -69,6 +69,19 @@ class RoutineNotificationPlannerTest {
     }
 
     @Test
+    fun `empty lead times disable notification requests`() {
+        val requests = planner.requestsForToday(
+            routines = listOf(routine(scheduledTime = LocalTime.of(8, 0))),
+            completedRoutineIds = emptySet(),
+            settings = AppSettings(notificationLeadTimes = emptyList()),
+            now = Instant.parse("2026-01-02T07:00:00Z"),
+            date = date,
+        )
+
+        assertTrue(requests.isEmpty())
+    }
+
+    @Test
     fun `quiet hours suppress matching notification times`() {
         val requests = planner.requestsForToday(
             routines = listOf(routine(scheduledTime = LocalTime.of(8, 0))),

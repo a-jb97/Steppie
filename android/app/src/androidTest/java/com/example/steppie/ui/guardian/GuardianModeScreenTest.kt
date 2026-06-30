@@ -83,6 +83,7 @@ class GuardianModeScreenTest {
     @Test
     fun homeMenuRoutesRoutineAndSecurityCards() {
         var routineClicks = 0
+        var environmentClicks = 0
         var securityClicks = 0
 
         composeRule.setContent {
@@ -99,6 +100,7 @@ class GuardianModeScreenTest {
                     onInteraction = {},
                     onOpenHome = {},
                     onOpenRoutineEdit = { routineClicks += 1 },
+                    onOpenEnvironmentSettings = { environmentClicks += 1 },
                     onOpenSecurity = { securityClicks += 1 },
                     onOpenPinChange = {},
                     onOpenRoutineSetCreate = {},
@@ -137,12 +139,77 @@ class GuardianModeScreenTest {
         }
 
         composeRule.onNodeWithText("루틴 관리").performClick()
+        composeRule.onNodeWithText("환경 설정").performClick()
         composeRule.onNodeWithText("보안").performClick()
 
         composeRule.runOnIdle {
             assertEquals(1, routineClicks)
+            assertEquals(1, environmentClicks)
             assertEquals(1, securityClicks)
         }
+    }
+
+    @Test
+    fun environmentSettingsShowsFigmaAndSprintControls() {
+        composeRule.setContent {
+            SteppieTheme {
+                GuardianModeScreen(
+                    state = GuardianModeUiState(
+                        isActive = true,
+                        isAuthenticated = true,
+                        destination = GuardianDestination.EnvironmentSettings,
+                    ),
+                    onDigit = {},
+                    onDeletePinDigit = {},
+                    onCloseToChild = {},
+                    onInteraction = {},
+                    onOpenHome = {},
+                    onOpenRoutineEdit = {},
+                    onOpenSecurity = {},
+                    onOpenPinChange = {},
+                    onOpenRoutineSetCreate = {},
+                    onOpenNewRoutineEditor = {},
+                    onOpenRoutineEditor = {},
+                    onToggleRoutineSetListEditing = {},
+                    onSelectRoutineSet = {},
+                    onRequestEditRoutineSetName = {},
+                    onEditingRoutineSetNameChange = {},
+                    onCancelEditRoutineSetName = {},
+                    onSaveEditingRoutineSetName = {},
+                    onDraftTitleChange = {},
+                    onDraftIconChange = {},
+                    onDraftColorChange = {},
+                    onDraftScheduledTimeChange = {},
+                    onSaveDraft = {},
+                    onRoutineSetNameChange = {},
+                    onRoutineSetStepTitleChange = {},
+                    onRoutineSetStepIconChange = {},
+                    onRoutineSetStepColorChange = {},
+                    onRoutineSetStepScheduledTimeChange = {},
+                    onAddRoutineSetStep = {},
+                    onEditRoutineSetStep = {},
+                    onRemoveRoutineSetStep = {},
+                    onSaveRoutineSetDraft = {},
+                    onRequestDelete = {},
+                    onRequestDeleteRoutineSet = {},
+                    onCancelDelete = {},
+                    onConfirmDelete = {},
+                    onConfirmDeleteRoutineSet = {},
+                    onMoveRoutine = { _, _ -> },
+                    onShowOutOfScopeNotice = {},
+                    onClearNotice = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("칭찬 애니메이션").assertIsDisplayed()
+        composeRule.onNodeWithText("음성 안내").assertIsDisplayed()
+        composeRule.onNodeWithText("효과음").assertIsDisplayed()
+        composeRule.onNodeWithText("햅틱/진동").assertIsDisplayed()
+        composeRule.onNodeWithText("음성 속도").assertIsDisplayed()
+        composeRule.onNodeWithText("음성 볼륨").assertIsDisplayed()
+        composeRule.onNodeWithText("예고 알림").assertIsDisplayed()
+        composeRule.onNodeWithText("방해 금지 시간").assertIsDisplayed()
     }
 
     @Test

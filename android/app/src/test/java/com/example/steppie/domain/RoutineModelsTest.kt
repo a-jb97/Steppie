@@ -1,6 +1,7 @@
 package com.example.steppie.domain
 
 import com.example.steppie.domain.model.IconRef
+import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.Routine
 import java.time.LocalTime
@@ -37,6 +38,19 @@ class RoutineModelsTest {
         }
         assertThrows(IllegalArgumentException::class.java) {
             routine(scheduledTime = LocalTime.of(8, 5, 1))
+        }
+    }
+
+    @Test
+    fun appSettings_allowsDisablingAllNotificationLeadTimes() {
+        val settings = AppSettings(notificationLeadTimes = emptyList())
+
+        assertEquals(emptyList<Int>(), settings.notificationLeadTimes)
+        assertThrows(IllegalArgumentException::class.java) {
+            AppSettings(notificationLeadTimes = listOf(10, 10))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AppSettings(notificationLeadTimes = listOf(0))
         }
     }
 
