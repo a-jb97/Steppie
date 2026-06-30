@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -82,6 +83,11 @@ import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
 import java.util.Locale
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.time.format.TextStyle
 
 private val GuardianSplitMinimumWidth = 905.dp
 
@@ -95,6 +101,7 @@ fun GuardianModeScreen(
     onOpenHome: () -> Unit,
     onOpenRoutineEdit: () -> Unit,
     onOpenEnvironmentSettings: () -> Unit = {},
+    onOpenRecords: () -> Unit = {},
     onOpenSecurity: () -> Unit,
     onOpenBackupRestore: () -> Unit = {},
     onOpenPinChange: () -> Unit,
@@ -127,6 +134,7 @@ fun GuardianModeScreen(
     onConfirmDelete: () -> Unit,
     onConfirmDeleteRoutineSet: () -> Unit,
     onMoveRoutine: (String, Int) -> Unit,
+    onSelectRecordsDate: (LocalDate) -> Unit = {},
     onShowOutOfScopeNotice: () -> Unit,
     onFeedbackIntensityChange: (FeedbackIntensity) -> Unit = {},
     onTtsEnabledChange: (Boolean) -> Unit = {},
@@ -171,6 +179,7 @@ fun GuardianModeScreen(
                 onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                 onOpenRoutineEdit = onOpenRoutineEdit,
                 onOpenEnvironmentSettings = onOpenEnvironmentSettings,
+                onOpenRecords = onOpenRecords,
                 onOpenSecurity = onOpenSecurity,
                 onShowOutOfScopeNotice = onShowOutOfScopeNotice,
             )
@@ -245,6 +254,12 @@ fun GuardianModeScreen(
                 onQuietHoursEnabledChange = onQuietHoursEnabledChange,
                 onQuietHoursStartChange = onQuietHoursStartChange,
                 onQuietHoursEndChange = onQuietHoursEndChange,
+            )
+            GuardianDestination.Records -> GuardianRecordsScreen(
+                state = state,
+                useWideLayout = maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight,
+                onOpenHome = onOpenHome,
+                onSelectRecordsDate = onSelectRecordsDate,
             )
             GuardianDestination.Security -> GuardianSecurityScreen(
                 onOpenHome = onOpenHome,
@@ -568,6 +583,7 @@ private fun GuardianHomeScreen(
     onOpenRoutineSetCreate: () -> Unit,
     onOpenRoutineEdit: () -> Unit,
     onOpenEnvironmentSettings: () -> Unit,
+    onOpenRecords: () -> Unit,
     onOpenSecurity: () -> Unit,
     onShowOutOfScopeNotice: () -> Unit,
 ) {
@@ -585,7 +601,7 @@ private fun GuardianHomeScreen(
         GuardianMenuCard(R.drawable.ic_guardian_menu_routine, stringResource(R.string.guardian_menu_create_routine_set), stringResource(R.string.guardian_menu_create_routine_set_desc), onOpenRoutineSetCreate)
         GuardianMenuCard(R.drawable.ic_guardian_menu_routine, stringResource(R.string.guardian_menu_routine), stringResource(R.string.guardian_menu_routine_desc), onOpenRoutineEdit)
         GuardianMenuCard(R.drawable.ic_guardian_menu_settings, stringResource(R.string.guardian_menu_feedback), stringResource(R.string.guardian_menu_feedback_desc), onOpenEnvironmentSettings)
-        GuardianMenuCard(R.drawable.ic_guardian_menu_records, stringResource(R.string.guardian_menu_records), stringResource(R.string.guardian_menu_records_desc), onShowOutOfScopeNotice)
+        GuardianMenuCard(R.drawable.ic_guardian_menu_records, stringResource(R.string.guardian_menu_records), stringResource(R.string.guardian_menu_records_desc), onOpenRecords)
         GuardianMenuCard(R.drawable.ic_guardian_menu_security, stringResource(R.string.guardian_menu_security), stringResource(R.string.guardian_menu_security_desc), onOpenSecurity)
     }
 }
@@ -1561,6 +1577,417 @@ private fun GuardianCardEditScreen(
         state.draftError?.let { ErrorMessage(it) }
     }
 }
+
+@Composable
+private fun GuardianRecordsScreen(
+    state: GuardianModeUiState,
+    useWideLayout: Boolean,
+    onOpenHome: () -> Unit,
+    onSelectRecordsDate: (LocalDate) -> Unit,
+) {
+    GuardianScaffold(
+        title = stringResource(R.string.guardian_records_title),
+        subtitle = stringResource(R.string.guardian_records_subtitle),
+        onBack = onOpenHome,
+    ) {
+        if (useWideLayout) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("guardian_records_split"),
+                horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Large),
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+                ) {
+                    GuardianRecordsDayList(state, onSelectRecordsDate)
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+                ) {
+                    GuardianRecordsDetail(state)
+                }
+            }
+        } else {
+            GuardianRecordsDayList(state, onSelectRecordsDate)
+            GuardianRecordsDetail(state)
+        }
+    }
+}
+
+@Composable
+private fun GuardianRecordsDayList(
+    state: GuardianModeUiState,
+    onSelectRecordsDate: (LocalDate) -> Unit,
+) {
+    GuardianPanel(title = stringResource(R.string.guardian_records_recent_title)) {
+        state.recordDays.forEach { day ->
+            GuardianRecordDayRow(
+                day = day,
+                selected = day.date == state.selectedRecordsDate,
+                onClick = { onSelectRecordsDate(day.date) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun GuardianRecordDayRow(
+    day: GuardianRecordDay,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val dateText = recordDateText(day.date)
+    val statusText = recordDayStatusText(day)
+    val description = stringResource(
+        R.string.a11y_guardian_record_day,
+        dateText,
+        day.completedCount,
+        day.totalCount,
+        day.completionPercent,
+        statusText,
+    )
+    val selectionState = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 74.dp)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                if (selected) 2.dp else SteppieStroke.Divider,
+                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                RoundedCornerShape(SteppieCornerRadius.Card),
+            )
+            .clearAndSetSemantics {
+                contentDescription = description
+                stateDescription = selectionState
+                role = Role.Button
+                semanticOnClick {
+                    onClick()
+                    true
+                }
+            }
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.Small),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+    ) {
+        Column(
+            modifier = Modifier.width(72.dp),
+            verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
+        ) {
+            Text(
+                text = weekdayText(day.date),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.guardianSection,
+            )
+            Text(
+                text = recordDateText(day.date),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianBody,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (day.hasRecords) {
+                GuardianRecordProgressIndicator(
+                    completedCount = day.completedCount,
+                    totalCount = day.totalCount,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        Text(
+            text = statusText,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = SteppieTheme.typography.guardianBody,
+            maxLines = 2,
+            textAlign = TextAlign.End,
+            modifier = Modifier.widthIn(min = 84.dp, max = 112.dp),
+        )
+    }
+}
+
+@Composable
+private fun GuardianRecordProgressIndicator(
+    completedCount: Int,
+    totalCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    if (totalCount >= 9) {
+        GuardianRecordContinuousProgressBar(
+            completedCount = completedCount,
+            totalCount = totalCount,
+            modifier = modifier,
+        )
+    } else {
+        GuardianRecordSegmentedProgressBar(
+            completedCount = completedCount,
+            totalCount = totalCount,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun GuardianRecordSegmentedProgressBar(
+    completedCount: Int,
+    totalCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    val segmentCount = totalCount.coerceAtLeast(1)
+    val completedSegments = completedCount.coerceIn(0, segmentCount)
+    Row(
+        modifier = modifier.heightIn(min = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
+    ) {
+        repeat(segmentCount) { index ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(
+                        if (index < completedSegments) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outline
+                        },
+                    ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun GuardianRecordContinuousProgressBar(
+    completedCount: Int,
+    totalCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    val progress = if (totalCount == 0) 0f else completedCount.toFloat() / totalCount.toFloat()
+    Box(
+        modifier = modifier
+            .heightIn(min = 20.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(MaterialTheme.colorScheme.outline),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .clip(RoundedCornerShape(5.dp))
+                .background(MaterialTheme.colorScheme.primary),
+        )
+    }
+}
+
+@Composable
+private fun GuardianRecordsDetail(state: GuardianModeUiState) {
+    val summary = state.selectedRecordSummary
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
+    ) {
+        Text(
+            text = fullRecordDateText(summary.date),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = SteppieTheme.typography.guardianTitle,
+        )
+        if (!summary.hasRecords) {
+            Text(
+                text = stringResource(R.string.guardian_records_empty_date),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianBody,
+            )
+        } else {
+            val summaryText = stringResource(
+                R.string.guardian_records_summary,
+                summary.completedCount,
+                summary.totalCount,
+                summary.completionPercent,
+            )
+            val summaryDescription = stringResource(
+                R.string.a11y_guardian_records_summary,
+                summary.completedCount,
+                summary.totalCount,
+                summary.completionPercent,
+            )
+            Text(
+                text = summaryText,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianBody,
+                modifier = Modifier.semantics {
+                    contentDescription = summaryDescription
+                },
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Small)) {
+                GuardianRecordStatCard(
+                    label = stringResource(R.string.guardian_records_completed_count),
+                    value = summary.completedCount.toString(),
+                    modifier = Modifier.weight(1f),
+                )
+                GuardianRecordStatCard(
+                    label = stringResource(R.string.guardian_records_total_count),
+                    value = summary.totalCount.toString(),
+                    modifier = Modifier.weight(1f),
+                )
+                GuardianRecordStatCard(
+                    label = stringResource(R.string.guardian_records_completion_rate),
+                    value = stringResource(R.string.guardian_records_percent_value, summary.completionPercent),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            GuardianRecordProgressIndicator(
+                completedCount = summary.completedCount,
+                totalCount = summary.totalCount,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(24.dp),
+            )
+            Text(
+                text = stringResource(R.string.guardian_records_routine_status_title),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.guardianTitle,
+            )
+            state.selectedRecordRoutines.forEach { routine ->
+                GuardianRecordRoutineRow(routine)
+            }
+        }
+    }
+}
+
+@Composable
+private fun GuardianRecordStatCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .heightIn(min = 96.dp)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(SteppieStroke.Divider, MaterialTheme.colorScheme.outline, RoundedCornerShape(SteppieCornerRadius.Card))
+            .padding(SteppieSpacing.Medium),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = label,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = SteppieTheme.typography.guardianBody,
+            maxLines = 2,
+        )
+        Text(
+            text = value,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = SteppieTheme.typography.guardianTitle,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun GuardianRecordRoutineRow(routine: GuardianRecordRoutine) {
+    val title = routine.title ?: stringResource(R.string.guardian_records_deleted_routine)
+    val status = stringResource(if (routine.isCompleted) R.string.guardian_records_completed else R.string.guardian_records_not_completed)
+    val completedTime = routine.completedAt?.let(::recordCompletedTimeText)
+    val statusDetail = if (routine.isCompleted && completedTime != null) {
+        stringResource(R.string.guardian_records_completed_at, completedTime)
+    } else {
+        status
+    }
+    val lifecycle = when {
+        routine.isMissing || routine.isDeleted -> stringResource(R.string.guardian_records_deleted_routine)
+        routine.isInactive -> stringResource(R.string.guardian_records_inactive_routine)
+        else -> null
+    }
+    val description = if (lifecycle == null) {
+        stringResource(R.string.a11y_guardian_record_routine, title, status)
+    } else {
+        stringResource(R.string.a11y_guardian_record_routine_with_lifecycle, title, status, lifecycle)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(SteppieStroke.Divider, MaterialTheme.colorScheme.outline, RoundedCornerShape(SteppieCornerRadius.Card))
+            .clearAndSetSemantics {
+                contentDescription = description
+            }
+            .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.Small),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(if (routine.isCompleted) SteppieTheme.colors.progressComplete else Color.Transparent)
+                .border(
+                    3.dp,
+                    if (routine.isCompleted) SteppieTheme.colors.progressComplete else MaterialTheme.colorScheme.onSurfaceVariant,
+                    CircleShape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (routine.isCompleted) {
+                Text(
+                    text = "✓",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    style = SteppieTheme.typography.button,
+                )
+            }
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall)) {
+            Text(
+                text = title,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.button,
+                maxLines = 2,
+            )
+            Text(
+                text = listOfNotNull(statusDetail, lifecycle).joinToString(" · "),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.guardianCaption,
+            )
+        }
+        Text(
+            text = status,
+            color = if (routine.isCompleted) SteppieTheme.colors.progressComplete else MaterialTheme.colorScheme.onSurface,
+            style = SteppieTheme.typography.guardianBody,
+        )
+    }
+}
+
+@Composable
+private fun recordDayStatusText(day: GuardianRecordDay): String = when {
+    !day.hasRecords -> stringResource(R.string.guardian_records_no_record)
+    day.remainingCount == 0 -> stringResource(R.string.guardian_records_all_done)
+    else -> stringResource(R.string.guardian_records_remaining_count, day.remainingCount)
+}
+
+private fun weekdayText(date: LocalDate): String = date.dayOfWeek
+    .getDisplayName(TextStyle.SHORT, Locale.getDefault())
+
+private fun recordDateText(date: LocalDate): String = "${date.monthValue}/${date.dayOfMonth}"
+
+private fun fullRecordDateText(date: LocalDate): String =
+    date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.getDefault()))
+
+private fun recordCompletedTimeText(completedAt: java.time.Instant): String =
+    completedAt.atZone(ZoneId.systemDefault()).format(
+        DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(Locale.getDefault()),
+    )
 
 @Composable
 private fun GuardianSecurityScreen(
