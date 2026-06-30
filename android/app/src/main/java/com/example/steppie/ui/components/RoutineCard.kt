@@ -29,6 +29,9 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick as semanticOnClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
@@ -75,6 +78,15 @@ fun RoutineCard(
     }
     val canClick = presentation == RoutineCardPresentation.List || state == RoutineCardState.Current
     val background = routineCardColor(cardColor)
+    val accessibilityDescription = if (presentation == RoutineCardPresentation.Focus) {
+        if (state == RoutineCardState.Current) {
+            stringResource(R.string.a11y_focus_routine_card, title, resolvedStateDescription, resolvedMeta)
+        } else {
+            stringResource(R.string.a11y_routine_card, title, resolvedStateDescription, resolvedMeta)
+        }
+    } else {
+        stringResource(R.string.a11y_routine_card, title, resolvedStateDescription, resolvedMeta)
+    }
 
     if (presentation == RoutineCardPresentation.Focus) {
         FocusRoutineCard(
@@ -82,6 +94,7 @@ fun RoutineCard(
             meta = resolvedMeta,
             state = state,
             stateDescription = resolvedStateDescription,
+            accessibilityDescription = accessibilityDescription,
             onClick = onClick,
             enabled = canClick,
             background = background,
@@ -95,6 +108,7 @@ fun RoutineCard(
             meta = resolvedMeta,
             state = state,
             stateDescription = resolvedStateDescription,
+            accessibilityDescription = accessibilityDescription,
             onClick = onClick,
             background = background,
             modifier = modifier,
@@ -109,6 +123,7 @@ private fun FocusRoutineCard(
     meta: String,
     state: RoutineCardState,
     stateDescription: String,
+    accessibilityDescription: String,
     onClick: () -> Unit,
     enabled: Boolean,
     background: Color,
@@ -138,8 +153,18 @@ private fun FocusRoutineCard(
             .border(borderWidth, borderColor, shape)
             .clip(shape)
             .background(background)
+            .clearAndSetSemantics {
+                contentDescription = accessibilityDescription
+                this.stateDescription = stateDescription
+                if (enabled) {
+                    role = Role.Button
+                    semanticOnClick {
+                        onClick()
+                        true
+                    }
+                }
+            }
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .semantics(mergeDescendants = true) { this.stateDescription = stateDescription }
             .padding(SteppieSpacing.ExtraLarge),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -178,6 +203,7 @@ private fun ListRoutineCard(
     meta: String,
     state: RoutineCardState,
     stateDescription: String,
+    accessibilityDescription: String,
     onClick: () -> Unit,
     background: Color,
     modifier: Modifier,
@@ -200,8 +226,16 @@ private fun ListRoutineCard(
             )
             .clip(shape)
             .background(background)
+            .clearAndSetSemantics {
+                contentDescription = accessibilityDescription
+                this.stateDescription = stateDescription
+                role = Role.Button
+                semanticOnClick {
+                    onClick()
+                    true
+                }
+            }
             .clickable(role = Role.Button, onClick = onClick)
-            .semantics(mergeDescendants = true) { this.stateDescription = stateDescription }
             .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.Small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
