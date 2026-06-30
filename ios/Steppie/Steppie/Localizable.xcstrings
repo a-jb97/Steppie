@@ -76,6 +76,118 @@
         }
       }
     },
+    "a11y.backup.restore.replaceHint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replaces the current app data with the backup file contents"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 앱 데이터를 백업 파일 내용으로 교체합니다"
+          }
+        }
+      }
+    },
+    "a11y.guardian.cardColor.selectHint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selects the card color"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "카드 색상을 선택합니다"
+          }
+        }
+      }
+    },
+    "a11y.guardian.scheduledTime.clearHint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removes the scheduled time"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예정 시각을 사용하지 않습니다"
+          }
+        }
+      }
+    },
+    "a11y.guardian.scheduledTime.selectHint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selects the time when this activity should start"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "활동을 시작할 예정 시각을 선택합니다"
+          }
+        }
+      }
+    },
+    "a11y.guardian.step.editOrReorderHint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit this step or change its order"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "단계를 수정하거나 순서를 바꿀 수 있습니다"
+          }
+        }
+      }
+    },
+    "a11y.selection.notSelected" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not selected"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택 안 됨"
+          }
+        }
+      }
+    },
+    "a11y.selection.selected" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selected"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택됨"
+          }
+        }
+      }
+    },
     "component.button.loading" : {
       "localizations" : {
         "en" : {
