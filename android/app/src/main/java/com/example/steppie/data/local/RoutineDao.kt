@@ -16,6 +16,10 @@ interface RoutineDao {
     fun observeRoutineSets(): Flow<List<RoutineSetWithRoutines>>
 
     @Transaction
+    @Query("SELECT * FROM routine_sets ORDER BY createdAtEpochMillis, id")
+    fun observeAllRoutineSets(): Flow<List<RoutineSetWithRoutines>>
+
+    @Transaction
     @Query("SELECT * FROM routine_sets WHERE id = :id AND deletedAtEpochMillis IS NULL")
     fun observeRoutineSet(id: String): Flow<RoutineSetWithRoutines?>
 
@@ -72,6 +76,9 @@ interface RoutineDao {
 
     @Query("SELECT * FROM daily_logs WHERE date = :date ORDER BY updatedAtEpochMillis, id")
     fun observeDailyLogs(date: String): Flow<List<DailyLogEntity>>
+
+    @Query("SELECT * FROM daily_logs WHERE date BETWEEN :startDate AND :endDate ORDER BY date DESC, updatedAtEpochMillis, id")
+    fun observeDailyLogs(startDate: String, endDate: String): Flow<List<DailyLogEntity>>
 
     @Query("SELECT * FROM daily_logs ORDER BY date, updatedAtEpochMillis, id")
     suspend fun getAllDailyLogEntities(): List<DailyLogEntity>

@@ -72,6 +72,12 @@ fun RoutineSetWithRoutines.toDomain(): RoutineSet = routineSet.toDomain(
         .toList(),
 )
 
+fun RoutineSetWithRoutines.toRecordsDomain(): RoutineSet = routineSet.toDomain(
+    routines = routines
+        .sortedBy(RoutineEntity::sortOrder)
+        .map(RoutineEntity::toDomain),
+)
+
 fun RoutineSetEntity.toDomain(routines: List<Routine> = emptyList()): RoutineSet = RoutineSet(
     id = id,
     name = LocalizedTextCodec.decode(localizedName),

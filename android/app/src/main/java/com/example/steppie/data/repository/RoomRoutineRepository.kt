@@ -5,6 +5,7 @@ import com.example.steppie.data.local.RoutineDao
 import com.example.steppie.data.local.SteppieDatabase
 import com.example.steppie.data.local.toDomain
 import com.example.steppie.data.local.toEntity
+import com.example.steppie.data.local.toRecordsDomain
 import com.example.steppie.domain.model.DailyLog
 import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.model.Routine
@@ -23,6 +24,9 @@ class RoomRoutineRepository(
 ) : RoutineRepository {
     override fun observeRoutineSets(): Flow<List<RoutineSet>> =
         dao.observeRoutineSets().map { sets -> sets.map { it.toDomain() } }
+
+    override fun observeRoutineSetsForRecords(): Flow<List<RoutineSet>> =
+        dao.observeAllRoutineSets().map { sets -> sets.map { it.toRecordsDomain() } }
 
     override fun observeRoutineSet(id: String): Flow<RoutineSet?> {
         requireUuidV4(id, "RoutineSet.id")
@@ -164,6 +168,9 @@ class RoomRoutineRepository(
 
     override fun observeDailyLogs(date: LocalDate): Flow<List<DailyLog>> =
         dao.observeDailyLogs(date.toString()).map { logs -> logs.map { it.toDomain() } }
+
+    override fun observeDailyLogs(startDate: LocalDate, endDate: LocalDate): Flow<List<DailyLog>> =
+        dao.observeDailyLogs(startDate.toString(), endDate.toString()).map { logs -> logs.map { it.toDomain() } }
 
     override suspend fun completeRoutine(
         routineId: String,
