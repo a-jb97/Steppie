@@ -51,6 +51,7 @@ final class IOSRoutineSpeechGuide: RoutineSpeechGuiding {
 @MainActor
 struct IOSRoutineFeedbackPerformer: RoutineFeedbackPerforming {
     func routineCompleted(settings: AppSettings) {
+        // TODO(Sprint 11): Play the completion sound here when a sound asset/service exists.
         guard allowsHaptics(settings) else { return }
         let style: UIImpactFeedbackGenerator.FeedbackStyle = settings.feedbackIntensity == .strong
             ? .medium

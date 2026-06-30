@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated enum FeedbackIntensity: String, Codable, Equatable, Sendable {
+nonisolated enum FeedbackIntensity: String, Codable, Equatable, Hashable, Sendable {
     case strong
     case normal
     case quiet

@@ -109,13 +109,13 @@ struct BackupService {
             Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
         },
         platform: String = "ios",
-        assetStore: any BackupAssetStore = FileBackupAssetStore()
+        assetStore: (any BackupAssetStore)? = nil
     ) {
         self.repository = repository
         self.now = now
         self.appVersion = appVersion
         self.platform = platform
-        self.assetStore = assetStore
+        self.assetStore = assetStore ?? FileBackupAssetStore()
     }
 
     func exportPackage() throws -> BackupPackage {
