@@ -2,10 +2,12 @@ import SwiftUI
 
 struct GuardianPINView: View {
     let purpose: GuardianPINPurpose
+    let showsRecoveryReset: Bool
     let verifyPIN: (String) -> Bool
     let savePIN: (String) -> Bool
     let onSuccess: () -> Void
     let onCancel: () -> Void
+    let onRecoveryRequested: (() -> Void)?
 
     @State private var firstPIN = ""
     @State private var currentPIN = ""
@@ -31,6 +33,13 @@ struct GuardianPINView: View {
                     keypad
                         .frame(maxWidth: .infinity)
                         .padding(.top, SteppieSpacing.large)
+                    if purpose == .enter, showsRecoveryReset, let onRecoveryRequested {
+                        Button("복구 코드로 PIN 재설정", action: onRecoveryRequested)
+                            .steppieTextStyle(.button)
+                            .foregroundStyle(Color.steppieTextSecondary)
+                            .frame(maxWidth: .infinity, minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                            .accessibilityHint(Text("6자리 복구 코드로 새 PIN을 설정합니다"))
+                    }
                     if let errorMessage {
                         errorView(errorMessage)
                             .accessibilityFocused($errorFocused)

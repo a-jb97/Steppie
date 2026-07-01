@@ -311,6 +311,9 @@ final class GuardianModeViewModel {
     private(set) var backupPackage: BackupPackage?
     private(set) var validatedRestorePayload: BackupRestorePayload?
     private(set) var backupStatusMessage: String?
+    private(set) var oneTimeRecoveryCode: String?
+    private(set) var recoveryCodeStatusMessage: String?
+    private(set) var recoveryCodeErrorMessage: String?
     var restorePIN = ""
 
     var validatedRestoreSnapshot: RoutineRepositorySnapshot? {
@@ -810,8 +813,31 @@ final class GuardianModeViewModel {
             let updated = try copySettings(current, guardianPinHash: GuardianPinService.makeHash(for: pin))
             try repository.updateAppSettings(updated)
             settings = updated
+            onDataChanged()
             return true
         } catch {
+            return false
+        }
+    }
+
+    func setPINAndGenerateRecoveryCode(_ pin: String) -> Bool {
+        do {
+            let current = try repository.appSettings()
+            let recoveryCode = GuardianPinService.generateRecoveryCode()
+            let updated = try copySettings(
+                current,
+                guardianPinHash: GuardianPinService.makeHash(for: pin),
+                recoveryCodeHash: GuardianPinService.makeRecoveryCodeHash(for: recoveryCode)
+            )
+            try repository.updateAppSettings(updated)
+            settings = updated
+            oneTimeRecoveryCode = recoveryCode
+            recoveryCodeStatusMessage = "복구 코드를 만들었어요. 이 코드는 한 번만 표시됩니다."
+            recoveryCodeErrorMessage = nil
+            onDataChanged()
+            return true
+        } catch {
+            recoveryCodeErrorMessage = "복구 코드를 만들지 못했어요."
             return false
         }
     }
@@ -828,6 +854,57 @@ final class GuardianModeViewModel {
     func updatePIN(oldPIN: String, newPIN: String) -> Bool {
         guard verifyPIN(oldPIN) else { return false }
         return setPIN(newPIN)
+    }
+
+    func verifyRecoveryCode(_ code: String) -> Bool {
+        let sanitizedCode = String(code.filter(\.isNumber).prefix(6))
+        let isValid = (try? repository.appSettings())
+            .map { GuardianPinService.verifyRecoveryCode(sanitizedCode, against: $0.recoveryCodeHash) } ?? false
+        if isValid {
+            recoveryCodeErrorMessage = nil
+        } else {
+            recoveryCodeErrorMessage = "복구 코드가 맞지 않아요. 6자리 숫자를 확인해 주세요."
+        }
+        return isValid
+    }
+
+    func regenerateRecoveryCode() -> Bool {
+        do {
+            let current = try repository.appSettings()
+            let recoveryCode = makeNewRecoveryCode(excluding: current.recoveryCodeHash)
+            let updated = try copySettings(
+                current,
+                recoveryCodeHash: GuardianPinService.makeRecoveryCodeHash(for: recoveryCode)
+            )
+            try repository.updateAppSettings(updated)
+            settings = updated
+            oneTimeRecoveryCode = recoveryCode
+            recoveryCodeStatusMessage = "새 복구 코드를 만들었어요. 이전 복구 코드는 사용할 수 없습니다."
+            recoveryCodeErrorMessage = nil
+            onDataChanged()
+            return true
+        } catch {
+            recoveryCodeErrorMessage = "복구 코드를 다시 만들지 못했어요."
+            return false
+        }
+    }
+
+    func clearOneTimeRecoveryCode() {
+        oneTimeRecoveryCode = nil
+    }
+
+    func clearRecoveryCodeError() {
+        recoveryCodeErrorMessage = nil
+    }
+
+    private func makeNewRecoveryCode(excluding storedHash: String?) -> String {
+        for _ in 0..<10 {
+            let candidate = GuardianPinService.generateRecoveryCode()
+            if !GuardianPinService.verifyRecoveryCode(candidate, against: storedHash) {
+                return candidate
+            }
+        }
+        return GuardianPinService.generateRecoveryCode()
     }
 
     func updateFeedbackSettings(_ transform: (AppSettings) throws -> AppSettings) {

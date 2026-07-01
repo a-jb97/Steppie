@@ -60,7 +60,7 @@ struct BackupRestoreView: View {
 
     private var backupSection: some View {
         labeledCard("백업 파일 만들기") {
-            Text("루틴 세트, 활동, 진행 기록, 설정, PIN 해시를 Steppie 백업 파일로 저장합니다.")
+            Text("루틴 세트, 활동, 진행 기록, 설정, PIN/복구 코드 해시를 Steppie 백업 파일로 저장합니다. 원본 PIN과 원본 복구 코드는 포함하지 않습니다.")
                 .steppieTextStyle(.guardianCaption)
                 .foregroundStyle(Color.steppieTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)

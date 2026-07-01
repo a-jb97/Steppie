@@ -251,6 +251,21 @@ struct SteppieTests {
         }
     }
 
+    @Test("보호자 복구 코드는 6자리 숫자만 허용하고 원본을 저장하지 않는다")
+    func guardianRecoveryCodeHashing() throws {
+        let generatedCode = GuardianPinService.generateRecoveryCode()
+        let hash = try GuardianPinService.makeRecoveryCodeHash(for: "123456", salt: "recovery-test-salt")
+
+        #expect(generatedCode.count == 6)
+        #expect(generatedCode.allSatisfy(\.isNumber))
+        #expect(hash != "123456")
+        #expect(GuardianPinService.verifyRecoveryCode("123456", against: hash))
+        #expect(!GuardianPinService.verifyRecoveryCode("000000", against: hash))
+        #expect(throws: GuardianPinError.invalidRecoveryCode) {
+            try GuardianPinService.makeRecoveryCodeHash(for: "1234")
+        }
+    }
+
     @Test("보호자 ViewModel은 PIN 설정과 검증을 AppSettings에 저장한다")
     func guardianViewModelStoresPINHash() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
@@ -262,6 +277,43 @@ struct SteppieTests {
         #expect(viewModel.verifyPIN("1234"))
         #expect(!viewModel.verifyPIN("0000"))
         #expect(try repository.appSettings().guardianPinHash != "1234")
+    }
+
+    @Test("보호자 ViewModel은 PIN 생성 시 복구 코드 hash를 저장하고 원본은 1회 표시 후 폐기한다")
+    func guardianViewModelStoresRecoveryCodeHashOnPINSetup() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+
+        #expect(viewModel.setPINAndGenerateRecoveryCode("1234"))
+        let recoveryCode = try #require(viewModel.oneTimeRecoveryCode)
+        let settings = try repository.appSettings()
+
+        #expect(recoveryCode.count == 6)
+        #expect(settings.recoveryCodeHash != nil)
+        #expect(settings.recoveryCodeHash != recoveryCode)
+        #expect(viewModel.verifyRecoveryCode(recoveryCode))
+
+        viewModel.clearOneTimeRecoveryCode()
+        #expect(viewModel.oneTimeRecoveryCode == nil)
+        #expect(viewModel.verifyRecoveryCode(recoveryCode))
+    }
+
+    @Test("보호자 ViewModel은 복구 코드 재생성 시 이전 코드를 무효화한다")
+    func guardianViewModelRegeneratesRecoveryCode() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+
+        #expect(viewModel.setPINAndGenerateRecoveryCode("1234"))
+        let firstCode = try #require(viewModel.oneTimeRecoveryCode)
+        let firstHash = try #require(try repository.appSettings().recoveryCodeHash)
+
+        #expect(viewModel.regenerateRecoveryCode())
+        let secondCode = try #require(viewModel.oneTimeRecoveryCode)
+        let secondHash = try #require(try repository.appSettings().recoveryCodeHash)
+
+        #expect(firstHash != secondHash)
+        #expect(!viewModel.verifyRecoveryCode(firstCode))
+        #expect(viewModel.verifyRecoveryCode(secondCode))
     }
 
     @Test("보호자 환경 설정은 AppSettings에 저장되고 변경 콜백을 호출한다")
@@ -1135,8 +1187,10 @@ struct SteppieTests {
     @Test("백업 export는 manifest와 data checksum을 포함하고 replace 복원한다")
     func backupExportAndReplaceRestore() throws {
         let source = try RoutinePreviewStore.makeSampleRepository()
+        let recoveryCode = "654321"
         let settingsWithPIN = try AppSettings(
-            guardianPinHash: GuardianPinService.makeHash(for: "1234", salt: "backup-test")
+            guardianPinHash: GuardianPinService.makeHash(for: "1234", salt: "backup-test"),
+            recoveryCodeHash: GuardianPinService.makeRecoveryCodeHash(for: recoveryCode, salt: "backup-recovery-test")
         )
         try source.updateAppSettings(settingsWithPIN)
         let activeSet = try #require(try source.routineSets().first)
@@ -1157,6 +1211,9 @@ struct SteppieTests {
         let entries = try SteppieZipArchive.readArchive(package.archiveData)
         #expect(entries["manifest.json"] != nil)
         #expect(entries["data.json"] != nil)
+        let dataJSON = String(data: try #require(entries["data.json"]), encoding: .utf8)
+        #expect(dataJSON?.contains("1234") == false)
+        #expect(dataJSON?.contains(recoveryCode) == false)
 
         let target = try RoutinePreviewStore.makeRepository()
         try BackupService(repository: target).restorePackage(package.archiveData)
@@ -1164,6 +1221,7 @@ struct SteppieTests {
         #expect(try target.routineSets().map(\.id) == [activeSet.id])
         #expect(try target.routines(in: activeSet.id).map(\.id).contains(firstRoutine.id))
         #expect(try target.appSettings().guardianPinHash == settingsWithPIN.guardianPinHash)
+        #expect(try target.appSettings().recoveryCodeHash == settingsWithPIN.recoveryCodeHash)
         #expect(try target.dailyLogs(on: DailyLog.localDateString(for: completedAt), routineSetID: activeSet.id).count == 1)
     }
 
