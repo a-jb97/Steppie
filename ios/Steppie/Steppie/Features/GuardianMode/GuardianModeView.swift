@@ -1600,7 +1600,10 @@ struct GuardianModeView: View {
                     NotificationCenter.default.post(name: .guardianPINChangeRequested, object: nil)
                     onInteraction()
                 }
-                securityCard(title: "복구 코드 확인", subtitle: "6자리 복구 코드. 원본은 저장하지 않음", assetName: "guardian-security-warning", iconSize: 55) {}
+                securityCard(title: "복구 코드 확인", subtitle: "PIN 확인 후 새 6자리 복구 코드를 한 번만 표시", assetName: "guardian-security-warning", iconSize: 55) {
+                    NotificationCenter.default.post(name: .guardianRecoveryCodeRegenerationRequested, object: nil)
+                    onInteraction()
+                }
                 securityCard(title: "백업/복원", subtitle: "로컬 파일 백업과 Replace 복원", assetName: "guardian-security-backup", iconSize: 50) {
                     viewModel.selectedDestination = .backupRestore
                     onInteraction()
@@ -2310,4 +2313,5 @@ extension SteppieCardColor {
 
 extension Notification.Name {
     static let guardianPINChangeRequested = Notification.Name("guardianPINChangeRequested")
+    static let guardianRecoveryCodeRegenerationRequested = Notification.Name("guardianRecoveryCodeRegenerationRequested")
 }
