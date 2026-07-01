@@ -430,6 +430,38 @@ struct SteppieTests {
         #expect(changeCount >= 4)
     }
 
+    @Test("보호자 루틴 편집은 사진을 IconRef.photo로 저장하고 기본 아이콘으로 되돌릴 수 있다")
+    func guardianRoutinePhotoEditing() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let photoStore = FakeRoutinePhotoStore(
+            icon: try IconRef.photo(
+                localAssetID: UUID(uuidString: "66666666-6666-4666-8666-666666666666")!,
+                backupAssetName: "routine-photo-66666666-6666-4666-8666-666666666666.jpg"
+            )
+        )
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: photoStore) {}
+        viewModel.load()
+        let activeSetID = try #require(viewModel.activeRoutineSet?.id)
+
+        viewModel.beginAddRoutine()
+        viewModel.draft?.title = "사진 루틴"
+        viewModel.updateDraftPhoto(data: Data([0xff, 0xd8, 0xff]))
+        viewModel.saveDraft(localeIdentifier: "ko")
+
+        let added = try #require(try repository.routines(in: activeSetID).last)
+        #expect(added.icon.type == .photo)
+        #expect(added.icon.backupAssetName == "routine-photo-66666666-6666-4666-8666-666666666666.jpg")
+        #expect(photoStore.savedData == Data([0xff, 0xd8, 0xff]))
+
+        viewModel.beginEditRoutine(added)
+        viewModel.resetDraftIconToDefault()
+        viewModel.saveDraft(localeIdentifier: "ko")
+
+        let updated = try #require(try repository.routine(id: added.id))
+        #expect(updated.icon.type == .builtin)
+        #expect(updated.icon.name == RoutineIconName.star.rawValue)
+    }
+
     @Test("보호자 모드는 활성 루틴 세트가 없어도 루틴 세트 생성으로 진입할 수 있다")
     func guardianModeCanCreateRoutineSetFromEmptyRepository() throws {
         let repository = try RoutinePreviewStore.makeRepository()
@@ -1487,6 +1519,24 @@ private final class FakeBackupAssetStore: BackupAssetStore {
 
     func saveAssetData(_ data: Data, backupAssetName name: String) throws {
         assets[name] = data
+    }
+}
+
+private final class FakeRoutinePhotoStore: RoutinePhotoStoring {
+    let icon: IconRef
+    var savedData: Data?
+
+    init(icon: IconRef) {
+        self.icon = icon
+    }
+
+    func data(forBackupAssetName name: String) throws -> Data? {
+        savedData
+    }
+
+    func savePhotoData(_ data: Data) throws -> IconRef {
+        savedData = data
+        return icon
     }
 }
 
