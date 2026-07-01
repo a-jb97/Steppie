@@ -30,6 +30,7 @@
     <string name="a11y_guardian_menu_card">%1$s. %2$s</string>
     <string name="a11y_routine_set_row">%1$s, %2$s</string>
     <string name="a11y_routine_edit_row">%1$s, %2$s. Select to edit</string>
+    <string name="a11y_template_row">%1$s, %2$s. Select to update the preview below</string>
     <string name="a11y_item_action">%1$s %2$s</string>
     <string name="a11y_selected">Selected</string>
     <string name="a11y_not_selected">Not selected</string>
@@ -155,6 +156,18 @@
     <string name="guardian_step_list_empty">At least 1 step is required to save.</string>
     <string name="guardian_step_order_title">%1$d. %2$s</string>
     <string name="guardian_template_action">Start from template</string>
+    <string name="guardian_template_home_desc">Create a morning, school, or bedtime routine</string>
+    <string name="guardian_template_select_title">Choose template</string>
+    <string name="guardian_template_select_subtitle">Choose a template and save it as a new routine set</string>
+    <string name="guardian_template_preview_title">Template preview</string>
+    <string name="guardian_template_preview_subtitle">Saving creates a new active routine set</string>
+    <string name="guardian_template_preview_hint_title">Preview</string>
+    <string name="guardian_template_preview_hint_body">Select a template on the left to review the routine list before saving.</string>
+    <string name="guardian_template_step_count">%1$d steps</string>
+    <string name="guardian_template_preview_summary">%1$d activities will be saved as a new routine set</string>
+    <string name="guardian_template_save_desc">After saving, you can edit, delete, and reorder it like any routine.</string>
+    <string name="guardian_template_save_action">Save as new routine set</string>
+    <string name="guardian_template_steps_title">%1$d steps to save</string>
     <string name="guardian_add_routine">Add activity</string>
     <string name="guardian_tablet_edit_hint">Select an activity on the left to edit it</string>
     <string name="guardian_card_edit_title">Edit card</string>

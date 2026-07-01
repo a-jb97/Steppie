@@ -206,6 +206,15 @@ class ChildRoutineViewModel(
         }
     }
 
+    fun onDataChanged() {
+        lastGuidedRoutineId = null
+        _uiState.value = _uiState.value.copy(
+            feedbackRoutineId = null,
+            undoRoutineId = null,
+            singlePane = ChildSinglePane.Focus,
+        )
+    }
+
     private fun announceSelectedRoutineIfNeeded(state: ChildRoutineUiState) {
         if (state.feedbackRoutineId != null) return
         val routine = state.selectedRoutine ?: return
