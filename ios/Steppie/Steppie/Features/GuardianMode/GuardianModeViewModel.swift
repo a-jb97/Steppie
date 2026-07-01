@@ -27,14 +27,55 @@ enum GuardianPINPurpose: Equatable {
 struct RoutineDraft: Equatable, Identifiable {
     let id: UUID?
     var title: String
-    var iconName: RoutineIconName
+    var icon: IconRef
     var colorToken: String
     var scheduledTime: LocalTime?
+
+    init(
+        id: UUID?,
+        title: String,
+        iconName: RoutineIconName,
+        colorToken: String,
+        scheduledTime: LocalTime?
+    ) {
+        self.id = id
+        self.title = title
+        self.icon = try! IconRef.builtin(name: iconName.rawValue)
+        self.colorToken = colorToken
+        self.scheduledTime = scheduledTime
+    }
+
+    init(
+        id: UUID?,
+        title: String,
+        icon: IconRef,
+        colorToken: String,
+        scheduledTime: LocalTime?
+    ) {
+        self.id = id
+        self.title = title
+        self.icon = icon
+        self.colorToken = colorToken
+        self.scheduledTime = scheduledTime
+    }
 
     var isNew: Bool { id == nil }
     var isValid: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && Routine.allowedColorTokens.contains(colorToken)
+    }
+
+    var iconName: RoutineIconName {
+        get {
+            guard icon.type == .builtin,
+                  let name = icon.name.flatMap(RoutineIconName.init(rawValue:)) else {
+                return .star
+            }
+            return name
+        }
+        set {
+            icon = try! IconRef.builtin(name: newValue.rawValue)
+        }
     }
 }
 
@@ -281,6 +322,7 @@ struct GuardianRecordDetail: Equatable {
 @Observable
 final class GuardianModeViewModel {
     private let repository: any RoutineRepository
+    private let photoStore: any RoutinePhotoStoring
     private let now: () -> Date
     private let calendar: Calendar
     private let onDataChanged: () -> Void
@@ -322,11 +364,13 @@ final class GuardianModeViewModel {
 
     init(
         repository: any RoutineRepository,
+        photoStore: (any RoutinePhotoStoring)? = nil,
         now: @escaping () -> Date = Date.init,
         calendar: Calendar = .current,
         onDataChanged: @escaping () -> Void
     ) {
         self.repository = repository
+        self.photoStore = photoStore ?? FileRoutinePhotoStore()
         self.now = now
         self.calendar = calendar
         self.onDataChanged = onDataChanged
@@ -351,7 +395,7 @@ final class GuardianModeViewModel {
         if draft.isNew { return draft.isValid }
         guard let original = selectedRoutine else { return true }
         return draft.title != localizedTitle(for: original)
-            || draft.iconName.rawValue != original.icon.name
+            || draft.icon != original.icon
             || draft.colorToken != original.colorToken
             || draft.scheduledTime != original.scheduledTime
     }
@@ -604,7 +648,7 @@ final class GuardianModeViewModel {
         draft = RoutineDraft(
             id: routine.id,
             title: localizedTitle(for: routine),
-            iconName: RoutineIconName(rawValue: routine.icon.name ?? "") ?? .star,
+            icon: routine.icon,
             colorToken: routine.colorToken,
             scheduledTime: routine.scheduledTime
         )
@@ -619,14 +663,13 @@ final class GuardianModeViewModel {
         do {
             let updatedAt = now()
             let title = try LocalizedText([localeIdentifier: draft.title])
-            let icon = try IconRef.builtin(name: draft.iconName.rawValue)
             if let id = draft.id, let original = try repository.routine(id: id) {
                 let updated = try Routine(
                     id: original.id,
                     routineSetID: original.routineSetID,
                     titleKey: original.titleKey,
                     title: title,
-                    icon: icon,
+                    icon: draft.icon,
                     colorToken: draft.colorToken,
                     order: original.order,
                     scheduledTime: draft.scheduledTime,
@@ -640,7 +683,7 @@ final class GuardianModeViewModel {
                 let routine = try Routine(
                     routineSetID: selectedRoutineSet.id,
                     title: title,
-                    icon: icon,
+                    icon: draft.icon,
                     colorToken: draft.colorToken,
                     order: routines.count,
                     scheduledTime: draft.scheduledTime,
@@ -656,6 +699,19 @@ final class GuardianModeViewModel {
         } catch {
             errorMessage = "저장하지 못했어요."
         }
+    }
+
+    func updateDraftPhoto(data: Data) {
+        guard draft != nil else { return }
+        do {
+            draft?.icon = try photoStore.savePhotoData(data)
+        } catch {
+            errorMessage = "사진을 저장하지 못했어요."
+        }
+    }
+
+    func resetDraftIconToDefault() {
+        draft?.icon = try! IconRef.builtin(name: RoutineIconName.star.rawValue)
     }
 
     func requestDelete(_ routine: Routine) {
