@@ -4,3 +4,13 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.ksp) apply false
 }
+
+val externalBuildRoot = file(
+    "/private/tmp/steppie-gradle-build/${Integer.toHexString(rootDir.absolutePath.hashCode())}",
+)
+
+layout.buildDirectory.set(externalBuildRoot.resolve("root"))
+
+subprojects {
+    layout.buildDirectory.set(externalBuildRoot.resolve(name))
+}
