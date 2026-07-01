@@ -1,9 +1,12 @@
+import PhotosUI
 import SwiftUI
+import UIKit
 
 struct GuardianModeView: View {
     @Environment(\.locale) private var locale
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var selectedRoutinePhotoItem: PhotosPickerItem?
     @State private var draggedRoutineID: UUID?
     @State private var dragStartIndex: Int?
     @State private var lastDragStep = 0
@@ -1068,12 +1071,7 @@ struct GuardianModeView: View {
                         .textFieldStyle(.plain)
                 }
                 labeledCard("아이콘 또는 사진") {
-                    Picker("아이콘", selection: draftIconBinding) {
-                        ForEach(RoutineIconName.allCases) { icon in
-                            Text(icon.rawValue).tag(icon)
-                        }
-                    }
-                    .pickerStyle(.menu)
+                    draftVisualPicker(for: draft)
                 }
                 labeledCard("카드 색상") {
                     HStack(spacing: 10) {
@@ -1874,6 +1872,76 @@ struct GuardianModeView: View {
         .accessibilityElement(children: .combine)
     }
 
+    private func draftVisualPicker(for draft: RoutineDraft) -> some View {
+        VStack(alignment: .leading, spacing: SteppieSpacing.small) {
+            adaptiveCardStack(spacing: SteppieSpacing.medium) {
+                RoutineVisualView(icon: draft.icon, size: .list)
+                    .frame(width: 64, height: 64)
+                Picker("기본 아이콘", selection: draftIconBinding) {
+                    ForEach(RoutineIconName.allCases) { icon in
+                        Text(icon.rawValue).tag(icon)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+            }
+
+            adaptiveControlStack {
+                PhotosPicker(
+                    selection: $selectedRoutinePhotoItem,
+                    matching: .images,
+                    photoLibrary: .shared()
+                ) {
+                    Label("사진 선택", systemImage: "photo.on.rectangle")
+                        .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityHint(Text("사진 앱에서 활동 사진을 선택합니다"))
+
+                RoutineCameraCaptureButton(
+                    onImagePicked: updateDraftPhoto(image:),
+                    onInteraction: onInteraction
+                )
+
+                if draft.icon.type == .photo {
+                    Button(role: .destructive) {
+                        viewModel.resetDraftIconToDefault()
+                        selectedRoutinePhotoItem = nil
+                        onInteraction()
+                    } label: {
+                        Label("사진 삭제", systemImage: "trash")
+                            .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityHint(Text("기본 아이콘으로 되돌립니다"))
+                }
+            }
+        }
+        .onChange(of: selectedRoutinePhotoItem) { _, item in
+            guard let item else { return }
+            loadSelectedRoutinePhoto(item)
+        }
+    }
+
+    private func loadSelectedRoutinePhoto(_ item: PhotosPickerItem) {
+        Task {
+            guard let data = try? await item.loadTransferable(type: Data.self) else {
+                selectedRoutinePhotoItem = nil
+                return
+            }
+            viewModel.updateDraftPhoto(data: data)
+            selectedRoutinePhotoItem = nil
+            onInteraction()
+        }
+    }
+
+    private func updateDraftPhoto(image: UIImage) {
+        guard let data = image.jpegData(compressionQuality: 0.9) else { return }
+        viewModel.updateDraftPhoto(data: data)
+        selectedRoutinePhotoItem = nil
+        onInteraction()
+    }
+
     @ViewBuilder
     private func adaptiveCardStack<Content: View>(
         spacing: CGFloat,
@@ -2235,6 +2303,7 @@ struct GuardianModeView: View {
             get: { viewModel.draft?.iconName ?? .star },
             set: {
                 viewModel.draft?.iconName = $0
+                selectedRoutinePhotoItem = nil
                 onInteraction()
             }
         )
@@ -2284,6 +2353,48 @@ struct GuardianModeView: View {
                 dragStartIndex = nil
                 lastDragStep = 0
             }
+    }
+}
+
+private struct RoutineCameraCaptureButton: View {
+    @State private var isCameraPresented = false
+    @State private var isCameraUnavailableAlertPresented = false
+    let onImagePicked: (UIImage) -> Void
+    let onInteraction: () -> Void
+
+    var body: some View {
+        SteppieButton("사진 촬영", role: .secondary) {
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                isCameraPresented = true
+            } else {
+                isCameraUnavailableAlertPresented = true
+            }
+            onInteraction()
+        }
+        .accessibilityHint(
+            Text(
+                UIImagePickerController.isSourceTypeAvailable(.camera)
+                    ? "카메라로 활동 사진을 촬영합니다"
+                    : "이 기기에서는 카메라를 사용할 수 없습니다"
+            )
+        )
+        .fullScreenCover(isPresented: $isCameraPresented) {
+            RoutineCameraPicker(
+                onImagePicked: { image in
+                    isCameraPresented = false
+                    onImagePicked(image)
+                },
+                onCancel: {
+                    isCameraPresented = false
+                }
+            )
+            .ignoresSafeArea()
+        }
+        .alert("카메라를 사용할 수 없어요", isPresented: $isCameraUnavailableAlertPresented) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("시뮬레이터 또는 카메라가 없는 기기에서는 사진 촬영을 사용할 수 없습니다.")
+        }
     }
 }
 
