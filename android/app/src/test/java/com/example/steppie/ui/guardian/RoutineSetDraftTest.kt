@@ -1,5 +1,6 @@
 package com.example.steppie.ui.guardian
 
+import com.example.steppie.domain.model.IconRef
 import java.time.Instant
 import java.time.LocalTime
 import org.junit.Assert.assertEquals
@@ -17,13 +18,13 @@ class RoutineSetDraftTest {
                 steps = listOf(
                     RoutineDraft(
                         title = "아침 먹기",
-                        iconName = "breakfast",
+                        icon = IconRef.Builtin("breakfast"),
                         colorToken = "color.card.mint",
                         scheduledTime = "08:30",
                     ),
                     RoutineDraft(
                         title = "산책하기",
-                        iconName = "walk",
+                        icon = IconRef.Builtin("walk"),
                         colorToken = "color.card.peach",
                     ),
                 ),
@@ -37,6 +38,25 @@ class RoutineSetDraftTest {
         assertEquals(listOf(0, 1), routineSet.routines.map { it.order })
         assertEquals(listOf(routineSet.id, routineSet.id), routineSet.routines.map { it.routineSetId })
         assertEquals(LocalTime.of(8, 30), routineSet.routines.first().scheduledTime)
+        assertEquals(listOf(IconRef.Builtin("breakfast"), IconRef.Builtin("walk")), routineSet.routines.map { it.icon })
+    }
+
+    @Test
+    fun `buildRoutineSetFromDraft preserves photo icons`() {
+        val photo = IconRef.Photo(
+            localAssetId = "10000000-0000-4000-8000-000000000001",
+            backupAssetName = "routine-photo-10000000-0000-4000-8000-000000000001.jpg",
+        )
+        val routineSet = buildRoutineSetFromDraft(
+            draft = RoutineSetDraft(
+                name = "사진 루틴",
+                steps = listOf(RoutineDraft(title = "사진 보기", icon = photo)),
+            ),
+            now = now,
+            localeTag = "ko",
+        )
+
+        assertEquals(photo, routineSet.routines.single().icon)
     }
 
     @Test

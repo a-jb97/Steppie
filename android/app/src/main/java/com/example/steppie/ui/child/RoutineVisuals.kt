@@ -2,11 +2,17 @@ package com.example.steppie.ui.child
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import android.graphics.BitmapFactory
 import com.example.steppie.R
+import com.example.steppie.data.photo.RoutinePhotoStore
 import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.ui.components.RoutineCardColor
@@ -26,6 +32,23 @@ internal fun RoutineIcon(
     focus: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val photoStore = remember(context) { RoutinePhotoStore(context) }
+    val photoBitmap = remember(icon) {
+        (icon as? IconRef.Photo)?.let { photo ->
+            val file = photoStore.fileFor(photo)
+            if (file.isFile) BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap() else null
+        }
+    }
+    if (photoBitmap != null) {
+        Image(
+            painter = BitmapPainter(photoBitmap),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier,
+        )
+        return
+    }
     val resource = when (icon) {
         is IconRef.Builtin -> builtinIconResource(icon.name, focus)
         is IconRef.Photo -> R.drawable.ic_routine_star_card

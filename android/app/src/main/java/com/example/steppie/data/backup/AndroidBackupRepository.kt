@@ -18,6 +18,7 @@ class AndroidBackupRepository(
                 snapshot = snapshot,
                 appVersion = appVersionName(),
                 output = it,
+                assets = dataSource.photoBackupAssets(snapshot),
             )
         }
     }
@@ -35,7 +36,7 @@ class AndroidBackupRepository(
 
     override suspend fun restoreReplace(uri: Uri) {
         val read = readBackup(uri)
-        dataSource.replaceAll(read.snapshot)
+        dataSource.replaceAll(read.snapshot, read.assets)
     }
 
     private fun readBackup(uri: Uri): ReadBackup {

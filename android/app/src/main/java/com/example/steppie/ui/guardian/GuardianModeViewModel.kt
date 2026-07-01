@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.steppie.data.backup.BackupImportPreview
 import com.example.steppie.data.backup.BackupProvider
 import com.example.steppie.data.backup.BackupValidationException
+import com.example.steppie.data.photo.RoutinePhotoStore
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.BuiltinIconNames
 import com.example.steppie.domain.model.DailyLog
@@ -57,12 +58,15 @@ enum class GuardianRecoveryError { CodeMismatch }
 data class RoutineDraft(
     val routineId: String? = null,
     val title: String = "",
-    val iconName: String = "star",
+    val icon: IconRef = IconRef.Builtin("star"),
     val colorToken: String = RoutineColorTokens.DEFAULT,
     val scheduledTime: String = "",
 ) {
     val isNew: Boolean
         get() = routineId == null
+
+    val builtinIconName: String
+        get() = (icon as? IconRef.Builtin)?.name ?: "star"
 }
 
 data class RoutineSetDraft(
@@ -144,6 +148,7 @@ class GuardianModeViewModel(
     private val routineRepository: RoutineRepository,
     private val appSettingsRepository: AppSettingsRepository,
     private val backupProvider: BackupProvider? = null,
+    private val routinePhotoStore: RoutinePhotoStore? = null,
 ) : ViewModel() {
     private val recordsEndDate = MutableStateFlow(LocalDate.now())
     private val _uiState = MutableStateFlow(GuardianModeUiState())
@@ -601,7 +606,6 @@ class GuardianModeViewModel(
     fun openRoutineEditor(routineId: String) {
         val routine = _uiState.value.routines.firstOrNull { it.id == routineId } ?: return
         val title = routine.title.resolve(null, Locale.getDefault().toLanguageTag())
-        val icon = routine.icon as? IconRef.Builtin
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.CardEdit,
@@ -611,7 +615,7 @@ class GuardianModeViewModel(
                 draft = RoutineDraft(
                     routineId = routine.id,
                     title = title,
-                    iconName = icon?.name ?: "star",
+                    icon = routine.icon,
                     colorToken = routine.colorToken,
                     scheduledTime = routine.scheduledTime?.toString().orEmpty(),
                 ),
@@ -793,7 +797,30 @@ class GuardianModeViewModel(
 
     fun updateDraftIcon(iconName: String) {
         if (iconName !in BuiltinIconNames.all) return
-        updateDraft { it.copy(iconName = iconName) }
+        updateDraft { it.copy(icon = IconRef.Builtin(iconName)) }
+    }
+
+    fun importDraftPhoto(uri: Uri) {
+        val store = routinePhotoStore ?: run {
+            _uiState.update { it.copy(draftError = "사진 선택 기능을 사용할 수 없습니다.") }
+            return
+        }
+        viewModelScope.launch {
+            runCatching { store.importPhoto(uri) }
+                .onSuccess { photo -> updateDraft { it.copy(icon = photo) } }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            draftError = error.message ?: "사진을 저장할 수 없습니다.",
+                            interactionToken = it.interactionToken + 1,
+                        )
+                    }
+                }
+        }
+    }
+
+    fun removeDraftPhoto() {
+        updateDraft { it.copy(icon = IconRef.Builtin("star")) }
     }
 
     fun updateDraftColor(colorToken: String) {
@@ -814,7 +841,30 @@ class GuardianModeViewModel(
 
     fun updateRoutineSetStepIcon(iconName: String) {
         if (iconName !in BuiltinIconNames.all) return
-        updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(iconName = iconName)) }
+        updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(icon = IconRef.Builtin(iconName))) }
+    }
+
+    fun importRoutineSetStepPhoto(uri: Uri) {
+        val store = routinePhotoStore ?: run {
+            _uiState.update { it.copy(draftError = "사진 선택 기능을 사용할 수 없습니다.") }
+            return
+        }
+        viewModelScope.launch {
+            runCatching { store.importPhoto(uri) }
+                .onSuccess { photo -> updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(icon = photo)) } }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            draftError = error.message ?: "사진을 저장할 수 없습니다.",
+                            interactionToken = it.interactionToken + 1,
+                        )
+                    }
+                }
+        }
+    }
+
+    fun removeRoutineSetStepPhoto() {
+        updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(icon = IconRef.Builtin("star"))) }
     }
 
     fun updateRoutineSetStepColor(colorToken: String) {
@@ -934,7 +984,7 @@ class GuardianModeViewModel(
                     Routine(
                         routineSetId = activeSet.id,
                         title = localizedTitle,
-                        icon = IconRef.Builtin(draft.iconName),
+                        icon = draft.icon,
                         colorToken = draft.colorToken,
                         order = state.routines.size,
                         scheduledTime = scheduledTime,
@@ -947,7 +997,7 @@ class GuardianModeViewModel(
                 routineRepository.updateRoutine(
                     existing.copy(
                         title = localizedTitle,
-                        icon = IconRef.Builtin(draft.iconName),
+                        icon = draft.icon,
                         colorToken = draft.colorToken,
                         scheduledTime = scheduledTime,
                         updatedAt = now,
@@ -1432,11 +1482,17 @@ class GuardianModeViewModel(
             routineRepository: RoutineRepository,
             appSettingsRepository: AppSettingsRepository,
             backupProvider: BackupProvider? = null,
+            routinePhotoStore: RoutinePhotoStore? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 require(modelClass.isAssignableFrom(GuardianModeViewModel::class.java))
-                return GuardianModeViewModel(routineRepository, appSettingsRepository, backupProvider) as T
+                return GuardianModeViewModel(
+                    routineRepository,
+                    appSettingsRepository,
+                    backupProvider,
+                    routinePhotoStore,
+                ) as T
             }
         }
     }
@@ -1572,7 +1628,7 @@ internal fun buildRoutineSetFromDraft(
         Routine(
             routineSetId = routineSetId,
             title = LocalizedText(mapOf(localeTag to trimmedTitle)),
-            icon = IconRef.Builtin(step.iconName),
+            icon = step.icon,
             colorToken = step.colorToken,
             order = index,
             scheduledTime = scheduledTime,

@@ -15,6 +15,7 @@ internal object BackupArchive {
         snapshot: BackupSnapshot,
         appVersion: String,
         output: OutputStream,
+        assets: Map<String, ByteArray> = emptyMap(),
     ) {
         val dataJson = BackupJson.encodeData(snapshot)
         val checksum = sha256(dataJson.toByteArray(Charsets.UTF_8))
@@ -34,6 +35,15 @@ internal object BackupArchive {
 
             zip.putNextEntry(ZipEntry("$BackupAssetDirectory/"))
             zip.closeEntry()
+
+            assets.forEach { (name, bytes) ->
+                if (bytes.size > BackupMaxAssetBytes) {
+                    throw BackupValidationException("백업 사진 에셋이 5MB를 초과합니다.")
+                }
+                zip.putNextEntry(ZipEntry("$BackupAssetDirectory/$name"))
+                zip.write(bytes)
+                zip.closeEntry()
+            }
         }
     }
 
@@ -61,7 +71,14 @@ internal object BackupArchive {
             throw BackupValidationException("백업 checksum이 일치하지 않습니다.")
         }
         val snapshot = BackupJson.decodeData(dataBytes.toString(Charsets.UTF_8))
-        return ReadBackup(manifest = manifest, snapshot = snapshot)
+        val assets = entries
+            .filterKeys { it.startsWith("$BackupAssetDirectory/") }
+            .mapKeys { it.key.removePrefix("$BackupAssetDirectory/") }
+            .filterKeys { it.isNotBlank() && '/' !in it && '\\' !in it }
+        if (assets.values.any { it.size > BackupMaxAssetBytes }) {
+            throw BackupValidationException("백업 사진 에셋이 5MB를 초과합니다.")
+        }
+        return ReadBackup(manifest = manifest, snapshot = snapshot, assets = assets)
     }
 
     fun defaultFileName(now: Instant = Instant.now()): String {
@@ -86,4 +103,5 @@ internal object BackupArchive {
 internal data class ReadBackup(
     val manifest: BackupManifest,
     val snapshot: BackupSnapshot,
+    val assets: Map<String, ByteArray>,
 )

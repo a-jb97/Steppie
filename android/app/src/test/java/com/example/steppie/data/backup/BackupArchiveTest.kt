@@ -38,6 +38,49 @@ class BackupArchiveTest {
     }
 
     @Test
+    fun archive_includesRoutinePhotoAssets() {
+        val assetName = "routine-photo-10000000-0000-4000-8000-000000000001.jpg"
+        val photoRoutine = Routine(
+            id = "40000000-0000-4000-8000-000000000002",
+            routineSetId = routineSetId,
+            title = LocalizedText(mapOf("ko" to "사진", "en" to "Photo")),
+            icon = IconRef.Photo(
+                localAssetId = "10000000-0000-4000-8000-000000000001",
+                backupAssetName = assetName,
+            ),
+            colorToken = "color.card.sky",
+            order = 1,
+            createdAt = now,
+            updatedAt = now,
+        )
+        val snapshot = testSnapshot().let { it.copy(routines = it.routines + photoRoutine.toEntity()) }
+        val bytes = ByteArrayOutputStream()
+
+        BackupArchive.write(
+            snapshot = snapshot,
+            appVersion = "1.0",
+            output = bytes,
+            assets = mapOf(assetName to byteArrayOf(1, 2, 3)),
+        )
+        val read = BackupArchive.read(ByteArrayInputStream(bytes.toByteArray()))
+
+        assertTrue(read.assets.containsKey(assetName))
+        assertEquals(3, read.assets.getValue(assetName).size)
+    }
+
+    @Test(expected = BackupValidationException::class)
+    fun archive_rejectsOversizedRoutinePhotoAsset() {
+        val bytes = ByteArrayOutputStream()
+
+        BackupArchive.write(
+            snapshot = testSnapshot(),
+            appVersion = "1.0",
+            output = bytes,
+            assets = mapOf("routine-photo-10000000-0000-4000-8000-000000000001.jpg" to ByteArray(5 * 1024 * 1024 + 1)),
+        )
+    }
+
+    @Test
     fun dataJson_doesNotContainRawPinFields() {
         val dataJson = BackupJson.encodeData(testSnapshot())
 
