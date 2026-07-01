@@ -12,6 +12,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -19,6 +20,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
@@ -27,6 +29,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.steppie.data.backup.AndroidBackupRepository
 import com.example.steppie.data.backup.BackupDataSource
 import com.example.steppie.data.local.SteppieDatabase
+import com.example.steppie.data.photo.RoutinePhotoStore
 import com.example.steppie.data.repository.DataStoreAppSettingsRepository
 import com.example.steppie.data.repository.RoomRoutineRepository
 import com.example.steppie.domain.model.AppSettings
@@ -48,10 +51,11 @@ class MainActivity : ComponentActivity() {
         RoomRoutineRepository(SteppieDatabase.getInstance(this))
     }
     private val appSettingsRepository by lazy { DataStoreAppSettingsRepository(this) }
+    private val routinePhotoStore by lazy { RoutinePhotoStore(this) }
     private val backupRepository by lazy {
         AndroidBackupRepository(
             context = this,
-            dataSource = BackupDataSource(SteppieDatabase.getInstance(this), appSettingsRepository),
+            dataSource = BackupDataSource(SteppieDatabase.getInstance(this), appSettingsRepository, routinePhotoStore),
         )
     }
     private val notificationScheduler by lazy { AndroidRoutineNotificationScheduler(this) }
@@ -74,6 +78,7 @@ class MainActivity : ComponentActivity() {
                         routineRepository,
                         appSettingsRepository,
                         backupRepository,
+                        routinePhotoStore,
                     ),
                 )
                 val childState by childViewModel.uiState.collectAsStateWithLifecycle()
@@ -82,10 +87,24 @@ class MainActivity : ComponentActivity() {
                     .collectAsStateWithLifecycle(initialValue = AppSettings())
                 val targetRoutineId by notificationRoutineId.collectAsStateWithLifecycle()
                 var notificationPermissionRefresh by remember { mutableIntStateOf(0) }
+                var photoTarget by remember { mutableStateOf<PhotoTarget?>(null) }
                 val notificationPermissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission(),
                 ) {
                     notificationPermissionRefresh += 1
+                }
+                val photoPickerLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.PickVisualMedia(),
+                ) { uri ->
+                    val target = photoTarget
+                    photoTarget = null
+                    if (uri != null) {
+                        when (target) {
+                            PhotoTarget.RoutineDraft -> guardianViewModel.importDraftPhoto(uri)
+                            PhotoTarget.RoutineSetStep -> guardianViewModel.importRoutineSetStepPhoto(uri)
+                            null -> Unit
+                        }
+                    }
                 }
                 val createBackupLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.CreateDocument("application/zip"),
@@ -169,12 +188,22 @@ class MainActivity : ComponentActivity() {
                         onSaveEditingRoutineSetName = guardianViewModel::saveEditingRoutineSetName,
                         onDraftTitleChange = guardianViewModel::updateDraftTitle,
                         onDraftIconChange = guardianViewModel::updateDraftIcon,
+                        onDraftPhotoPick = {
+                            photoTarget = PhotoTarget.RoutineDraft
+                            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        onDraftPhotoRemove = guardianViewModel::removeDraftPhoto,
                         onDraftColorChange = guardianViewModel::updateDraftColor,
                         onDraftScheduledTimeChange = guardianViewModel::updateDraftScheduledTime,
                         onSaveDraft = guardianViewModel::saveDraft,
                         onRoutineSetNameChange = guardianViewModel::updateRoutineSetName,
                         onRoutineSetStepTitleChange = guardianViewModel::updateRoutineSetStepTitle,
                         onRoutineSetStepIconChange = guardianViewModel::updateRoutineSetStepIcon,
+                        onRoutineSetStepPhotoPick = {
+                            photoTarget = PhotoTarget.RoutineSetStep
+                            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        onRoutineSetStepPhotoRemove = guardianViewModel::removeRoutineSetStepPhoto,
                         onRoutineSetStepColorChange = guardianViewModel::updateRoutineSetStepColor,
                         onRoutineSetStepScheduledTimeChange = guardianViewModel::updateRoutineSetStepScheduledTime,
                         onAddRoutineSetStep = guardianViewModel::addRoutineSetStep,
@@ -254,6 +283,8 @@ class MainActivity : ComponentActivity() {
 
 private fun android.content.Intent?.notificationRoutineId(): String? =
     this?.takeIf { it.action == ACTION_OPEN_ROUTINE }?.getStringExtra(EXTRA_ROUTINE_ID)
+
+private enum class PhotoTarget { RoutineDraft, RoutineSetStep }
 
 private class AndroidFeedbackController(
     private val activity: ComponentActivity,

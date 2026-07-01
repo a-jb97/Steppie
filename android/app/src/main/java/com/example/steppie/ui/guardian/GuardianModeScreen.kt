@@ -128,12 +128,16 @@ fun GuardianModeScreen(
     onSaveEditingRoutineSetName: () -> Unit,
     onDraftTitleChange: (String) -> Unit,
     onDraftIconChange: (String) -> Unit,
+    onDraftPhotoPick: () -> Unit = {},
+    onDraftPhotoRemove: () -> Unit = {},
     onDraftColorChange: (String) -> Unit,
     onDraftScheduledTimeChange: (String) -> Unit,
     onSaveDraft: () -> Unit,
     onRoutineSetNameChange: (String) -> Unit,
     onRoutineSetStepTitleChange: (String) -> Unit,
     onRoutineSetStepIconChange: (String) -> Unit,
+    onRoutineSetStepPhotoPick: () -> Unit = {},
+    onRoutineSetStepPhotoRemove: () -> Unit = {},
     onRoutineSetStepColorChange: (String) -> Unit,
     onRoutineSetStepScheduledTimeChange: (String) -> Unit,
     onAddRoutineSetStep: () -> Unit,
@@ -251,6 +255,8 @@ fun GuardianModeScreen(
                 onRequestDelete = onRequestDelete,
                 onDraftTitleChange = onDraftTitleChange,
                 onDraftIconChange = onDraftIconChange,
+                onDraftPhotoPick = onDraftPhotoPick,
+                onDraftPhotoRemove = onDraftPhotoRemove,
                 onDraftColorChange = onDraftColorChange,
                 onDraftScheduledTimeChange = onDraftScheduledTimeChange,
                 onSaveDraft = onSaveDraft,
@@ -262,6 +268,8 @@ fun GuardianModeScreen(
                 onRoutineSetNameChange = onRoutineSetNameChange,
                 onRoutineSetStepTitleChange = onRoutineSetStepTitleChange,
                 onRoutineSetStepIconChange = onRoutineSetStepIconChange,
+                onRoutineSetStepPhotoPick = onRoutineSetStepPhotoPick,
+                onRoutineSetStepPhotoRemove = onRoutineSetStepPhotoRemove,
                 onRoutineSetStepColorChange = onRoutineSetStepColorChange,
                 onRoutineSetStepScheduledTimeChange = onRoutineSetStepScheduledTimeChange,
                 onAddRoutineSetStep = onAddRoutineSetStep,
@@ -1308,6 +1316,8 @@ private fun GuardianRoutineSetCreateScreen(
     onRoutineSetNameChange: (String) -> Unit,
     onRoutineSetStepTitleChange: (String) -> Unit,
     onRoutineSetStepIconChange: (String) -> Unit,
+    onRoutineSetStepPhotoPick: () -> Unit,
+    onRoutineSetStepPhotoRemove: () -> Unit,
     onRoutineSetStepColorChange: (String) -> Unit,
     onRoutineSetStepScheduledTimeChange: (String) -> Unit,
     onAddRoutineSetStep: () -> Unit,
@@ -1359,6 +1369,8 @@ private fun GuardianRoutineSetCreateScreen(
                         draft = draft.stepDraft,
                         onTitleChange = onRoutineSetStepTitleChange,
                         onIconChange = onRoutineSetStepIconChange,
+                        onPhotoPick = onRoutineSetStepPhotoPick,
+                        onPhotoRemove = onRoutineSetStepPhotoRemove,
                         onColorChange = onRoutineSetStepColorChange,
                         onScheduledTimeChange = onRoutineSetStepScheduledTimeChange,
                         onAddStep = onAddRoutineSetStep,
@@ -1375,6 +1387,8 @@ private fun GuardianRoutineSetCreateScreen(
                 draft = draft.stepDraft,
                 onTitleChange = onRoutineSetStepTitleChange,
                 onIconChange = onRoutineSetStepIconChange,
+                onPhotoPick = onRoutineSetStepPhotoPick,
+                onPhotoRemove = onRoutineSetStepPhotoRemove,
                 onColorChange = onRoutineSetStepColorChange,
                 onScheduledTimeChange = onRoutineSetStepScheduledTimeChange,
                 onAddStep = onAddRoutineSetStep,
@@ -1405,6 +1419,8 @@ private fun RoutineSetStepEditor(
     draft: RoutineDraft,
     onTitleChange: (String) -> Unit,
     onIconChange: (String) -> Unit,
+    onPhotoPick: () -> Unit,
+    onPhotoRemove: () -> Unit,
     onColorChange: (String) -> Unit,
     onScheduledTimeChange: (String) -> Unit,
     onAddStep: () -> Unit,
@@ -1418,7 +1434,12 @@ private fun RoutineSetStepEditor(
             label = { Text(stringResource(R.string.guardian_field_step_title)) },
             singleLine = true,
         )
-        IconPicker(selectedIcon = draft.iconName, onSelected = onIconChange)
+        IconPicker(
+            selectedIcon = draft.icon,
+            onSelected = onIconChange,
+            onPhotoPick = onPhotoPick,
+            onPhotoRemove = onPhotoRemove,
+        )
         ColorPicker(selectedColorToken = draft.colorToken, onSelected = onColorChange)
         OutlinedTextField(
             value = draft.scheduledTime,
@@ -1483,7 +1504,7 @@ private fun RoutineSetStepRow(
             modifier = Modifier.size(44.dp),
             contentAlignment = Alignment.Center,
         ) {
-            RoutineIcon(IconRef.Builtin(step.iconName), focus = false, modifier = Modifier.size(40.dp))
+            RoutineIcon(step.icon, focus = false, modifier = Modifier.size(40.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -1823,6 +1844,8 @@ private fun GuardianCardEditScreen(
     onRequestDelete: (String) -> Unit,
     onDraftTitleChange: (String) -> Unit,
     onDraftIconChange: (String) -> Unit,
+    onDraftPhotoPick: () -> Unit,
+    onDraftPhotoRemove: () -> Unit,
     onDraftColorChange: (String) -> Unit,
     onDraftScheduledTimeChange: (String) -> Unit,
     onSaveDraft: () -> Unit,
@@ -1865,7 +1888,12 @@ private fun GuardianCardEditScreen(
             label = { Text(stringResource(R.string.guardian_field_title)) },
             singleLine = true,
         )
-        IconPicker(selectedIcon = draft.iconName, onSelected = onDraftIconChange)
+        IconPicker(
+            selectedIcon = draft.icon,
+            onSelected = onDraftIconChange,
+            onPhotoPick = onDraftPhotoPick,
+            onPhotoRemove = onDraftPhotoRemove,
+        )
         ColorPicker(selectedColorToken = draft.colorToken, onSelected = onDraftColorChange)
         OutlinedTextField(
             value = draft.scheduledTime,
@@ -2867,12 +2895,58 @@ private fun DragHandle(
 }
 
 @Composable
-private fun IconPicker(selectedIcon: String, onSelected: (String) -> Unit) {
+private fun IconPicker(
+    selectedIcon: IconRef,
+    onSelected: (String) -> Unit,
+    onPhotoPick: () -> Unit,
+    onPhotoRemove: () -> Unit,
+) {
     GuardianPanel(title = stringResource(R.string.guardian_icon_picker_title), body = stringResource(R.string.guardian_icon_picker_body)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(SteppieCornerRadius.Control))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(
+                        SteppieStroke.Divider,
+                        MaterialTheme.colorScheme.outline,
+                        RoundedCornerShape(SteppieCornerRadius.Control),
+                    )
+                    .padding(SteppieSpacing.ExtraSmall),
+                contentAlignment = Alignment.Center,
+            ) {
+                RoutineIcon(selectedIcon, focus = false, modifier = Modifier.fillMaxSize())
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall),
+            ) {
+                SteppieButton(
+                    label = stringResource(R.string.guardian_photo_pick),
+                    onClick = onPhotoPick,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = SteppieButtonStyle.Secondary,
+                )
+                if (selectedIcon is IconRef.Photo) {
+                    SteppieButton(
+                        label = stringResource(R.string.guardian_photo_remove),
+                        onClick = onPhotoRemove,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = SteppieButtonStyle.Secondary,
+                    )
+                }
+            }
+        }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
+            val selectedBuiltin = (selectedIcon as? IconRef.Builtin)?.name
             items(BuiltinIconNames.all.toList()) { iconName ->
                 val selectionState = stringResource(
-                    if (iconName == selectedIcon) R.string.a11y_selected else R.string.a11y_not_selected,
+                    if (iconName == selectedBuiltin) R.string.a11y_selected else R.string.a11y_not_selected,
                 )
                 val description = stringResource(R.string.a11y_icon_option, iconName, selectionState)
                 Box(
@@ -2880,8 +2954,8 @@ private fun IconPicker(selectedIcon: String, onSelected: (String) -> Unit) {
                         .size(64.dp)
                         .clip(RoundedCornerShape(SteppieCornerRadius.Control))
                         .border(
-                            if (iconName == selectedIcon) SteppieStroke.Focus else SteppieStroke.Divider,
-                            if (iconName == selectedIcon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                            if (iconName == selectedBuiltin) SteppieStroke.Focus else SteppieStroke.Divider,
+                            if (iconName == selectedBuiltin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                             RoundedCornerShape(SteppieCornerRadius.Control),
                         )
                         .clearAndSetSemantics {
