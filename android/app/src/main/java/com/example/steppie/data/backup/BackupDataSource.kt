@@ -7,11 +7,13 @@ import com.example.steppie.data.local.RoutineEntity
 import com.example.steppie.data.local.RoutineSetEntity
 import com.example.steppie.data.local.SteppieDatabase
 import com.example.steppie.data.repository.DataStoreAppSettingsRepository
+import com.example.steppie.data.photo.RoutinePhotoStore
 import java.time.Instant
 
 class BackupDataSource(
     private val database: SteppieDatabase,
     private val appSettingsRepository: DataStoreAppSettingsRepository,
+    private val routinePhotoStore: RoutinePhotoStore? = null,
     private val dao: RoutineDao = database.routineDao(),
 ) {
     suspend fun snapshot(exportedAt: Instant = Instant.now()): BackupSnapshot = BackupSnapshot(
@@ -22,8 +24,20 @@ class BackupDataSource(
         appSettings = appSettingsRepository.getAppSettings(),
     )
 
-    suspend fun replaceAll(newSnapshot: BackupSnapshot) {
+    fun photoBackupAssets(snapshot: BackupSnapshot): Map<String, ByteArray> {
+        val store = routinePhotoStore ?: return emptyMap()
+        val photos = snapshot.routines
+            .filter { it.iconType == "photo" }
+            .mapNotNull { entity ->
+                val localAssetId = entity.localAssetId ?: return@mapNotNull null
+                com.example.steppie.domain.model.IconRef.Photo(localAssetId, entity.backupAssetName)
+            }
+        return store.readBackupAssets(photos)
+    }
+
+    suspend fun replaceAll(newSnapshot: BackupSnapshot, assets: Map<String, ByteArray> = emptyMap()) {
         val previous = snapshot()
+        val previousAssets = routinePhotoStore?.snapshotFiles().orEmpty()
         try {
             replaceRoomData(
                 routineSets = newSnapshot.routineSets,
@@ -31,10 +45,12 @@ class BackupDataSource(
                 dailyLogs = newSnapshot.dailyLogs,
             )
             appSettingsRepository.replaceAppSettings(newSnapshot.appSettings)
+            routinePhotoStore?.replaceAllFromBackup(assets)
         } catch (error: Throwable) {
             runCatching {
                 replaceRoomData(previous.routineSets, previous.routines, previous.dailyLogs)
                 appSettingsRepository.replaceAppSettings(previous.appSettings)
+                routinePhotoStore?.replaceAllFiles(previousAssets)
             }
             throw error
         }
