@@ -150,6 +150,13 @@ class MainActivity : ComponentActivity() {
                         onOpenBackupRestore = guardianViewModel::openBackupRestore,
                         onOpenPinChange = guardianViewModel::openPinChange,
                         onOpenRoutineSetCreate = guardianViewModel::openRoutineSetCreate,
+                        onOpenTemplateSelect = guardianViewModel::openTemplateSelect,
+                        onOpenTemplateSelectFromHome = guardianViewModel::openTemplateSelectFromHome,
+                        onCloseTemplateSelect = guardianViewModel::closeTemplateSelect,
+                        onPreviewTemplate = guardianViewModel::previewTemplate,
+                        onSaveTemplatePreview = {
+                            guardianViewModel.saveTemplatePreview(childViewModel::onDataChanged)
+                        },
                         onOpenNewRoutineEditor = guardianViewModel::openNewRoutineEditor,
                         onOpenRoutineEditor = guardianViewModel::openRoutineEditor,
                         onToggleRoutineSetListEditing = guardianViewModel::toggleRoutineSetListEditing,

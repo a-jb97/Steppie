@@ -106,6 +106,11 @@ fun GuardianModeScreen(
     onOpenBackupRestore: () -> Unit = {},
     onOpenPinChange: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
+    onOpenTemplateSelect: () -> Unit,
+    onOpenTemplateSelectFromHome: () -> Unit,
+    onCloseTemplateSelect: () -> Unit,
+    onPreviewTemplate: (RoutineTemplateId) -> Unit,
+    onSaveTemplatePreview: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
     onOpenRoutineEditor: (String) -> Unit,
     onToggleRoutineSetListEditing: () -> Unit,
@@ -178,6 +183,7 @@ fun GuardianModeScreen(
                 onCloseToChild = onCloseToChild,
                 onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                 onOpenRoutineEdit = onOpenRoutineEdit,
+                onOpenTemplateSelect = onOpenTemplateSelectFromHome,
                 onOpenEnvironmentSettings = onOpenEnvironmentSettings,
                 onOpenRecords = onOpenRecords,
                 onOpenSecurity = onOpenSecurity,
@@ -189,6 +195,7 @@ fun GuardianModeScreen(
                         state = state,
                         onOpenHome = onOpenHome,
                         onOpenRoutineSetCreate = onOpenRoutineSetCreate,
+                        onOpenTemplateSelect = onOpenTemplateSelect,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                         onOpenRoutineEditor = onOpenRoutineEditor,
                         onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
@@ -204,6 +211,7 @@ fun GuardianModeScreen(
                         state = state,
                         onOpenHome = onOpenHome,
                         onOpenRoutineSetCreate = onOpenRoutineSetCreate,
+                        onOpenTemplateSelect = onOpenTemplateSelect,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                         onOpenRoutineEditor = onOpenRoutineEditor,
                         onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
@@ -216,6 +224,13 @@ fun GuardianModeScreen(
                     )
                 }
             }
+            GuardianDestination.TemplateSelect -> GuardianTemplateSelectScreen(
+                state = state,
+                onBack = onCloseTemplateSelect,
+                onPreviewTemplate = onPreviewTemplate,
+                onSaveTemplatePreview = onSaveTemplatePreview,
+                useWideLayout = maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight,
+            )
             GuardianDestination.CardEdit -> GuardianCardEditScreen(
                 state = state,
                 onOpenRoutineEdit = onOpenRoutineEdit,
@@ -582,6 +597,7 @@ private fun GuardianHomeScreen(
     onCloseToChild: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
     onOpenRoutineEdit: () -> Unit,
+    onOpenTemplateSelect: () -> Unit,
     onOpenEnvironmentSettings: () -> Unit,
     onOpenRecords: () -> Unit,
     onOpenSecurity: () -> Unit,
@@ -599,6 +615,7 @@ private fun GuardianHomeScreen(
         },
     ) {
         GuardianMenuCard(R.drawable.ic_guardian_menu_routine, stringResource(R.string.guardian_menu_create_routine_set), stringResource(R.string.guardian_menu_create_routine_set_desc), onOpenRoutineSetCreate)
+        GuardianMenuCard(R.drawable.ic_guardian_menu_routine, stringResource(R.string.guardian_template_action), stringResource(R.string.guardian_template_home_desc), onOpenTemplateSelect)
         GuardianMenuCard(R.drawable.ic_guardian_menu_routine, stringResource(R.string.guardian_menu_routine), stringResource(R.string.guardian_menu_routine_desc), onOpenRoutineEdit)
         GuardianMenuCard(R.drawable.ic_guardian_menu_settings, stringResource(R.string.guardian_menu_feedback), stringResource(R.string.guardian_menu_feedback_desc), onOpenEnvironmentSettings)
         GuardianMenuCard(R.drawable.ic_guardian_menu_records, stringResource(R.string.guardian_menu_records), stringResource(R.string.guardian_menu_records_desc), onOpenRecords)
@@ -983,6 +1000,7 @@ private fun GuardianRoutineEditScreen(
     state: GuardianModeUiState,
     onOpenHome: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
+    onOpenTemplateSelect: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
     onOpenRoutineEditor: (String) -> Unit,
     onToggleRoutineSetListEditing: () -> Unit,
@@ -1012,7 +1030,7 @@ private fun GuardianRoutineEditScreen(
                 } else {
                     SteppieButton(
                         label = stringResource(R.string.guardian_template_action),
-                        onClick = onShowOutOfScopeNotice,
+                        onClick = onOpenTemplateSelect,
                         modifier = Modifier.fillMaxWidth(),
                         style = SteppieButtonStyle.Secondary,
                     )
@@ -1460,6 +1478,7 @@ private fun GuardianRoutineSplitScreen(
     state: GuardianModeUiState,
     onOpenHome: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
+    onOpenTemplateSelect: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
     onOpenRoutineEditor: (String) -> Unit,
     onToggleRoutineSetListEditing: () -> Unit,
@@ -1480,6 +1499,7 @@ private fun GuardianRoutineSplitScreen(
                 state = state,
                 onOpenHome = onOpenHome,
                 onOpenRoutineSetCreate = onOpenRoutineSetCreate,
+                onOpenTemplateSelect = onOpenTemplateSelect,
                 onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                 onOpenRoutineEditor = onOpenRoutineEditor,
                 onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
@@ -1509,6 +1529,234 @@ private fun GuardianRoutineSplitScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = SteppieTheme.typography.guardianTitle,
                 textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GuardianTemplateSelectScreen(
+    state: GuardianModeUiState,
+    onBack: () -> Unit,
+    onPreviewTemplate: (RoutineTemplateId) -> Unit,
+    onSaveTemplatePreview: () -> Unit,
+    useWideLayout: Boolean,
+) {
+    val selectedTemplate = state.selectedTemplate ?: RoutineTemplates.all.first()
+    GuardianScaffold(
+        title = stringResource(R.string.guardian_template_action),
+        subtitle = stringResource(R.string.guardian_template_select_subtitle),
+        onBack = onBack,
+        bottom = {
+            Row(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium)) {
+                SteppieButton(
+                    label = stringResource(R.string.action_back),
+                    onClick = onBack,
+                    modifier = Modifier.weight(1f),
+                    style = SteppieButtonStyle.Secondary,
+                )
+                SteppieButton(
+                    label = stringResource(R.string.guardian_template_save_action),
+                    onClick = onSaveTemplatePreview,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        },
+    ) {
+        if (useWideLayout) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("guardian_template_select_split"),
+                horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Large),
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+                ) {
+                    RoutineTemplates.all.forEach { template ->
+                        TemplateSelectionRow(
+                            template = template,
+                            selected = template.id == selectedTemplate.id,
+                            onClick = { onPreviewTemplate(template.id) },
+                        )
+                    }
+                }
+                TemplatePreviewSteps(template = selectedTemplate, modifier = Modifier.weight(1f))
+            }
+        } else {
+            RoutineTemplates.all.forEach { template ->
+                TemplateSelectionRow(
+                    template = template,
+                    selected = template.id == selectedTemplate.id,
+                    onClick = { onPreviewTemplate(template.id) },
+                )
+            }
+            TemplatePreviewSummary(template = selectedTemplate)
+            TemplatePreviewSteps(template = selectedTemplate)
+        }
+        state.draftError?.let { ErrorMessage(it) }
+    }
+}
+
+@Composable
+private fun TemplateSelectionRow(
+    template: RoutineTemplate,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val templateName = template.name.resolve(null, Locale.getDefault().toLanguageTag())
+    val stepCount = stringResource(R.string.guardian_template_step_count, template.steps.size)
+    val accessibilityDescription = stringResource(R.string.a11y_template_row, templateName, stepCount)
+    val selectionState = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
+    val borderColor = if (selected) SteppieTheme.colors.warning else MaterialTheme.colorScheme.outline
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 96.dp)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                if (selected) 2.dp else SteppieStroke.Divider,
+                borderColor,
+                RoundedCornerShape(SteppieCornerRadius.Card),
+            )
+            .clickable(role = Role.Button, onClick = onClick)
+            .clearAndSetSemantics {
+                contentDescription = accessibilityDescription
+                role = Role.Button
+                stateDescription = selectionState
+            }
+            .padding(SteppieSpacing.Small),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
+    ) {
+        TemplateSelectionMark(selected = selected)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall)) {
+            Text(
+                text = templateName,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianTitle,
+            )
+            Text(
+                text = stepCount,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.guardianCaption,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TemplateSelectionMark(selected: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(if (selected) SteppieTheme.colors.warning else Color.Transparent)
+            .border(3.dp, SteppieTheme.colors.warning, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Text(
+                text = "✓",
+                color = MaterialTheme.colorScheme.onError,
+                style = SteppieTheme.typography.button,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TemplatePreviewSummary(
+    template: RoutineTemplate,
+    modifier: Modifier = Modifier,
+) {
+    val templateName = template.name.resolve(null, Locale.getDefault().toLanguageTag())
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
+    ) {
+        Text(
+            text = templateName,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = SteppieTheme.typography.guardianTitle,
+        )
+        Text(
+            text = stringResource(R.string.guardian_template_preview_summary, template.steps.size),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = SteppieTheme.typography.guardianBody,
+        )
+    }
+}
+
+@Composable
+private fun TemplatePreviewSteps(
+    template: RoutineTemplate,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+    ) {
+        template.steps.forEachIndexed { index, step ->
+            TemplatePreviewStepRow(index = index, step = step)
+        }
+    }
+}
+
+@Composable
+private fun TemplatePreviewStepRow(
+    index: Int,
+    step: RoutineTemplateStep,
+) {
+    val title = step.title.resolve(null, Locale.getDefault().toLanguageTag())
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 104.dp)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(SteppieStroke.Divider, MaterialTheme.colorScheme.outline, RoundedCornerShape(SteppieCornerRadius.Card))
+            .padding(SteppieSpacing.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = (index + 1).toString(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.button,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(SteppieCornerRadius.Control))
+                .background(colorForToken(step.colorToken)),
+            contentAlignment = Alignment.Center,
+        ) {
+            RoutineIcon(IconRef.Builtin(step.iconName), focus = false, modifier = Modifier.size(44.dp))
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
+        ) {
+            Text(
+                text = title,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.button,
+            )
+            Text(
+                text = stringResource(R.string.guardian_time_none),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.guardianCaption,
             )
         }
     }
@@ -2431,10 +2679,11 @@ private fun ColorPicker(selectedColorToken: String, onSelected: (String) -> Unit
 private fun GuardianPanel(
     title: String,
     body: String? = null,
-    content: @Composable ColumnScope.() -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit = {},
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(SteppieCornerRadius.Card))
             .background(MaterialTheme.colorScheme.surface)

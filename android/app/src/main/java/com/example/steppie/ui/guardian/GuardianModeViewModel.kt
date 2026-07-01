@@ -34,7 +34,18 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class GuardianDestination { Pin, Home, RoutineEdit, CardEdit, RoutineSetCreate, EnvironmentSettings, Records, Security, BackupRestore }
+enum class GuardianDestination {
+    Pin,
+    Home,
+    RoutineEdit,
+    TemplateSelect,
+    CardEdit,
+    RoutineSetCreate,
+    EnvironmentSettings,
+    Records,
+    Security,
+    BackupRestore,
+}
 
 enum class GuardianPinMode { Enter, Setup, ChangeCurrent, ChangeNew }
 
@@ -93,6 +104,8 @@ data class GuardianModeUiState(
     val routines: List<Routine> = emptyList(),
     val draft: RoutineDraft? = null,
     val routineSetDraft: RoutineSetDraft? = null,
+    val selectedTemplate: RoutineTemplate? = null,
+    val templateReturnDestination: GuardianDestination = GuardianDestination.RoutineEdit,
     val routineSetListEditing: Boolean = false,
     val selectedRecordsDate: LocalDate = LocalDate.now(),
     val recordDays: List<GuardianRecordDay> = emptyList(),
@@ -236,6 +249,8 @@ class GuardianModeViewModel(
                 destination = GuardianDestination.Home,
                 draft = null,
                 routineSetDraft = null,
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
                 routineSetListEditing = false,
                 editingRoutineSetId = null,
                 editingRoutineSetName = "",
@@ -254,6 +269,8 @@ class GuardianModeViewModel(
                 destination = GuardianDestination.RoutineEdit,
                 draft = null,
                 routineSetDraft = null,
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
                 draftError = null,
                 pendingDeleteRoutineId = null,
                 pendingDeleteRoutineSetId = null,
@@ -269,6 +286,8 @@ class GuardianModeViewModel(
                 destination = GuardianDestination.Security,
                 draft = null,
                 routineSetDraft = null,
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
                 routineSetListEditing = false,
                 editingRoutineSetId = null,
                 editingRoutineSetName = "",
@@ -287,6 +306,8 @@ class GuardianModeViewModel(
                 destination = GuardianDestination.EnvironmentSettings,
                 draft = null,
                 routineSetDraft = null,
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
                 routineSetListEditing = false,
                 editingRoutineSetId = null,
                 editingRoutineSetName = "",
@@ -308,6 +329,8 @@ class GuardianModeViewModel(
                 selectedRecordsDate = today,
                 draft = null,
                 routineSetDraft = null,
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
                 routineSetListEditing = false,
                 editingRoutineSetId = null,
                 editingRoutineSetName = "",
@@ -403,6 +426,8 @@ class GuardianModeViewModel(
                 destination = GuardianDestination.BackupRestore,
                 draft = null,
                 routineSetDraft = null,
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
                 routineSetListEditing = false,
                 editingRoutineSetId = null,
                 editingRoutineSetName = "",
@@ -437,6 +462,8 @@ class GuardianModeViewModel(
                 destination = GuardianDestination.CardEdit,
                 draft = RoutineDraft(),
                 routineSetDraft = null,
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
                 draftError = null,
                 notice = null,
                 interactionToken = it.interactionToken + 1,
@@ -452,6 +479,8 @@ class GuardianModeViewModel(
             it.copy(
                 destination = GuardianDestination.CardEdit,
                 routineSetDraft = null,
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
                 draft = RoutineDraft(
                     routineId = routine.id,
                     title = title,
@@ -472,12 +501,90 @@ class GuardianModeViewModel(
                 destination = GuardianDestination.RoutineSetCreate,
                 draft = null,
                 routineSetDraft = RoutineSetDraft(),
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
                 draftError = null,
                 pendingDeleteRoutineId = null,
                 pendingDeleteRoutineSetId = null,
                 notice = null,
                 interactionToken = it.interactionToken + 1,
             )
+        }
+    }
+
+    fun openTemplateSelect(returnDestination: GuardianDestination = GuardianDestination.RoutineEdit) {
+        _uiState.update {
+            it.copy(
+                destination = GuardianDestination.TemplateSelect,
+                draft = null,
+                routineSetDraft = null,
+                selectedTemplate = RoutineTemplates.find(RoutineTemplateId.Morning),
+                templateReturnDestination = returnDestination,
+                draftError = null,
+                notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun openTemplateSelectFromHome() {
+        openTemplateSelect(GuardianDestination.Home)
+    }
+
+    fun closeTemplateSelect() {
+        val destination = _uiState.value.templateReturnDestination
+        _uiState.update {
+            it.copy(
+                destination = destination,
+                selectedTemplate = null,
+                draftError = null,
+                notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun previewTemplate(templateId: RoutineTemplateId) {
+        val template = RoutineTemplates.find(templateId) ?: return
+        _uiState.update {
+            it.copy(
+                destination = GuardianDestination.TemplateSelect,
+                selectedTemplate = template,
+                draft = null,
+                routineSetDraft = null,
+                draftError = null,
+                notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun saveTemplatePreview(onDataChanged: () -> Unit) {
+        val template = _uiState.value.selectedTemplate ?: return
+        viewModelScope.launch {
+            runCatching {
+                routineRepository.createRoutineSet(template.instantiate(Instant.now()))
+            }.onSuccess {
+                onDataChanged()
+                _uiState.update { state ->
+                    state.copy(
+                        destination = GuardianDestination.RoutineEdit,
+                        selectedTemplate = null,
+                        draft = null,
+                        routineSetDraft = null,
+                        draftError = null,
+                        notice = "템플릿으로 새 루틴 세트를 저장했습니다.",
+                        interactionToken = state.interactionToken + 1,
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update { state ->
+                    state.copy(
+                        draftError = error.message ?: "템플릿을 저장할 수 없습니다.",
+                        interactionToken = state.interactionToken + 1,
+                    )
+                }
+            }
         }
     }
 

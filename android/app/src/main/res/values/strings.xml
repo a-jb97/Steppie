@@ -30,6 +30,7 @@
     <string name="a11y_guardian_menu_card">%1$s. %2$s</string>
     <string name="a11y_routine_set_row">%1$s, %2$s</string>
     <string name="a11y_routine_edit_row">%1$s, %2$s. 선택하면 편집합니다</string>
+    <string name="a11y_template_row">%1$s, %2$s. 선택하면 아래 미리보기가 바뀝니다</string>
     <string name="a11y_item_action">%1$s %2$s</string>
     <string name="a11y_selected">선택됨</string>
     <string name="a11y_not_selected">선택 안 됨</string>
@@ -155,6 +156,18 @@
     <string name="guardian_step_list_empty">저장하려면 최소 1개 단계가 필요합니다.</string>
     <string name="guardian_step_order_title">%1$d. %2$s</string>
     <string name="guardian_template_action">템플릿에서 시작하기</string>
+    <string name="guardian_template_home_desc">아침, 학교, 취침 기본 루틴 만들기</string>
+    <string name="guardian_template_select_title">템플릿 선택</string>
+    <string name="guardian_template_select_subtitle">템플릿을 고른 뒤 새 루틴 세트로 저장합니다</string>
+    <string name="guardian_template_preview_title">템플릿 미리보기</string>
+    <string name="guardian_template_preview_subtitle">저장하면 새 활성 루틴 세트로 추가됩니다</string>
+    <string name="guardian_template_preview_hint_title">미리보기</string>
+    <string name="guardian_template_preview_hint_body">왼쪽에서 템플릿을 선택하면 저장할 루틴 목록을 확인할 수 있습니다.</string>
+    <string name="guardian_template_step_count">단계 %1$d개</string>
+    <string name="guardian_template_preview_summary">%1$d개 활동이 새 루틴 세트로 저장됩니다</string>
+    <string name="guardian_template_save_desc">저장 후 일반 루틴처럼 편집, 삭제, 순서 변경할 수 있습니다.</string>
+    <string name="guardian_template_save_action">새 루틴 세트로 저장</string>
+    <string name="guardian_template_steps_title">저장할 단계 %1$d개</string>
     <string name="guardian_add_routine">활동 추가</string>
     <string name="guardian_tablet_edit_hint">왼쪽에서 활동을 선택해 편집합니다</string>
     <string name="guardian_card_edit_title">카드 편집</string>
