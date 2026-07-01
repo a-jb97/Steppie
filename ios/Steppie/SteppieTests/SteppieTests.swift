@@ -451,6 +451,128 @@ struct SteppieTests {
         #expect(changeCount == 1)
     }
 
+    @Test("내장 루틴 템플릿은 morning school bedtime 3종과 한국어 영어 라벨을 제공한다")
+    func builtInRoutineTemplatesExposeRequiredLocalizedContent() throws {
+        let templates = BuiltInRoutineTemplates.all
+
+        #expect(templates.map(\.id) == ["morning", "school", "bedtime"])
+        for template in templates {
+            #expect(template.name.values["ko"]?.isEmpty == false)
+            #expect(template.name.values["en"]?.isEmpty == false)
+            #expect(!template.steps.isEmpty)
+            for step in template.steps {
+                #expect(step.title.values["ko"]?.isEmpty == false)
+                #expect(step.title.values["en"]?.isEmpty == false)
+                #expect(Routine.allowedColorTokens.contains(step.colorToken))
+                #expect(RoutineIconName(rawValue: step.iconName.rawValue) != nil)
+            }
+        }
+    }
+
+    @Test("템플릿 저장은 새 활성 루틴 세트와 ordered 루틴을 생성한다")
+    func guardianTemplateSaveCreatesActiveRoutineSetAndOrderedRoutines() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        var changeCount = 0
+        let viewModel = GuardianModeViewModel(repository: repository) {
+            changeCount += 1
+        }
+
+        viewModel.beginTemplateSelection()
+        viewModel.selectTemplate(try #require(viewModel.routineTemplates.first { $0.id == "morning" }))
+        viewModel.saveSelectedTemplate()
+
+        let activeSet = try #require(try repository.routineSets().first(where: \.isActive))
+        let routines = try repository.routines(in: activeSet.id)
+        #expect(activeSet.name.resolved(appLocale: "ko") == "아침 루틴")
+        #expect(activeSet.name.resolved(appLocale: "en") == "Morning routine")
+        #expect(routines.map { $0.title.resolved(appLocale: "ko") } == ["일어나기", "세수하기", "양치하기", "옷 입기", "아침 먹기", "가방 챙기기"])
+        #expect(routines.map(\.order) == [0, 1, 2, 3, 4, 5])
+        #expect(routines.map(\.titleKey) == ["routine.wakeUp", "routine.washFace", "routine.brushTeeth", "routine.getDressed", "routine.breakfast", "routine.packBag"])
+        #expect(Set(routines.map(\.id)).count == routines.count)
+        #expect(viewModel.selectedRoutineSet?.id == activeSet.id)
+        #expect(viewModel.selectedDestination == .routineEditor)
+        #expect(changeCount == 1)
+    }
+
+    @Test("같은 템플릿을 두 번 저장해도 RoutineSet과 Routine UUID는 중복되지 않는다")
+    func guardianTemplateSaveGeneratesFreshIDsEveryTime() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let bedtime = try #require(viewModel.routineTemplates.first { $0.id == "bedtime" })
+
+        viewModel.beginTemplateSelection()
+        viewModel.selectTemplate(bedtime)
+        viewModel.saveSelectedTemplate()
+        let firstSetID = try #require(viewModel.selectedRoutineSet?.id)
+        let firstRoutineIDs = try Set(repository.routines(in: firstSetID).map(\.id))
+
+        viewModel.beginTemplateSelection()
+        viewModel.selectTemplate(bedtime)
+        viewModel.saveSelectedTemplate()
+        let secondSetID = try #require(viewModel.selectedRoutineSet?.id)
+        let secondRoutineIDs = try Set(repository.routines(in: secondSetID).map(\.id))
+
+        #expect(firstSetID != secondSetID)
+        #expect(firstRoutineIDs.isDisjoint(with: secondRoutineIDs))
+        #expect(try repository.routineSets().count == 2)
+    }
+
+    @Test("템플릿으로 생성된 루틴은 일반 루틴처럼 편집 삭제 정렬할 수 있다")
+    func guardianTemplateRoutinesRemainEditable() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let school = try #require(viewModel.routineTemplates.first { $0.id == "school" })
+
+        viewModel.beginTemplateSelection()
+        viewModel.selectTemplate(school)
+        viewModel.saveSelectedTemplate()
+        let setID = try #require(viewModel.selectedRoutineSet?.id)
+
+        let first = try #require(viewModel.routines.first)
+        viewModel.beginEditRoutine(first)
+        viewModel.draft?.title = "스쿨버스 타기"
+        viewModel.draft?.colorToken = "color.card.rose"
+        viewModel.saveDraft(localeIdentifier: "ko")
+        #expect(try repository.routine(id: first.id)?.title.resolved(appLocale: "ko") == "스쿨버스 타기")
+
+        let last = try #require(viewModel.routines.last)
+        viewModel.moveRoutine(last, to: 0)
+        #expect(try repository.routines(in: setID).first?.id == last.id)
+        #expect(try repository.routines(in: setID).map(\.order) == [0, 1, 2, 3])
+
+        viewModel.requestDelete(last)
+        viewModel.confirmDelete()
+        #expect(try repository.routines(in: setID).count == 3)
+        #expect(try repository.routines(in: setID).map(\.order) == [0, 1, 2])
+        #expect(try repository.routine(id: last.id)?.deletedAt != nil)
+    }
+
+    @Test("템플릿 저장 후 아이 모드는 새 활성 루틴 세트를 읽고 백업에도 포함된다")
+    func templateSaveRefreshesChildModeAndBackupSnapshot() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let childViewModel = ChildRoutineViewModel(repository: repository)
+        let guardianViewModel = GuardianModeViewModel(repository: repository) {
+            childViewModel.load()
+        }
+        let bedtime = try #require(guardianViewModel.routineTemplates.first { $0.id == "bedtime" })
+
+        childViewModel.load()
+        #expect(childViewModel.loadState == .empty)
+
+        guardianViewModel.beginTemplateSelection()
+        guardianViewModel.selectTemplate(bedtime)
+        guardianViewModel.saveSelectedTemplate()
+
+        let activeSet = try #require(childViewModel.activeRoutineSet)
+        #expect(childViewModel.loadState == .loaded)
+        #expect(activeSet.name.resolved(appLocale: "ko") == "취침 루틴")
+        #expect(childViewModel.routines.map { $0.title.resolved(appLocale: "ko") } == ["목욕하기", "잠옷 입기", "잠자기"])
+
+        let snapshot = try repository.backupSnapshot()
+        #expect(snapshot.routineSets.contains { $0.id == activeSet.id })
+        #expect(snapshot.routines.filter { $0.routineSetID == activeSet.id }.count == 3)
+    }
+
     @Test("루틴 관리는 여러 루틴 세트를 목록으로 유지하고 선택한 세트의 단계만 편집한다")
     func guardianRoutineManagementKeepsMultipleRoutineSets() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
