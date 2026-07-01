@@ -155,6 +155,136 @@ class GuardianModeScreenTest {
     }
 
     @Test
+    fun securityScreenRoutesRecoveryCodeCard() {
+        var recoveryClicks = 0
+
+        composeRule.setContent {
+            SteppieTheme {
+                GuardianModeScreen(
+                    state = GuardianModeUiState(
+                        isActive = true,
+                        isAuthenticated = true,
+                        destination = GuardianDestination.Security,
+                    ),
+                    onDigit = {},
+                    onDeletePinDigit = {},
+                    onCloseToChild = {},
+                    onInteraction = {},
+                    onOpenHome = {},
+                    onOpenRoutineEdit = {},
+                    onOpenSecurity = {},
+                    onOpenPinChange = {},
+                    onOpenRecoveryCode = { recoveryClicks += 1 },
+                    onOpenRoutineSetCreate = {},
+                    onOpenNewRoutineEditor = {},
+                    onOpenRoutineEditor = {},
+                    onToggleRoutineSetListEditing = {},
+                    onSelectRoutineSet = {},
+                    onRequestEditRoutineSetName = {},
+                    onEditingRoutineSetNameChange = {},
+                    onCancelEditRoutineSetName = {},
+                    onSaveEditingRoutineSetName = {},
+                    onDraftTitleChange = {},
+                    onDraftIconChange = {},
+                    onDraftColorChange = {},
+                    onDraftScheduledTimeChange = {},
+                    onSaveDraft = {},
+                    onRoutineSetNameChange = {},
+                    onRoutineSetStepTitleChange = {},
+                    onRoutineSetStepIconChange = {},
+                    onRoutineSetStepColorChange = {},
+                    onRoutineSetStepScheduledTimeChange = {},
+                    onAddRoutineSetStep = {},
+                    onEditRoutineSetStep = {},
+                    onRemoveRoutineSetStep = {},
+                    onSaveRoutineSetDraft = {},
+                    onRequestDelete = {},
+                    onRequestDeleteRoutineSet = {},
+                    onCancelDelete = {},
+                    onConfirmDelete = {},
+                    onConfirmDeleteRoutineSet = {},
+                    onMoveRoutine = { _, _ -> },
+                    onShowOutOfScopeNotice = {},
+                    onClearNotice = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("복구 코드 확인").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(1, recoveryClicks)
+        }
+    }
+
+    @Test
+    fun recoveryCodeScreenShowsOneTimeCodeAndAcknowledges() {
+        var closeClicks = 0
+
+        composeRule.setContent {
+            SteppieTheme {
+                GuardianModeScreen(
+                    state = GuardianModeUiState(
+                        isActive = true,
+                        isAuthenticated = true,
+                        destination = GuardianDestination.RecoveryCode,
+                        recoveryStep = GuardianRecoveryStep.ShowCode,
+                        recoveryCodeToShow = "654321",
+                    ),
+                    onDigit = {},
+                    onDeletePinDigit = {},
+                    onCloseToChild = {},
+                    onInteraction = {},
+                    onOpenHome = {},
+                    onOpenRoutineEdit = {},
+                    onOpenSecurity = {},
+                    onOpenPinChange = {},
+                    onOpenRoutineSetCreate = {},
+                    onOpenNewRoutineEditor = {},
+                    onOpenRoutineEditor = {},
+                    onToggleRoutineSetListEditing = {},
+                    onSelectRoutineSet = {},
+                    onRequestEditRoutineSetName = {},
+                    onEditingRoutineSetNameChange = {},
+                    onCancelEditRoutineSetName = {},
+                    onSaveEditingRoutineSetName = {},
+                    onDraftTitleChange = {},
+                    onDraftIconChange = {},
+                    onDraftColorChange = {},
+                    onDraftScheduledTimeChange = {},
+                    onSaveDraft = {},
+                    onRoutineSetNameChange = {},
+                    onRoutineSetStepTitleChange = {},
+                    onRoutineSetStepIconChange = {},
+                    onRoutineSetStepColorChange = {},
+                    onRoutineSetStepScheduledTimeChange = {},
+                    onAddRoutineSetStep = {},
+                    onEditRoutineSetStep = {},
+                    onRemoveRoutineSetStep = {},
+                    onSaveRoutineSetDraft = {},
+                    onRequestDelete = {},
+                    onRequestDeleteRoutineSet = {},
+                    onCancelDelete = {},
+                    onConfirmDelete = {},
+                    onConfirmDeleteRoutineSet = {},
+                    onMoveRoutine = { _, _ -> },
+                    onShowOutOfScopeNotice = {},
+                    onCloseRecoveryCode = { closeClicks += 1 },
+                    onClearNotice = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("복구 코드").assertIsDisplayed()
+        composeRule.onNodeWithText("6").assertIsDisplayed()
+        composeRule.onNodeWithText("확인했습니다").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(1, closeClicks)
+        }
+    }
+
+    @Test
     fun recordsScreenShowsSummaryAndRoutineStatus() {
         val date = LocalDate.parse("2026-06-30")
         val selectedDay = GuardianRecordDay(

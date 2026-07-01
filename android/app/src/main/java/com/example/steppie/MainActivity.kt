@@ -149,6 +149,8 @@ class MainActivity : ComponentActivity() {
                         onOpenSecurity = guardianViewModel::openSecurity,
                         onOpenBackupRestore = guardianViewModel::openBackupRestore,
                         onOpenPinChange = guardianViewModel::openPinChange,
+                        onOpenRecoveryCode = guardianViewModel::openRecoveryCodeRegeneration,
+                        onOpenRecoveryPinReset = guardianViewModel::openRecoveryPinReset,
                         onOpenRoutineSetCreate = guardianViewModel::openRoutineSetCreate,
                         onOpenTemplateSelect = guardianViewModel::openTemplateSelect,
                         onOpenTemplateSelectFromHome = guardianViewModel::openTemplateSelectFromHome,
@@ -206,6 +208,12 @@ class MainActivity : ComponentActivity() {
                         onRestorePinDigit = guardianViewModel::inputRestorePinDigit,
                         onDeleteRestorePinDigit = guardianViewModel::deleteRestorePinDigit,
                         onCancelRestore = guardianViewModel::cancelRestore,
+                        onRecoveryDigit = guardianViewModel::inputRecoveryDigit,
+                        onDeleteRecoveryDigit = guardianViewModel::deleteRecoveryDigit,
+                        onRecoveryCodeChange = guardianViewModel::updateRecoveryCodeInput,
+                        onConfirmRecoveryCode = guardianViewModel::confirmRecoveryCodeForPinReset,
+                        onCancelRecoveryPinReset = guardianViewModel::cancelRecoveryPinReset,
+                        onCloseRecoveryCode = guardianViewModel::closeRecoveryCode,
                         onClearNotice = guardianViewModel::clearNotice,
                     )
                 } else {

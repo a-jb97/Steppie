@@ -44,10 +44,15 @@ enum class GuardianDestination {
     EnvironmentSettings,
     Records,
     Security,
+    RecoveryCode,
     BackupRestore,
 }
 
-enum class GuardianPinMode { Enter, Setup, ChangeCurrent, ChangeNew }
+enum class GuardianPinMode { Enter, Setup, ChangeCurrent, ChangeNew, RecoveryRegenerateConfirm, RecoveryResetNew }
+
+enum class GuardianRecoveryStep { ShowCode, EnterCodeForPinReset }
+
+enum class GuardianRecoveryError { CodeMismatch }
 
 data class RoutineDraft(
     val routineId: String? = null,
@@ -122,6 +127,11 @@ data class GuardianModeUiState(
     val pendingRestoreUri: Uri? = null,
     val pendingRestorePreview: BackupImportPreview? = null,
     val restorePinDigits: String = "",
+    val recoveryStep: GuardianRecoveryStep? = null,
+    val recoveryCodeToShow: String? = null,
+    val recoveryDigits: String = "",
+    val recoveryError: GuardianRecoveryError? = null,
+    val recoveryReturnDestination: GuardianDestination = GuardianDestination.Home,
     val notice: String? = null,
     val interactionToken: Long = 0L,
 ) {
@@ -139,6 +149,7 @@ class GuardianModeViewModel(
     private val _uiState = MutableStateFlow(GuardianModeUiState())
     val uiState: StateFlow<GuardianModeUiState> = _uiState.asStateFlow()
     private var verifiedPinForChange: String? = null
+    private var verifiedRecoveryCodeForReset: String? = null
     private var recordRoutineSetsCache: List<RoutineSet> = emptyList()
     private var dailyLogsCache: List<DailyLog> = emptyList()
 
@@ -199,6 +210,7 @@ class GuardianModeViewModel(
 
     fun openFromChild() {
         verifiedPinForChange = null
+        verifiedRecoveryCodeForReset = null
         _uiState.update { state ->
             state.copy(
                 isActive = true,
@@ -207,6 +219,10 @@ class GuardianModeViewModel(
                 pinMode = if (state.hasGuardianPin) GuardianPinMode.Enter else GuardianPinMode.Setup,
                 pinDigits = "",
                 pinError = null,
+                recoveryStep = null,
+                recoveryCodeToShow = null,
+                recoveryDigits = "",
+                recoveryError = null,
                 notice = null,
                 interactionToken = state.interactionToken + 1,
             )
@@ -215,6 +231,7 @@ class GuardianModeViewModel(
 
     fun closeToChild() {
         verifiedPinForChange = null
+        verifiedRecoveryCodeForReset = null
         _uiState.update { GuardianModeUiState(hasGuardianPin = it.hasGuardianPin, appSettings = it.appSettings) }
     }
 
@@ -281,6 +298,7 @@ class GuardianModeViewModel(
     }
 
     fun openSecurity() {
+        verifiedRecoveryCodeForReset = null
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.Security,
@@ -294,6 +312,10 @@ class GuardianModeViewModel(
                 draftError = null,
                 backupError = null,
                 backupMessage = null,
+                recoveryStep = null,
+                recoveryCodeToShow = null,
+                recoveryDigits = "",
+                recoveryError = null,
                 notice = null,
                 interactionToken = it.interactionToken + 1,
             )
@@ -445,12 +467,117 @@ class GuardianModeViewModel(
 
     fun openPinChange() {
         verifiedPinForChange = null
+        verifiedRecoveryCodeForReset = null
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.Pin,
                 pinMode = GuardianPinMode.ChangeCurrent,
                 pinDigits = "",
                 pinError = null,
+                recoveryStep = null,
+                recoveryCodeToShow = null,
+                recoveryDigits = "",
+                recoveryError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun openRecoveryCodeRegeneration() {
+        verifiedPinForChange = null
+        verifiedRecoveryCodeForReset = null
+        _uiState.update {
+            it.copy(
+                destination = GuardianDestination.Pin,
+                pinMode = GuardianPinMode.RecoveryRegenerateConfirm,
+                pinDigits = "",
+                pinError = null,
+                recoveryStep = null,
+                recoveryCodeToShow = null,
+                recoveryDigits = "",
+                recoveryError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun openRecoveryPinReset() {
+        verifiedPinForChange = null
+        verifiedRecoveryCodeForReset = null
+        _uiState.update {
+            it.copy(
+                destination = GuardianDestination.RecoveryCode,
+                recoveryStep = GuardianRecoveryStep.EnterCodeForPinReset,
+                recoveryCodeToShow = null,
+                recoveryDigits = "",
+                recoveryError = null,
+                pinDigits = "",
+                pinError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun closeRecoveryCode() {
+        verifiedRecoveryCodeForReset = null
+        _uiState.update {
+            val destination = it.recoveryReturnDestination
+            it.copy(
+                isAuthenticated = true,
+                destination = destination,
+                recoveryStep = null,
+                recoveryCodeToShow = null,
+                recoveryDigits = "",
+                recoveryError = null,
+                pinDigits = "",
+                pinError = null,
+                notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun inputRecoveryDigit(digit: Int) {
+        require(digit in 0..9)
+        val current = _uiState.value
+        if (current.recoveryStep != GuardianRecoveryStep.EnterCodeForPinReset) return
+        if (current.recoveryDigits.length >= 6) return
+        updateRecoveryCodeInput(current.recoveryDigits + digit.toString())
+    }
+
+    fun updateRecoveryCodeInput(value: String) {
+        val digits = value.filter(Char::isDigit).take(6)
+        _uiState.update {
+            it.copy(
+                recoveryDigits = digits,
+                recoveryError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun deleteRecoveryDigit() {
+        updateRecoveryCodeInput(_uiState.value.recoveryDigits.dropLast(1))
+    }
+
+    fun confirmRecoveryCodeForPinReset() {
+        val recoveryCode = _uiState.value.recoveryDigits
+        if (recoveryCode.length != 6) return
+        verifyRecoveryCodeForPinReset(recoveryCode)
+    }
+
+    fun cancelRecoveryPinReset() {
+        verifiedRecoveryCodeForReset = null
+        _uiState.update {
+            it.copy(
+                destination = if (it.isAuthenticated) GuardianDestination.Security else GuardianDestination.Pin,
+                pinMode = if (it.hasGuardianPin) GuardianPinMode.Enter else GuardianPinMode.Setup,
+                pinDigits = "",
+                pinError = null,
+                recoveryStep = null,
+                recoveryCodeToShow = null,
+                recoveryDigits = "",
+                recoveryError = null,
                 interactionToken = it.interactionToken + 1,
             )
         }
@@ -1106,13 +1233,18 @@ class GuardianModeViewModel(
                     }
                 }
                 GuardianPinMode.Setup -> {
-                    appSettingsRepository.setGuardianPin(pin)
+                    val recoveryCode = appSettingsRepository.setGuardianPin(pin)
                     _uiState.update {
                         it.copy(
                             isAuthenticated = true,
                             destination = GuardianDestination.Home,
                             pinDigits = "",
                             pinError = null,
+                            recoveryStep = GuardianRecoveryStep.ShowCode,
+                            recoveryCodeToShow = recoveryCode,
+                            recoveryDigits = "",
+                            recoveryError = null,
+                            recoveryReturnDestination = GuardianDestination.Home,
                             interactionToken = it.interactionToken + 1,
                         )
                     }
@@ -1134,7 +1266,8 @@ class GuardianModeViewModel(
                 }
                 GuardianPinMode.ChangeNew -> {
                     val currentPin = verifiedPinForChange
-                    if (currentPin != null && appSettingsRepository.changeGuardianPin(currentPin, pin)) {
+                    val recoveryCode = currentPin?.let { appSettingsRepository.changeGuardianPin(it, pin) }
+                    if (recoveryCode != null) {
                         verifiedPinForChange = null
                         _uiState.update {
                             it.copy(
@@ -1142,13 +1275,104 @@ class GuardianModeViewModel(
                                 destination = GuardianDestination.Security,
                                 pinDigits = "",
                                 pinError = null,
-                                notice = "PIN이 변경되었습니다.",
+                                recoveryStep = GuardianRecoveryStep.ShowCode,
+                                recoveryCodeToShow = recoveryCode,
+                                recoveryDigits = "",
+                                recoveryError = null,
+                                recoveryReturnDestination = GuardianDestination.Security,
                                 interactionToken = it.interactionToken + 1,
                             )
                         }
                     } else {
                         showPinError()
                     }
+                }
+                GuardianPinMode.RecoveryRegenerateConfirm -> {
+                    val recoveryCode = appSettingsRepository.regenerateRecoveryCode(pin)
+                    if (recoveryCode != null) {
+                        _uiState.update {
+                            it.copy(
+                                isAuthenticated = true,
+                                destination = GuardianDestination.Security,
+                                pinDigits = "",
+                                pinError = null,
+                                recoveryStep = GuardianRecoveryStep.ShowCode,
+                                recoveryCodeToShow = recoveryCode,
+                                recoveryDigits = "",
+                                recoveryError = null,
+                                recoveryReturnDestination = GuardianDestination.Security,
+                                interactionToken = it.interactionToken + 1,
+                            )
+                        }
+                    } else {
+                        showPinError()
+                    }
+                }
+                GuardianPinMode.RecoveryResetNew -> {
+                    val recoveryCode = verifiedRecoveryCodeForReset
+                    val newRecoveryCode = recoveryCode?.let {
+                        appSettingsRepository.resetGuardianPinWithRecoveryCode(it, pin)
+                    }
+                    if (newRecoveryCode != null) {
+                        verifiedRecoveryCodeForReset = null
+                        _uiState.update {
+                            it.copy(
+                                isAuthenticated = true,
+                                destination = GuardianDestination.Home,
+                                pinDigits = "",
+                                pinError = null,
+                                recoveryStep = null,
+                                recoveryCodeToShow = null,
+                                recoveryDigits = "",
+                                recoveryError = null,
+                                recoveryReturnDestination = GuardianDestination.Home,
+                                interactionToken = it.interactionToken + 1,
+                            )
+                        }
+                    } else {
+                        verifiedRecoveryCodeForReset = null
+                        _uiState.update {
+                            it.copy(
+                                destination = GuardianDestination.RecoveryCode,
+                                recoveryStep = GuardianRecoveryStep.EnterCodeForPinReset,
+                                recoveryDigits = "",
+                                recoveryError = GuardianRecoveryError.CodeMismatch,
+                                pinDigits = "",
+                                pinError = null,
+                                interactionToken = it.interactionToken + 1,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun verifyRecoveryCodeForPinReset(recoveryCode: String) {
+        viewModelScope.launch {
+            if (appSettingsRepository.verifyRecoveryCode(recoveryCode)) {
+                verifiedRecoveryCodeForReset = recoveryCode
+                _uiState.update {
+                    it.copy(
+                        destination = GuardianDestination.Pin,
+                        pinMode = GuardianPinMode.RecoveryResetNew,
+                        pinDigits = "",
+                        pinError = null,
+                        recoveryStep = null,
+                        recoveryCodeToShow = null,
+                        recoveryDigits = "",
+                        recoveryError = null,
+                        interactionToken = it.interactionToken + 1,
+                    )
+                }
+            } else {
+                verifiedRecoveryCodeForReset = null
+                _uiState.update {
+                    it.copy(
+                        recoveryDigits = "",
+                        recoveryError = GuardianRecoveryError.CodeMismatch,
+                        interactionToken = it.interactionToken + 1,
+                    )
                 }
             }
         }

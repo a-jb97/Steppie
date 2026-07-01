@@ -77,13 +77,14 @@ class DataStoreAppSettingsRepository(
         }
     }
 
-    override suspend fun setGuardianPin(pin: String) {
+    override suspend fun setGuardianPin(pin: String): String {
         require(pin.matches(pinPattern)) { "Guardian PIN must be exactly 4 digits." }
         val recoveryCode = generateRecoveryCode()
         dataStore.edit { preferences ->
             preferences[Keys.GuardianPinHash] = PinHashing.hash(pin)
             preferences[Keys.RecoveryCodeHash] = PinHashing.hash(recoveryCode)
         }
+        return recoveryCode
     }
 
     override suspend fun verifyGuardianPin(pin: String): Boolean {
@@ -92,11 +93,32 @@ class DataStoreAppSettingsRepository(
         return PinHashing.verify(pin, storedHash)
     }
 
-    override suspend fun changeGuardianPin(currentPin: String, newPin: String): Boolean {
+    override suspend fun verifyRecoveryCode(recoveryCode: String): Boolean {
+        if (!recoveryCode.matches(recoveryCodePattern)) return false
+        val storedHash = dataStore.data.first()[Keys.RecoveryCodeHash] ?: return false
+        return PinHashing.verify(recoveryCode, storedHash)
+    }
+
+    override suspend fun changeGuardianPin(currentPin: String, newPin: String): String? {
         require(newPin.matches(pinPattern)) { "Guardian PIN must be exactly 4 digits." }
-        if (!verifyGuardianPin(currentPin)) return false
-        setGuardianPin(newPin)
-        return true
+        if (!verifyGuardianPin(currentPin)) return null
+        return setGuardianPin(newPin)
+    }
+
+    override suspend fun regenerateRecoveryCode(currentPin: String): String? {
+        if (!verifyGuardianPin(currentPin)) return null
+        val recoveryCode = generateRecoveryCode()
+        dataStore.edit { preferences ->
+            preferences[Keys.RecoveryCodeHash] = PinHashing.hash(recoveryCode)
+        }
+        return recoveryCode
+    }
+
+    override suspend fun resetGuardianPinWithRecoveryCode(recoveryCode: String, newPin: String): String? {
+        require(newPin.matches(pinPattern)) { "Guardian PIN must be exactly 4 digits." }
+        if (!recoveryCode.matches(recoveryCodePattern)) return null
+        if (!verifyRecoveryCode(recoveryCode)) return null
+        return setGuardianPin(newPin)
     }
 
     private object Keys {

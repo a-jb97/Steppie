@@ -24,4 +24,12 @@ class PinHashingTest {
         assertTrue(PinHashing.verify("1234", first))
         assertTrue(PinHashing.verify("1234", second))
     }
+
+    @Test
+    fun hash_verifiesRecoveryCodeAndRejectsDifferentCode() {
+        val hash = PinHashing.hash("654321")
+
+        assertTrue(PinHashing.verify("654321", hash))
+        assertFalse(PinHashing.verify("123456", hash))
+    }
 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -31,6 +32,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -50,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -63,6 +66,8 @@ import androidx.compose.ui.semantics.onClick as semanticOnClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.steppie.R
@@ -105,12 +110,14 @@ fun GuardianModeScreen(
     onOpenSecurity: () -> Unit,
     onOpenBackupRestore: () -> Unit = {},
     onOpenPinChange: () -> Unit,
+    onOpenRecoveryCode: () -> Unit = {},
+    onOpenRecoveryPinReset: () -> Unit = {},
     onOpenRoutineSetCreate: () -> Unit,
-    onOpenTemplateSelect: () -> Unit,
-    onOpenTemplateSelectFromHome: () -> Unit,
-    onCloseTemplateSelect: () -> Unit,
-    onPreviewTemplate: (RoutineTemplateId) -> Unit,
-    onSaveTemplatePreview: () -> Unit,
+    onOpenTemplateSelect: () -> Unit = {},
+    onOpenTemplateSelectFromHome: () -> Unit = {},
+    onCloseTemplateSelect: () -> Unit = {},
+    onPreviewTemplate: (RoutineTemplateId) -> Unit = {},
+    onSaveTemplatePreview: () -> Unit = {},
     onOpenNewRoutineEditor: () -> Unit,
     onOpenRoutineEditor: (String) -> Unit,
     onToggleRoutineSetListEditing: () -> Unit,
@@ -156,6 +163,12 @@ fun GuardianModeScreen(
     onRestorePinDigit: (Int) -> Unit = {},
     onDeleteRestorePinDigit: () -> Unit = {},
     onCancelRestore: () -> Unit = {},
+    onRecoveryDigit: (Int) -> Unit = {},
+    onDeleteRecoveryDigit: () -> Unit = {},
+    onRecoveryCodeChange: (String) -> Unit = {},
+    onConfirmRecoveryCode: () -> Unit = {},
+    onCancelRecoveryPinReset: () -> Unit = {},
+    onCloseRecoveryCode: () -> Unit = {},
     onClearNotice: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -178,6 +191,7 @@ fun GuardianModeScreen(
                 state = state,
                 onDigit = onDigit,
                 onDeletePinDigit = onDeletePinDigit,
+                onOpenRecoveryPinReset = onOpenRecoveryPinReset,
             )
             GuardianDestination.Home -> GuardianHomeScreen(
                 onCloseToChild = onCloseToChild,
@@ -279,14 +293,37 @@ fun GuardianModeScreen(
             GuardianDestination.Security -> GuardianSecurityScreen(
                 onOpenHome = onOpenHome,
                 onOpenPinChange = onOpenPinChange,
+                onOpenRecoveryCode = onOpenRecoveryCode,
                 onOpenBackupRestore = onOpenBackupRestore,
-                onShowOutOfScopeNotice = onShowOutOfScopeNotice,
+            )
+            GuardianDestination.RecoveryCode -> GuardianRecoveryCodeScreen(
+                state = state,
+                onCancelRecoveryPinReset = onCancelRecoveryPinReset,
+                onRecoveryCodeChange = onRecoveryCodeChange,
+                onConfirmRecoveryCode = onConfirmRecoveryCode,
+                onCloseRecoveryCode = onCloseRecoveryCode,
             )
             GuardianDestination.BackupRestore -> GuardianBackupRestoreScreen(
                 state = state,
                 onOpenSecurity = onOpenSecurity,
                 onCreateBackupFile = onCreateBackupFile,
                 onOpenRestoreFile = onOpenRestoreFile,
+            )
+        }
+
+        if (state.recoveryStep == GuardianRecoveryStep.ShowCode && state.recoveryCodeToShow != null) {
+            GuardianRecoveryCodeSheet(
+                recoveryCode = state.recoveryCodeToShow,
+                onCloseRecoveryCode = onCloseRecoveryCode,
+            )
+        }
+        if (state.recoveryStep == GuardianRecoveryStep.EnterCodeForPinReset) {
+            GuardianRecoveryCodeInputSheet(
+                recoveryDigits = state.recoveryDigits,
+                recoveryError = state.recoveryError,
+                onRecoveryCodeChange = onRecoveryCodeChange,
+                onConfirmRecoveryCode = onConfirmRecoveryCode,
+                onCancelRecoveryPinReset = onCancelRecoveryPinReset,
             )
         }
     }
@@ -441,6 +478,7 @@ private fun GuardianPinScreen(
     state: GuardianModeUiState,
     onDigit: (Int) -> Unit,
     onDeletePinDigit: () -> Unit,
+    onOpenRecoveryPinReset: () -> Unit,
 ) {
     val pinProgressDescription = stringResource(R.string.a11y_pin_progress, state.pinDigits.length)
     Column(
@@ -462,12 +500,16 @@ private fun GuardianPinScreen(
                 GuardianPinMode.Setup -> stringResource(R.string.guardian_pin_setup_title)
                 GuardianPinMode.ChangeCurrent -> stringResource(R.string.guardian_pin_change_current_title)
                 GuardianPinMode.ChangeNew -> stringResource(R.string.guardian_pin_change_new_title)
+                GuardianPinMode.RecoveryRegenerateConfirm -> stringResource(R.string.guardian_recovery_confirm_pin_title)
+                GuardianPinMode.RecoveryResetNew -> stringResource(R.string.guardian_recovery_new_pin_title)
             },
             subtitle = when (state.pinMode) {
                 GuardianPinMode.Enter -> stringResource(R.string.guardian_pin_subtitle)
                 GuardianPinMode.Setup -> stringResource(R.string.guardian_pin_setup_subtitle)
                 GuardianPinMode.ChangeCurrent -> stringResource(R.string.guardian_pin_change_current_subtitle)
                 GuardianPinMode.ChangeNew -> stringResource(R.string.guardian_pin_change_new_subtitle)
+                GuardianPinMode.RecoveryRegenerateConfirm -> stringResource(R.string.guardian_recovery_confirm_pin_subtitle)
+                GuardianPinMode.RecoveryResetNew -> stringResource(R.string.guardian_recovery_new_pin_subtitle)
             },
         )
         Spacer(Modifier.height(SteppieSpacing.Large))
@@ -497,6 +539,18 @@ private fun GuardianPinScreen(
         if (state.pinError != null) {
             Spacer(Modifier.height(28.dp))
             ErrorMessage(state.pinError)
+        }
+        if (state.pinMode == GuardianPinMode.Enter) {
+            Spacer(Modifier.height(SteppieSpacing.Small))
+            Text(
+                text = stringResource(R.string.guardian_recovery_reset_pin_action),
+                modifier = Modifier
+                    .heightIn(min = SteppieLayout.GuardianMinimumTouchTarget)
+                    .clickable(role = Role.Button, onClick = onOpenRecoveryPinReset)
+                    .padding(horizontal = SteppieSpacing.Small, vertical = SteppieSpacing.ExtraSmall),
+                color = MaterialTheme.colorScheme.primary,
+                style = SteppieTheme.typography.button,
+            )
         }
     }
 }
@@ -2241,8 +2295,8 @@ private fun recordCompletedTimeText(completedAt: java.time.Instant): String =
 private fun GuardianSecurityScreen(
     onOpenHome: () -> Unit,
     onOpenPinChange: () -> Unit,
+    onOpenRecoveryCode: () -> Unit,
     onOpenBackupRestore: () -> Unit,
-    onShowOutOfScopeNotice: () -> Unit,
 ) {
     GuardianScaffold(
         title = stringResource(R.string.guardian_security_title),
@@ -2250,9 +2304,232 @@ private fun GuardianSecurityScreen(
         onBack = onOpenHome,
     ) {
         GuardianMenuCard(R.drawable.ic_guardian_security_warning, stringResource(R.string.guardian_pin_change), stringResource(R.string.guardian_pin_change_desc), onOpenPinChange)
-        GuardianMenuCard(R.drawable.ic_guardian_security_warning, stringResource(R.string.guardian_recovery_code), stringResource(R.string.guardian_recovery_code_desc), onShowOutOfScopeNotice)
+        GuardianMenuCard(R.drawable.ic_guardian_security_warning, stringResource(R.string.guardian_recovery_code), stringResource(R.string.guardian_recovery_code_desc), onOpenRecoveryCode)
         GuardianMenuCard(R.drawable.ic_guardian_security_backup, stringResource(R.string.guardian_backup), stringResource(R.string.guardian_backup_desc), onOpenBackupRestore)
         GuardianPrivacyNote()
+    }
+}
+
+@Composable
+private fun GuardianRecoveryCodeScreen(
+    state: GuardianModeUiState,
+    onCancelRecoveryPinReset: () -> Unit,
+    onRecoveryCodeChange: (String) -> Unit,
+    onConfirmRecoveryCode: () -> Unit,
+    onCloseRecoveryCode: () -> Unit,
+) {
+    when (state.recoveryStep) {
+        GuardianRecoveryStep.ShowCode -> Box(Modifier.fillMaxSize())
+        GuardianRecoveryStep.EnterCodeForPinReset -> Box(Modifier.fillMaxSize())
+        null -> GuardianScaffold(
+            title = stringResource(R.string.guardian_recovery_show_title),
+            subtitle = stringResource(R.string.guardian_recovery_show_subtitle),
+            onBack = onCancelRecoveryPinReset,
+        ) {
+            ErrorMessage(stringResource(R.string.guardian_recovery_unavailable))
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.GuardianRecoveryCodeInputSheet(
+    recoveryDigits: String,
+    recoveryError: GuardianRecoveryError?,
+    onRecoveryCodeChange: (String) -> Unit,
+    onConfirmRecoveryCode: () -> Unit,
+    onCancelRecoveryPinReset: () -> Unit,
+) {
+    val inputDescription = stringResource(R.string.a11y_recovery_code_input)
+    val recoveryErrorMessage = recoveryError?.let { recoveryErrorMessage(it) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.32f)),
+    )
+    Column(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .heightIn(max = 560.dp)
+            .clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .verticalScroll(rememberScrollState())
+            .padding(
+                start = SteppieLayout.ChildScreenPadding,
+                top = SteppieSpacing.Small,
+                end = SteppieLayout.ChildScreenPadding,
+                bottom = SteppieLayout.ChildScreenPadding,
+            ),
+        verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Large),
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .size(width = 84.dp, height = 6.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.outline),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
+            Text(
+                text = stringResource(R.string.guardian_recovery_enter_title),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianTitle,
+            )
+            Text(
+                text = stringResource(R.string.guardian_recovery_enter_subtitle),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianBody,
+            )
+        }
+        OutlinedTextField(
+            value = recoveryDigits,
+            onValueChange = onRecoveryCodeChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 92.dp)
+                .semantics {
+                    contentDescription = inputDescription
+                },
+            placeholder = {
+                Text(
+                    text = stringResource(R.string.guardian_recovery_code_placeholder),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    style = SteppieTheme.typography.childCardTitle,
+                )
+            },
+            singleLine = true,
+            textStyle = SteppieTheme.typography.childCardTitle.copy(textAlign = TextAlign.Center),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            isError = recoveryError != null,
+        )
+        recoveryErrorMessage?.let { ErrorMessage(it) }
+        SteppieButton(
+            label = stringResource(R.string.guardian_recovery_set_new_pin),
+            onClick = onConfirmRecoveryCode,
+            modifier = Modifier.fillMaxWidth(),
+            state = if (recoveryDigits.length == 6) {
+                SteppieButtonState.Enabled
+            } else {
+                SteppieButtonState.Disabled
+            },
+        )
+        SteppieButton(
+            label = stringResource(R.string.action_cancel),
+            onClick = onCancelRecoveryPinReset,
+            modifier = Modifier.fillMaxWidth(),
+            style = SteppieButtonStyle.Secondary,
+        )
+    }
+}
+
+@Composable
+private fun recoveryErrorMessage(error: GuardianRecoveryError): String = when (error) {
+    GuardianRecoveryError.CodeMismatch -> stringResource(R.string.guardian_recovery_code_mismatch)
+}
+
+@Composable
+@Suppress("DEPRECATION")
+private fun BoxScope.GuardianRecoveryCodeSheet(
+    recoveryCode: String,
+    onCloseRecoveryCode: () -> Unit,
+) {
+    val clipboardManager = LocalClipboardManager.current
+    var showCopiedDialog by remember { mutableStateOf(false) }
+    val recoveryCodeDescription = stringResource(R.string.a11y_recovery_code_value, recoveryCode)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.54f)),
+    )
+    Column(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .heightIn(max = 620.dp)
+            .clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .verticalScroll(rememberScrollState())
+            .padding(
+                start = SteppieLayout.ChildScreenPadding,
+                top = SteppieSpacing.Small,
+                end = SteppieLayout.ChildScreenPadding,
+                bottom = SteppieLayout.ChildScreenPadding,
+            ),
+        verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Large),
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .size(width = 96.dp, height = 6.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.outline),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
+            Text(
+                text = stringResource(R.string.guardian_recovery_show_title),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianTitle,
+            )
+            Text(
+                text = stringResource(R.string.guardian_recovery_show_subtitle),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianBody,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 116.dp)
+                .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+                .border(SteppieStroke.Divider, MaterialTheme.colorScheme.outline, RoundedCornerShape(SteppieCornerRadius.Card))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .semantics {
+                    contentDescription = recoveryCodeDescription
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = recoveryCode.chunked(1).joinToString(" "),
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                style = SteppieTheme.typography.childCardTitle,
+            )
+        }
+        Text(
+            text = stringResource(R.string.guardian_recovery_one_time_notice),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = SteppieTheme.typography.guardianBody,
+        )
+        SteppieButton(
+            label = stringResource(R.string.action_copy),
+            onClick = {
+                clipboardManager.setText(AnnotatedString(recoveryCode))
+                showCopiedDialog = true
+            },
+            modifier = Modifier.fillMaxWidth(),
+            style = SteppieButtonStyle.Secondary,
+        )
+        SteppieButton(
+            label = stringResource(R.string.guardian_recovery_acknowledge),
+            onClick = onCloseRecoveryCode,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    if (showCopiedDialog) {
+        AlertDialog(
+            onDismissRequest = { showCopiedDialog = false },
+            title = { Text(stringResource(R.string.guardian_recovery_copy_done_title)) },
+            text = { Text(stringResource(R.string.guardian_recovery_copy_done_body)) },
+            confirmButton = {
+                SteppieButton(
+                    label = stringResource(R.string.action_ok),
+                    onClick = { showCopiedDialog = false },
+                )
+            },
+        )
     }
 }
 
