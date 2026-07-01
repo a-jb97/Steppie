@@ -186,6 +186,7 @@
     <string name="guardian_icon_picker_title">아이콘 또는 사진</string>
     <string name="guardian_icon_picker_body">기본 아이콘을 쓰거나 사진을 선택합니다</string>
     <string name="guardian_photo_pick">사진 선택</string>
+    <string name="guardian_photo_camera">사진 촬영</string>
     <string name="guardian_photo_remove">사진 삭제</string>
     <string name="guardian_color_picker_title">카드 색상</string>
     <string name="guardian_unsaved_warning">저장하지 않고 나가면 변경사항이 반영되지 않습니다.</string>

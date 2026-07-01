@@ -129,6 +129,7 @@ fun GuardianModeScreen(
     onDraftTitleChange: (String) -> Unit,
     onDraftIconChange: (String) -> Unit,
     onDraftPhotoPick: () -> Unit = {},
+    onDraftCameraCapture: () -> Unit = {},
     onDraftPhotoRemove: () -> Unit = {},
     onDraftColorChange: (String) -> Unit,
     onDraftScheduledTimeChange: (String) -> Unit,
@@ -137,6 +138,7 @@ fun GuardianModeScreen(
     onRoutineSetStepTitleChange: (String) -> Unit,
     onRoutineSetStepIconChange: (String) -> Unit,
     onRoutineSetStepPhotoPick: () -> Unit = {},
+    onRoutineSetStepCameraCapture: () -> Unit = {},
     onRoutineSetStepPhotoRemove: () -> Unit = {},
     onRoutineSetStepColorChange: (String) -> Unit,
     onRoutineSetStepScheduledTimeChange: (String) -> Unit,
@@ -256,6 +258,7 @@ fun GuardianModeScreen(
                 onDraftTitleChange = onDraftTitleChange,
                 onDraftIconChange = onDraftIconChange,
                 onDraftPhotoPick = onDraftPhotoPick,
+                onDraftCameraCapture = onDraftCameraCapture,
                 onDraftPhotoRemove = onDraftPhotoRemove,
                 onDraftColorChange = onDraftColorChange,
                 onDraftScheduledTimeChange = onDraftScheduledTimeChange,
@@ -269,6 +272,7 @@ fun GuardianModeScreen(
                 onRoutineSetStepTitleChange = onRoutineSetStepTitleChange,
                 onRoutineSetStepIconChange = onRoutineSetStepIconChange,
                 onRoutineSetStepPhotoPick = onRoutineSetStepPhotoPick,
+                onRoutineSetStepCameraCapture = onRoutineSetStepCameraCapture,
                 onRoutineSetStepPhotoRemove = onRoutineSetStepPhotoRemove,
                 onRoutineSetStepColorChange = onRoutineSetStepColorChange,
                 onRoutineSetStepScheduledTimeChange = onRoutineSetStepScheduledTimeChange,
@@ -1317,6 +1321,7 @@ private fun GuardianRoutineSetCreateScreen(
     onRoutineSetStepTitleChange: (String) -> Unit,
     onRoutineSetStepIconChange: (String) -> Unit,
     onRoutineSetStepPhotoPick: () -> Unit,
+    onRoutineSetStepCameraCapture: () -> Unit,
     onRoutineSetStepPhotoRemove: () -> Unit,
     onRoutineSetStepColorChange: (String) -> Unit,
     onRoutineSetStepScheduledTimeChange: (String) -> Unit,
@@ -1370,6 +1375,7 @@ private fun GuardianRoutineSetCreateScreen(
                         onTitleChange = onRoutineSetStepTitleChange,
                         onIconChange = onRoutineSetStepIconChange,
                         onPhotoPick = onRoutineSetStepPhotoPick,
+                        onCameraCapture = onRoutineSetStepCameraCapture,
                         onPhotoRemove = onRoutineSetStepPhotoRemove,
                         onColorChange = onRoutineSetStepColorChange,
                         onScheduledTimeChange = onRoutineSetStepScheduledTimeChange,
@@ -1388,6 +1394,7 @@ private fun GuardianRoutineSetCreateScreen(
                 onTitleChange = onRoutineSetStepTitleChange,
                 onIconChange = onRoutineSetStepIconChange,
                 onPhotoPick = onRoutineSetStepPhotoPick,
+                onCameraCapture = onRoutineSetStepCameraCapture,
                 onPhotoRemove = onRoutineSetStepPhotoRemove,
                 onColorChange = onRoutineSetStepColorChange,
                 onScheduledTimeChange = onRoutineSetStepScheduledTimeChange,
@@ -1420,6 +1427,7 @@ private fun RoutineSetStepEditor(
     onTitleChange: (String) -> Unit,
     onIconChange: (String) -> Unit,
     onPhotoPick: () -> Unit,
+    onCameraCapture: () -> Unit,
     onPhotoRemove: () -> Unit,
     onColorChange: (String) -> Unit,
     onScheduledTimeChange: (String) -> Unit,
@@ -1438,6 +1446,7 @@ private fun RoutineSetStepEditor(
             selectedIcon = draft.icon,
             onSelected = onIconChange,
             onPhotoPick = onPhotoPick,
+            onCameraCapture = onCameraCapture,
             onPhotoRemove = onPhotoRemove,
         )
         ColorPicker(selectedColorToken = draft.colorToken, onSelected = onColorChange)
@@ -1845,6 +1854,7 @@ private fun GuardianCardEditScreen(
     onDraftTitleChange: (String) -> Unit,
     onDraftIconChange: (String) -> Unit,
     onDraftPhotoPick: () -> Unit,
+    onDraftCameraCapture: () -> Unit,
     onDraftPhotoRemove: () -> Unit,
     onDraftColorChange: (String) -> Unit,
     onDraftScheduledTimeChange: (String) -> Unit,
@@ -1892,6 +1902,7 @@ private fun GuardianCardEditScreen(
             selectedIcon = draft.icon,
             onSelected = onDraftIconChange,
             onPhotoPick = onDraftPhotoPick,
+            onCameraCapture = onDraftCameraCapture,
             onPhotoRemove = onDraftPhotoRemove,
         )
         ColorPicker(selectedColorToken = draft.colorToken, onSelected = onDraftColorChange)
@@ -2899,6 +2910,7 @@ private fun IconPicker(
     selectedIcon: IconRef,
     onSelected: (String) -> Unit,
     onPhotoPick: () -> Unit,
+    onCameraCapture: () -> Unit,
     onPhotoRemove: () -> Unit,
 ) {
     GuardianPanel(title = stringResource(R.string.guardian_icon_picker_title), body = stringResource(R.string.guardian_icon_picker_body)) {
@@ -2929,6 +2941,12 @@ private fun IconPicker(
                 SteppieButton(
                     label = stringResource(R.string.guardian_photo_pick),
                     onClick = onPhotoPick,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = SteppieButtonStyle.Secondary,
+                )
+                SteppieButton(
+                    label = stringResource(R.string.guardian_photo_camera),
+                    onClick = onCameraCapture,
                     modifier = Modifier.fillMaxWidth(),
                     style = SteppieButtonStyle.Secondary,
                 )

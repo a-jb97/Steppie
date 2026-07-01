@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.net.Uri
 import android.media.ToneGenerator
 import android.os.Build
 import android.os.Bundle
@@ -24,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.steppie.data.backup.AndroidBackupRepository
@@ -42,6 +44,7 @@ import com.example.steppie.ui.child.ChildRoutineViewModel
 import com.example.steppie.ui.guardian.GuardianModeScreen
 import com.example.steppie.ui.guardian.GuardianModeViewModel
 import com.example.steppie.ui.theme.SteppieTheme
+import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,6 +91,8 @@ class MainActivity : ComponentActivity() {
                 val targetRoutineId by notificationRoutineId.collectAsStateWithLifecycle()
                 var notificationPermissionRefresh by remember { mutableIntStateOf(0) }
                 var photoTarget by remember { mutableStateOf<PhotoTarget?>(null) }
+                var cameraPhotoTarget by remember { mutableStateOf<PhotoTarget?>(null) }
+                var cameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
                 val notificationPermissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission(),
                 ) {
@@ -99,6 +104,21 @@ class MainActivity : ComponentActivity() {
                     val target = photoTarget
                     photoTarget = null
                     if (uri != null) {
+                        when (target) {
+                            PhotoTarget.RoutineDraft -> guardianViewModel.importDraftPhoto(uri)
+                            PhotoTarget.RoutineSetStep -> guardianViewModel.importRoutineSetStepPhoto(uri)
+                            null -> Unit
+                        }
+                    }
+                }
+                val cameraLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.TakePicture(),
+                ) { success ->
+                    val target = cameraPhotoTarget
+                    val uri = cameraPhotoUri
+                    cameraPhotoTarget = null
+                    cameraPhotoUri = null
+                    if (success && uri != null) {
                         when (target) {
                             PhotoTarget.RoutineDraft -> guardianViewModel.importDraftPhoto(uri)
                             PhotoTarget.RoutineSetStep -> guardianViewModel.importRoutineSetStepPhoto(uri)
@@ -192,6 +212,12 @@ class MainActivity : ComponentActivity() {
                             photoTarget = PhotoTarget.RoutineDraft
                             photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
+                        onDraftCameraCapture = {
+                            val uri = createCameraImageUri()
+                            cameraPhotoTarget = PhotoTarget.RoutineDraft
+                            cameraPhotoUri = uri
+                            cameraLauncher.launch(uri)
+                        },
                         onDraftPhotoRemove = guardianViewModel::removeDraftPhoto,
                         onDraftColorChange = guardianViewModel::updateDraftColor,
                         onDraftScheduledTimeChange = guardianViewModel::updateDraftScheduledTime,
@@ -202,6 +228,12 @@ class MainActivity : ComponentActivity() {
                         onRoutineSetStepPhotoPick = {
                             photoTarget = PhotoTarget.RoutineSetStep
                             photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        onRoutineSetStepCameraCapture = {
+                            val uri = createCameraImageUri()
+                            cameraPhotoTarget = PhotoTarget.RoutineSetStep
+                            cameraPhotoUri = uri
+                            cameraLauncher.launch(uri)
                         },
                         onRoutineSetStepPhotoRemove = guardianViewModel::removeRoutineSetStepPhoto,
                         onRoutineSetStepColorChange = guardianViewModel::updateRoutineSetStepColor,
@@ -278,6 +310,12 @@ class MainActivity : ComponentActivity() {
         } else {
             ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
+    }
+
+    private fun createCameraImageUri(): Uri {
+        val directory = File(cacheDir, "camera_photos").apply { mkdirs() }
+        val file = File.createTempFile("routine-photo-", ".jpg", directory)
+        return FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
     }
 }
 
