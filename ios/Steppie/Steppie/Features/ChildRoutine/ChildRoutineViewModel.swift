@@ -202,6 +202,7 @@ final class ChildRoutineViewModel {
 
             if let settings {
                 feedbackPerformer.routineCompleted(settings: settings)
+                speechGuide.speak(localizedCompletionSpeech(for: routine), settings: settings)
             }
             rescheduleNotifications()
         } catch {
@@ -350,16 +351,23 @@ final class ChildRoutineViewModel {
     }
 
     private func localizedTitle(for routine: Routine) -> String {
-        let localeIdentifier = Locale.autoupdatingCurrent.identifier
+        let localeIdentifier = locale().identifier
         return routine.title.resolved(
             appLocale: localeIdentifier,
-            systemLanguages: Locale.preferredLanguages
+            systemLanguages: [localeIdentifier]
         )
     }
 
     private var localizedAllDoneSpeech: String {
-        Locale.autoupdatingCurrent.language.languageCode?.identifier == "en"
+        locale().language.languageCode?.identifier == "en"
             ? "All routines are complete."
             : "오늘 할 일을 모두 끝냈어요."
+    }
+
+    private func localizedCompletionSpeech(for routine: Routine) -> String {
+        let title = localizedTitle(for: routine)
+        return locale().language.languageCode?.identifier == "en"
+            ? "\(title) done. Great job!"
+            : "\(title) 완료! 잘했어요!"
     }
 }
