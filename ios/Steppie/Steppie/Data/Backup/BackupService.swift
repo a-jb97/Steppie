@@ -52,6 +52,7 @@ struct BackupRestorePayload: Equatable, Sendable {
 protocol BackupAssetStore {
     func data(forBackupAssetName name: String) throws -> Data?
     func saveAssetData(_ data: Data, backupAssetName name: String) throws
+    func removeAssetData(backupAssetName name: String) throws
 }
 
 struct FileBackupAssetStore: BackupAssetStore {
@@ -74,6 +75,12 @@ struct FileBackupAssetStore: BackupAssetStore {
     func saveAssetData(_ data: Data, backupAssetName name: String) throws {
         try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         try data.write(to: assetURL(for: name), options: .atomic)
+    }
+
+    func removeAssetData(backupAssetName name: String) throws {
+        let url = try assetURL(for: name)
+        guard fileManager.fileExists(atPath: url.path) else { return }
+        try fileManager.removeItem(at: url)
     }
 
     private func assetURL(for name: String) throws -> URL {
@@ -224,10 +231,19 @@ struct BackupService {
     }
 
     func restorePayload(_ payload: BackupRestorePayload) throws {
-        for (name, data) in payload.assets {
-            try assetStore.saveAssetData(data, backupAssetName: name)
+        var savedAssetNames: [String] = []
+        do {
+            for (name, data) in payload.assets {
+                try assetStore.saveAssetData(data, backupAssetName: name)
+                savedAssetNames.append(name)
+            }
+            try repository.replaceAll(with: payload.snapshot)
+        } catch {
+            for name in savedAssetNames {
+                try? assetStore.removeAssetData(backupAssetName: name)
+            }
+            throw error
         }
-        try repository.replaceAll(with: payload.snapshot)
     }
 
     private func normalizedSnapshot(
