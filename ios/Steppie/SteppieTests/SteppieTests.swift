@@ -41,10 +41,12 @@ struct SteppieTests {
     @Test("포커스 카드 완료는 피드백 화면을 유지하고 다음 카드 선택 후 current를 이동한다")
     func childRoutineCompletionWaitsForManualAdvance() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
+        let speechGuide = FakeRoutineSpeechGuide()
         let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
         let completedDate = DailyLog.localDateString(for: completedAt)
         let viewModel = ChildRoutineViewModel(
             repository: repository,
+            speechGuide: speechGuide,
             now: { completedAt }
         )
         viewModel.load()
@@ -52,6 +54,7 @@ struct SteppieTests {
 
         viewModel.completeSelectedRoutine()
         #expect(viewModel.completedCount == 1)
+        #expect(speechGuide.spokenTexts.contains("일어나기 완료! 잘했어요!"))
         #expect(viewModel.cardState(for: firstRoutine) == .completed)
         #expect(try repository.dailyLog(on: completedDate, routineID: firstRoutine.id)?.status == .completed)
         #expect(viewModel.isShowingCompletionFeedback)
@@ -873,7 +876,8 @@ struct SteppieTests {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let now = Date(timeIntervalSince1970: 1_767_225_600)
         let date = DailyLog.localDateString(for: now)
-        let routines = try repository.routines(in: repository.routineSets()[0].id)
+        let routineSets = try repository.routineSets()
+        let routines = try repository.routines(in: routineSets[0].id)
         let target = routines[2]
         let viewModel = ChildRoutineViewModel(
             repository: repository,
@@ -1257,6 +1261,28 @@ struct SteppieTests {
         #expect(try target.dailyLogs(on: DailyLog.localDateString(for: completedAt), routineSetID: activeSet.id).count == 1)
     }
 
+    @Test("복원 중 DB replace가 실패하면 새로 저장한 사진 에셋을 정리한다")
+    func restoreCleansSavedAssetsWhenReplaceFails() throws {
+        let assetName = "routine-photo-77777777-7777-4777-8777-777777777777.jpg"
+        let assetStore = FakeBackupAssetStore()
+        let repository = FailingReplaceRepository()
+        let payload = BackupRestorePayload(
+            snapshot: RoutineRepositorySnapshot(
+                routineSets: [],
+                routines: [],
+                dailyLogs: [],
+                appSettings: try AppSettings()
+            ),
+            assets: [assetName: Data([0xff, 0xd8, 0xff])]
+        )
+
+        #expect(throws: FailingReplaceRepository.ReplaceError.failed) {
+            try BackupService(repository: repository, assetStore: assetStore).restorePayload(payload)
+        }
+        #expect(assetStore.assets[assetName] == nil)
+        #expect(assetStore.removedAssetNames == [assetName])
+    }
+
     @Test("checksum이 손상된 백업은 복원을 거부한다")
     func backupRejectsInvalidChecksum() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
@@ -1435,6 +1461,25 @@ struct SteppieTests {
         #expect(try target.routineSets().isEmpty == false)
     }
 
+    @Test("보호자 복원 성공은 데이터 변경 콜백을 호출해 아이 모드 재로딩 경로를 연다")
+    func guardianRestoreSuccessCallsDataChanged() throws {
+        let source = try RoutinePreviewStore.makeSampleRepository()
+        let package = try BackupService(repository: source).exportPackage()
+        let target = try RoutinePreviewStore.makeRepository()
+        var changeCount = 0
+        let viewModel = GuardianModeViewModel(repository: target) {
+            changeCount += 1
+        }
+
+        #expect(viewModel.setPIN("1234"))
+        viewModel.validateRestorePackage(package.archiveData)
+        viewModel.restorePIN = "1234"
+        viewModel.confirmRestore()
+
+        #expect(changeCount == 2)
+        #expect(try target.routineSets().isEmpty == false)
+    }
+
     private func makeFixture(
         routineCount: Int
     ) throws -> (
@@ -1519,6 +1564,63 @@ private final class FakeBackupAssetStore: BackupAssetStore {
 
     func saveAssetData(_ data: Data, backupAssetName name: String) throws {
         assets[name] = data
+    }
+
+    var removedAssetNames: [String] = []
+
+    func removeAssetData(backupAssetName name: String) throws {
+        assets[name] = nil
+        removedAssetNames.append(name)
+    }
+}
+
+@MainActor
+private final class FakeRoutineSpeechGuide: RoutineSpeechGuiding {
+    var spokenTexts: [String] = []
+
+    func speak(_ text: String, settings: AppSettings) {
+        guard settings.ttsEnabled else { return }
+        spokenTexts.append(text)
+    }
+
+    func stop() {}
+}
+
+@MainActor
+private final class FailingReplaceRepository: RoutineRepository {
+    enum ReplaceError: Error, Equatable {
+        case failed
+    }
+
+    func createRoutineSet(_ routineSet: RoutineSet) throws {}
+    func routineSet(id: UUID) throws -> RoutineSet? { nil }
+    func routineSets(includeDeleted: Bool) throws -> [RoutineSet] { [] }
+    func updateRoutineSet(_ routineSet: RoutineSet) throws {}
+    func deleteRoutineSet(id: UUID, at date: Date) throws {}
+    func createRoutine(_ routine: Routine) throws {}
+    func routine(id: UUID) throws -> Routine? { nil }
+    func routines(in routineSetID: UUID, includeInactive: Bool, includeDeleted: Bool) throws -> [Routine] { [] }
+    func updateRoutine(_ routine: Routine) throws {}
+    func deleteRoutine(id: UUID, at date: Date) throws {}
+    func reorderRoutines(in routineSetID: UUID, orderedIDs: [UUID], at date: Date) throws {}
+    func dailyLogs(on date: String, routineSetID: UUID?) throws -> [DailyLog] { [] }
+    func dailyLog(on date: String, routineID: UUID) throws -> DailyLog? { nil }
+    func setRoutineCompleted(routineID: UUID, routineSetID: UUID, on date: String, at completedAt: Date) throws -> DailyLog {
+        throw ReplaceError.failed
+    }
+    func undoRoutineCompletion(routineID: UUID, on date: String, at updatedAt: Date) throws -> DailyLog? { nil }
+    func appSettings() throws -> AppSettings { try AppSettings() }
+    func updateAppSettings(_ settings: AppSettings) throws {}
+    func backupSnapshot() throws -> RoutineRepositorySnapshot {
+        RoutineRepositorySnapshot(
+            routineSets: [],
+            routines: [],
+            dailyLogs: [],
+            appSettings: try AppSettings()
+        )
+    }
+    func replaceAll(with snapshot: RoutineRepositorySnapshot) throws {
+        throw ReplaceError.failed
     }
 }
 
