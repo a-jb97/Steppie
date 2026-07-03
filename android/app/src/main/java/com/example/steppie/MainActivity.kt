@@ -137,18 +137,14 @@ class MainActivity : ComponentActivity() {
                     uri?.let(guardianViewModel::previewRestoreBackup)
                 }
 
-                LaunchedEffect(Unit) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                        ContextCompat.checkSelfPermission(
-                            this@MainActivity,
-                            Manifest.permission.POST_NOTIFICATIONS,
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
                 LaunchedEffect(childViewModel) {
                     childViewModel.feedbackEvents.collect(feedbackController::play)
+                }
+                LaunchedEffect(guardianState.restoreCompletedToken) {
+                    if (guardianState.restoreCompletedToken > 0L) {
+                        childViewModel.onDataChanged()
+                        notificationPermissionRefresh += 1
+                    }
                 }
                 LaunchedEffect(childState.routines, childState.completedRoutineIds, settings, notificationPermissionRefresh) {
                     notificationScheduler.reconcileToday(
@@ -256,7 +252,17 @@ class MainActivity : ComponentActivity() {
                         onTtsVolumeChange = guardianViewModel::updateTtsVolume,
                         onSoundEnabledChange = guardianViewModel::updateSoundEnabled,
                         onHapticEnabledChange = guardianViewModel::updateHapticEnabled,
-                        onNotificationLeadTimeChange = guardianViewModel::updateNotificationLeadTime,
+                        onNotificationLeadTimeChange = { leadMinutes, enabled ->
+                            guardianViewModel.updateNotificationLeadTime(leadMinutes, enabled)
+                            if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                ContextCompat.checkSelfPermission(
+                                    this@MainActivity,
+                                    Manifest.permission.POST_NOTIFICATIONS,
+                                ) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        },
                         onQuietHoursEnabledChange = guardianViewModel::updateQuietHoursEnabled,
                         onQuietHoursStartChange = guardianViewModel::updateQuietHoursStart,
                         onQuietHoursEndChange = guardianViewModel::updateQuietHoursEnd,

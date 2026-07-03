@@ -138,6 +138,7 @@ data class GuardianModeUiState(
     val recoveryReturnDestination: GuardianDestination = GuardianDestination.Home,
     val notice: String? = null,
     val interactionToken: Long = 0L,
+    val restoreCompletedToken: Long = 0L,
 ) {
     val title: String
         get() = activeRoutineSet?.name?.resolve(null, Locale.getDefault().toLanguageTag()).orEmpty()
@@ -1244,10 +1245,9 @@ class GuardianModeViewModel(
                 .onSuccess {
                     _uiState.update {
                         GuardianModeUiState(
-                            hasGuardianPin = it.hasGuardianPin,
-                            appSettings = it.appSettings,
                             backupMessage = "백업 파일에서 복원했습니다.",
                             interactionToken = it.interactionToken + 1,
+                            restoreCompletedToken = it.restoreCompletedToken + 1,
                         )
                     }
                 }

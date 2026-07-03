@@ -42,12 +42,16 @@ class RoutinePhotoStore(context: Context) {
         }.toMap()
 
     fun replaceAllFromBackup(assets: Map<String, ByteArray>) {
-        photoDirectory.deleteRecursively()
-        photoDirectory.mkdirs()
+        val stagingDirectory = File(photoDirectory.parentFile, "$PhotoDirectoryName-restore").apply {
+            deleteRecursively()
+            mkdirs()
+        }
         assets.forEach { (name, bytes) ->
             val assetId = localAssetIdFromBackupName(name) ?: return@forEach
-            fileForAssetId(assetId).writeBytes(bytes)
+            File(stagingDirectory, "$assetId.jpg").writeBytes(bytes)
         }
+        photoDirectory.deleteRecursively()
+        check(stagingDirectory.renameTo(photoDirectory)) { "사진 에셋을 복원할 수 없습니다." }
     }
 
     fun snapshotFiles(): Map<String, ByteArray> {
