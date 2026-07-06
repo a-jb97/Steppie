@@ -510,7 +510,7 @@ struct GuardianModeView: View {
                 labeledCard("아이콘 또는 사진") {
                     Picker("아이콘", selection: routineSetStepIconBinding) {
                         ForEach(RoutineIconName.allCases) { icon in
-                            Text(icon.rawValue).tag(icon)
+                            Text(icon.displayName(for: locale)).tag(icon)
                         }
                     }
                     .pickerStyle(.menu)
@@ -1908,7 +1908,7 @@ struct GuardianModeView: View {
                     .frame(width: 64, height: 64)
                 Picker("기본 아이콘", selection: draftIconBinding) {
                     ForEach(RoutineIconName.allCases) { icon in
-                        Text(icon.rawValue).tag(icon)
+                        Text(icon.displayName(for: locale)).tag(icon)
                     }
                 }
                 .pickerStyle(.menu)
@@ -2458,6 +2458,42 @@ extension SteppieCardColor {
         case .peach: "복숭아색"
         case .lavender: "라벤더색"
         case .rose: "장미색"
+        }
+    }
+}
+
+extension RoutineIconName {
+    func displayName(for locale: Locale) -> String {
+        let isKorean = locale.language.languageCode?.identifier == "ko"
+        switch self {
+        case .wakeUp: return isKorean ? "일어나기" : "Wake up"
+        case .washFace: return isKorean ? "세수하기" : "Wash face"
+        case .brushTeeth: return isKorean ? "양치하기" : "Brush teeth"
+        case .getDressed: return isKorean ? "옷 입기" : "Get dressed"
+        case .breakfast: return isKorean ? "아침 먹기" : "Eat breakfast"
+        case .packBag: return isKorean ? "가방 챙기기" : "Pack bag"
+        case .school: return isKorean ? "학교" : "School"
+        case .book: return isKorean ? "책" : "Book"
+        case .pencil: return isKorean ? "연필" : "Pencil"
+        case .lunch: return isKorean ? "점심 먹기" : "Eat lunch"
+        case .playground: return isKorean ? "놀이터" : "Playground"
+        case .bus: return isKorean ? "버스" : "Bus"
+        case .bath: return isKorean ? "목욕하기" : "Take a bath"
+        case .pajamas: return isKorean ? "잠옷 입기" : "Put on pajamas"
+        case .storyBook: return isKorean ? "이야기책" : "Story book"
+        case .toilet: return isKorean ? "화장실" : "Toilet"
+        case .sleep: return isKorean ? "잠자기" : "Sleep"
+        case .star: return isKorean ? "별" : "Star"
+        case .home: return isKorean ? "집" : "Home"
+        case .meal: return isKorean ? "식사" : "Meal"
+        case .snack: return isKorean ? "간식" : "Snack"
+        case .medicine: return isKorean ? "약" : "Medicine"
+        case .walk: return isKorean ? "산책" : "Walk"
+        case .therapy: return isKorean ? "치료" : "Therapy"
+        case .music: return isKorean ? "음악" : "Music"
+        case .art: return isKorean ? "미술" : "Art"
+        case .cleanUp: return isKorean ? "정리하기" : "Clean up"
+        case .timer: return isKorean ? "타이머" : "Timer"
         }
     }
 }
