@@ -164,7 +164,11 @@ final class ChildRoutineViewModel {
     }
 
     func showFocus() {
+        if completionFeedbackRoutineID == nil {
+            selectedRoutineID = currentRoutine?.id
+        }
         page = .focus
+        speakSelectedRoutineIfNeeded()
     }
 
     func cardState(for routine: Routine) -> RoutineCardState {

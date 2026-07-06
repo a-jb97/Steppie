@@ -38,6 +38,27 @@ struct SteppieTests {
         #expect(try repository.routines(in: upcoming.routineSetID) == originalRoutines)
     }
 
+    @Test("오늘의 순서에서 지금 할 일을 누르면 현재 루틴으로 돌아간다")
+    func childRoutineShowFocusReturnsToCurrentRoutine() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let viewModel = ChildRoutineViewModel(repository: repository)
+        viewModel.load()
+        let current = try #require(viewModel.currentRoutine)
+        let upcoming = try #require(viewModel.routines.last)
+
+        viewModel.showList()
+        viewModel.selectRoutine(upcoming, showFocus: true)
+        #expect(viewModel.selectedRoutineID == upcoming.id)
+
+        viewModel.showList()
+        viewModel.showFocus()
+
+        #expect(viewModel.page == .focus)
+        #expect(viewModel.selectedRoutineID == current.id)
+        #expect(viewModel.selectedRoutine?.id == current.id)
+        #expect(viewModel.cardState(for: current) == .current)
+    }
+
     @Test("포커스 카드 완료는 피드백 화면을 유지하고 다음 카드 선택 후 current를 이동한다")
     func childRoutineCompletionWaitsForManualAdvance() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
@@ -260,7 +281,7 @@ struct SteppieTests {
         let hash = try GuardianPinService.makeRecoveryCodeHash(for: "123456", salt: "recovery-test-salt")
 
         #expect(generatedCode.count == 6)
-        #expect(generatedCode.allSatisfy(\.isNumber))
+        #expect(generatedCode.allSatisfy { $0.isNumber })
         #expect(hash != "123456")
         #expect(GuardianPinService.verifyRecoveryCode("123456", against: hash))
         #expect(!GuardianPinService.verifyRecoveryCode("000000", against: hash))
