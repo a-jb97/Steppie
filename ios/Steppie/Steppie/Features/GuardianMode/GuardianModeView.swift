@@ -8,8 +8,8 @@ struct GuardianModeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedRoutinePhotoItem: PhotosPickerItem?
     @State private var draggedRoutineID: UUID?
+    @State private var routineDragOrder: [UUID]?
     @State private var dragStartIndex: Int?
-    @State private var lastDragStep = 0
     @State private var phoneNavigationPath: [GuardianDestination] = []
     let viewModel: GuardianModeViewModel
     let onDone: () -> Void
@@ -609,11 +609,14 @@ struct GuardianModeView: View {
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                 } else {
-                    ForEach(viewModel.routines) { routine in
+                    ForEach(displayedRoutines) { routine in
                         editableRoutineRow(routine, isWide: isWide)
                             .listRowInsets(routineListRowInsets)
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
+                            .transaction { transaction in
+                                transaction.animation = nil
+                            }
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
                                     viewModel.requestDelete(routine)
@@ -1005,6 +1008,13 @@ struct GuardianModeView: View {
         )
     }
 
+    private var displayedRoutines: [Routine] {
+        guard let routineDragOrder else { return viewModel.routines }
+        let routinesByID = Dictionary(uniqueKeysWithValues: viewModel.routines.map { ($0.id, $0) })
+        let orderedRoutines = routineDragOrder.compactMap { routinesByID[$0] }
+        return orderedRoutines.count == viewModel.routines.count ? orderedRoutines : viewModel.routines
+    }
+
     private var headerListRowInsets: EdgeInsets {
         EdgeInsets(top: 0, leading: 0, bottom: SteppieSpacing.extraSmall, trailing: 0)
     }
@@ -1051,13 +1061,24 @@ struct GuardianModeView: View {
                 .gesture(reorderGesture(for: routine))
                 .accessibilityLabel(Text("\(viewModel.localizedTitle(for: routine)) 순서 변경 핸들"))
                 .accessibilityHint(Text("누른 상태로 위아래로 움직여 순서를 바꿉니다"))
+                .accessibilityAction(named: Text("\(viewModel.localizedTitle(for: routine)) 위로 이동")) {
+                    viewModel.moveRoutine(routine, direction: -1)
+                    onInteraction()
+                }
+                .accessibilityAction(named: Text("\(viewModel.localizedTitle(for: routine)) 아래로 이동")) {
+                    viewModel.moveRoutine(routine, direction: 1)
+                    onInteraction()
+                }
         }
         .padding(SteppieSpacing.small)
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
         .background(Color.steppieBackgroundPrimary)
         .overlay {
             RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
-                .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
+                .stroke(
+                    draggedRoutineID == routine.id ? Color.steppieFocusRing : Color.steppieBorderSubtle,
+                    lineWidth: draggedRoutineID == routine.id ? SteppieStroke.focus : SteppieStroke.divider
+                )
         }
         .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
         .contextMenu {
@@ -2342,24 +2363,35 @@ struct GuardianModeView: View {
                 switch value {
                 case .first(true):
                     draggedRoutineID = routine.id
-                    dragStartIndex = viewModel.routines.firstIndex(where: { $0.id == routine.id })
-                    lastDragStep = 0
-                case .second(true, let drag?):
-                    guard let startIndex = dragStartIndex else { return }
-                    let step = Int((drag.translation.height / 104).rounded())
-                    guard step != lastDragStep else { return }
-                    let destination = min(max(startIndex + step, 0), viewModel.routines.count - 1)
-                    viewModel.moveRoutine(routine, to: destination)
-                    lastDragStep = step
+                    let currentOrder = viewModel.routines.map(\.id)
+                    routineDragOrder = currentOrder
+                    dragStartIndex = currentOrder.firstIndex(of: routine.id)
                     onInteraction()
+                case .second(true, let drag?):
+                    guard let startIndex = dragStartIndex,
+                          var order = routineDragOrder,
+                          let currentIndex = order.firstIndex(of: routine.id)
+                    else { return }
+                    let step = Int((drag.translation.height / 104).rounded())
+                    let destination = min(max(startIndex + step, 0), order.count - 1)
+                    guard currentIndex != destination else { return }
+
+                    let movedID = order.remove(at: currentIndex)
+                    order.insert(movedID, at: destination)
+                    routineDragOrder = order
                 default:
                     break
                 }
             }
             .onEnded { _ in
+                if let routineDragOrder,
+                   routineDragOrder != viewModel.routines.map(\.id) {
+                    viewModel.saveRoutineOrder(orderedIDs: routineDragOrder)
+                    onInteraction()
+                }
                 draggedRoutineID = nil
+                routineDragOrder = nil
                 dragStartIndex = nil
-                lastDragStep = 0
             }
     }
 }

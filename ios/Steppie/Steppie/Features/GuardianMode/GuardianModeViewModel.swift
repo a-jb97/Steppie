@@ -770,6 +770,16 @@ final class GuardianModeViewModel {
         saveRoutineOrder(moved, in: selectedRoutineSet.id)
     }
 
+    func saveRoutineOrder(orderedIDs: [UUID]) {
+        guard let selectedRoutineSet,
+              orderedIDs.count == routines.count,
+              Set(orderedIDs) == Set(routines.map(\.id)) else { return }
+        let routinesByID = Dictionary(uniqueKeysWithValues: routines.map { ($0.id, $0) })
+        let moved = orderedIDs.compactMap { routinesByID[$0] }
+        guard moved.count == routines.count else { return }
+        saveRoutineOrder(moved, in: selectedRoutineSet.id)
+    }
+
     func selectRoutineSet(_ routineSet: RoutineSet) {
         guard routineSets.contains(where: { $0.id == routineSet.id }) else { return }
         selectedRoutineSetID = routineSet.id
