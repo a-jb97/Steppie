@@ -1921,10 +1921,9 @@ struct GuardianModeView: View {
                     matching: .images,
                     photoLibrary: .shared()
                 ) {
-                    Label("사진 선택", systemImage: "photo.on.rectangle")
-                        .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                    secondaryPickerLabel("사진 선택")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
                 .accessibilityHint(Text("사진 앱에서 활동 사진을 선택합니다"))
 
                 RoutineCameraCaptureButton(
@@ -1950,6 +1949,24 @@ struct GuardianModeView: View {
             guard let item else { return }
             loadSelectedRoutinePhoto(item)
         }
+    }
+
+    private func secondaryPickerLabel(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .steppieTextStyle(.button)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 54)
+            .padding(.horizontal, SteppieSpacing.large)
+            .foregroundStyle(Color.steppieTextPrimary)
+            .background(Color.steppieBackgroundPrimary)
+            .overlay {
+                RoundedRectangle(cornerRadius: SteppieCornerRadius.control)
+                    .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
+            }
+            .clipShape(.rect(cornerRadius: SteppieCornerRadius.control))
+            .contentShape(.rect)
     }
 
     private func loadSelectedRoutinePhoto(_ item: PhotosPickerItem) {
