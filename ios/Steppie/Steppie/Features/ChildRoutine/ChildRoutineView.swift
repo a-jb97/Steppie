@@ -3,6 +3,7 @@ import SwiftUI
 struct ChildRoutineView: View {
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
     let viewModel: ChildRoutineViewModel
     let onGuardianEntryRequested: () -> Void
 
@@ -400,7 +401,7 @@ struct ChildRoutineView: View {
     private var feedbackUndoButton: some View {
         Button(action: viewModel.undoLastCompletion) {
             HStack(spacing: SteppieSpacing.extraSmall) {
-                Image("feedback-undo-arrow")
+                Image(feedbackUndoIconName)
                     .resizable()
                     .scaledToFit()
                     .frame(width: 18, height: 18)
@@ -426,6 +427,10 @@ struct ChildRoutineView: View {
         .opacity(viewModel.canUndoCompletion ? 1 : 0)
         .disabled(!viewModel.canUndoCompletion)
         .accessibilityLabel(Text("screen.feedback.undo"))
+    }
+
+    private var feedbackUndoIconName: String {
+        colorScheme == .dark ? "feedback-undo-arrow-dark" : "feedback-undo-arrow"
     }
 
     @ViewBuilder

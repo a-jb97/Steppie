@@ -1,15 +1,12 @@
 {
   "images" : [
     {
-      "filename" : "Group 5.svg",
+      "filename" : "feedback-undo-arrow-dark.svg",
       "idiom" : "universal"
     }
   ],
   "info" : {
     "author" : "xcode",
     "version" : 1
-  },
-  "properties" : {
-    "preserves-vector-representation" : true
   }
 }
