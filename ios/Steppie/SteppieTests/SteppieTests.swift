@@ -486,6 +486,43 @@ struct SteppieTests {
         #expect(updated.icon.name == RoutineIconName.star.rawValue)
     }
 
+    @Test("루틴 세트 단계 편집은 카드 편집처럼 사진을 저장하고 기본 아이콘으로 되돌릴 수 있다")
+    func guardianRoutineSetStepPhotoEditing() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let photoStore = FakeRoutinePhotoStore(
+            icon: try IconRef.photo(
+                localAssetID: UUID(uuidString: "77777777-7777-4777-8777-777777777777")!,
+                backupAssetName: "routine-photo-77777777-7777-4777-8777-777777777777.jpg"
+            )
+        )
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: photoStore) {}
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "사진 루틴 세트"
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "사진 단계"
+        viewModel.updateRoutineSetStepDraftPhoto(data: Data([0xff, 0xd8, 0xff]))
+        viewModel.saveRoutineSetStepDraft()
+        viewModel.saveRoutineSetDraft(localeIdentifier: "ko")
+
+        let activeSet = try #require(try repository.routineSets().first(where: \.isActive))
+        let added = try #require(try repository.routines(in: activeSet.id).first)
+        #expect(added.icon.type == .photo)
+        #expect(added.icon.backupAssetName == "routine-photo-77777777-7777-4777-8777-777777777777.jpg")
+        #expect(photoStore.savedData == Data([0xff, 0xd8, 0xff]))
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "기본 아이콘 루틴 세트"
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "기본 아이콘 단계"
+        viewModel.updateRoutineSetStepDraftPhoto(data: Data([0x01]))
+        viewModel.resetRoutineSetStepDraftIconToDefault()
+        viewModel.saveRoutineSetStepDraft()
+        let resetStep = try #require(viewModel.routineSetDraft?.steps.first)
+        #expect(resetStep.icon.type == .builtin)
+        #expect(resetStep.icon.name == RoutineIconName.star.rawValue)
+    }
+
     @Test("보호자 모드는 활성 루틴 세트가 없어도 루틴 세트 생성으로 진입할 수 있다")
     func guardianModeCanCreateRoutineSetFromEmptyRepository() throws {
         let repository = try RoutinePreviewStore.makeRepository()

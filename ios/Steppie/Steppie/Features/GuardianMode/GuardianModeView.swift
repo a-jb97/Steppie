@@ -7,6 +7,7 @@ struct GuardianModeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedRoutinePhotoItem: PhotosPickerItem?
+    @State private var selectedRoutineSetStepPhotoItem: PhotosPickerItem?
     @State private var draggedRoutineID: UUID?
     @State private var routineDragOrder: [UUID]?
     @State private var dragStartIndex: Int?
@@ -404,7 +405,7 @@ struct GuardianModeView: View {
                 .fill(SteppieCardColor(colorToken: step.colorToken).color)
                 .frame(width: dynamicTypeSize.isAccessibilitySize ? 68 : 20, height: dynamicTypeSize.isAccessibilitySize ? 20 : 68)
                 .accessibilityHidden(true)
-            SteppieRoutineIcon(step.iconName, size: .list)
+            RoutineVisualView(icon: step.icon, size: .list)
                 .frame(width: 52, height: 52)
             VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
                 Text(step.title)
@@ -508,12 +509,7 @@ struct GuardianModeView: View {
                         .textFieldStyle(.plain)
                 }
                 labeledCard("아이콘 또는 사진") {
-                    Picker("아이콘", selection: routineSetStepIconBinding) {
-                        ForEach(RoutineIconName.allCases) { icon in
-                            Text(icon.displayName(for: locale)).tag(icon)
-                        }
-                    }
-                    .pickerStyle(.menu)
+                    routineSetStepDraftVisualPicker(for: stepDraft)
                 }
                 labeledCard("카드 색상") {
                     HStack(spacing: 10) {
@@ -1978,6 +1974,55 @@ struct GuardianModeView: View {
         }
     }
 
+    private func routineSetStepDraftVisualPicker(for draft: RoutineSetStepDraft) -> some View {
+        VStack(alignment: .leading, spacing: SteppieSpacing.small) {
+            adaptiveCardStack(spacing: SteppieSpacing.medium) {
+                RoutineVisualView(icon: draft.icon, size: .list)
+                    .frame(width: 64, height: 64)
+                Picker("기본 아이콘", selection: routineSetStepIconBinding) {
+                    ForEach(RoutineIconName.allCases) { icon in
+                        Text(icon.displayName(for: locale)).tag(icon)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+            }
+
+            adaptiveControlStack {
+                PhotosPicker(
+                    selection: $selectedRoutineSetStepPhotoItem,
+                    matching: .images,
+                    photoLibrary: .shared()
+                ) {
+                    secondaryPickerLabel("사진 선택")
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text("사진 앱에서 활동 사진을 선택합니다"))
+
+                RoutineCameraCaptureButton(
+                    onImagePicked: updateRoutineSetStepDraftPhoto(image:),
+                    onInteraction: onInteraction
+                )
+
+                if draft.icon.type == .photo {
+                    Button(role: .destructive) {
+                        viewModel.resetRoutineSetStepDraftIconToDefault()
+                        selectedRoutineSetStepPhotoItem = nil
+                        onInteraction()
+                    } label: {
+                        secondaryPickerLabel("사진 삭제", foregroundColor: Color.steppieDanger)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(Text("기본 아이콘으로 되돌립니다"))
+                }
+            }
+        }
+        .onChange(of: selectedRoutineSetStepPhotoItem) { _, item in
+            guard let item else { return }
+            loadSelectedRoutineSetStepPhoto(item)
+        }
+    }
+
     private func secondaryPickerLabel(
         _ title: LocalizedStringKey,
         foregroundColor: Color = Color.steppieTextPrimary
@@ -2011,10 +2056,29 @@ struct GuardianModeView: View {
         }
     }
 
+    private func loadSelectedRoutineSetStepPhoto(_ item: PhotosPickerItem) {
+        Task {
+            guard let data = try? await item.loadTransferable(type: Data.self) else {
+                selectedRoutineSetStepPhotoItem = nil
+                return
+            }
+            viewModel.updateRoutineSetStepDraftPhoto(data: data)
+            selectedRoutineSetStepPhotoItem = nil
+            onInteraction()
+        }
+    }
+
     private func updateDraftPhoto(image: UIImage) {
         guard let data = image.jpegData(compressionQuality: 0.9) else { return }
         viewModel.updateDraftPhoto(data: data)
         selectedRoutinePhotoItem = nil
+        onInteraction()
+    }
+
+    private func updateRoutineSetStepDraftPhoto(image: UIImage) {
+        guard let data = image.jpegData(compressionQuality: 0.9) else { return }
+        viewModel.updateRoutineSetStepDraftPhoto(data: data)
+        selectedRoutineSetStepPhotoItem = nil
         onInteraction()
     }
 
@@ -2341,6 +2405,7 @@ struct GuardianModeView: View {
             get: { viewModel.routineSetStepDraft?.iconName ?? .star },
             set: {
                 viewModel.routineSetStepDraft?.iconName = $0
+                selectedRoutineSetStepPhotoItem = nil
                 onInteraction()
             }
         )

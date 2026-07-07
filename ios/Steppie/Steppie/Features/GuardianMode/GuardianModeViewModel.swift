@@ -125,7 +125,7 @@ extension AppSettings {
 struct RoutineSetStepDraft: Equatable, Identifiable {
     let id: UUID
     var title: String
-    var iconName: RoutineIconName
+    var icon: IconRef
     var colorToken: String
     var scheduledTime: LocalTime?
 
@@ -138,7 +138,21 @@ struct RoutineSetStepDraft: Equatable, Identifiable {
     ) {
         self.id = id
         self.title = title
-        self.iconName = iconName
+        self.icon = try! IconRef.builtin(name: iconName.rawValue)
+        self.colorToken = colorToken
+        self.scheduledTime = scheduledTime
+    }
+
+    init(
+        id: UUID = UUID(),
+        title: String = "",
+        icon: IconRef,
+        colorToken: String = Routine.defaultColorToken,
+        scheduledTime: LocalTime? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.icon = icon
         self.colorToken = colorToken
         self.scheduledTime = scheduledTime
     }
@@ -146,6 +160,19 @@ struct RoutineSetStepDraft: Equatable, Identifiable {
     var isValid: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && Routine.allowedColorTokens.contains(colorToken)
+    }
+
+    var iconName: RoutineIconName {
+        get {
+            guard icon.type == .builtin,
+                  let name = icon.name.flatMap(RoutineIconName.init(rawValue:)) else {
+                return .star
+            }
+            return name
+        }
+        set {
+            icon = try! IconRef.builtin(name: newValue.rawValue)
+        }
     }
 }
 
@@ -609,7 +636,7 @@ final class GuardianModeViewModel {
                 let routine = try Routine(
                     routineSetID: routineSet.id,
                     title: LocalizedText([localeIdentifier: step.title]),
-                    icon: IconRef.builtin(name: step.iconName.rawValue),
+                    icon: step.icon,
                     colorToken: step.colorToken,
                     order: order,
                     scheduledTime: step.scheduledTime,
@@ -712,6 +739,19 @@ final class GuardianModeViewModel {
 
     func resetDraftIconToDefault() {
         draft?.icon = try! IconRef.builtin(name: RoutineIconName.star.rawValue)
+    }
+
+    func updateRoutineSetStepDraftPhoto(data: Data) {
+        guard routineSetStepDraft != nil else { return }
+        do {
+            routineSetStepDraft?.icon = try photoStore.savePhotoData(data)
+        } catch {
+            errorMessage = "사진을 저장하지 못했어요."
+        }
+    }
+
+    func resetRoutineSetStepDraftIconToDefault() {
+        routineSetStepDraft?.icon = try! IconRef.builtin(name: RoutineIconName.star.rawValue)
     }
 
     func requestDelete(_ routine: Routine) {
