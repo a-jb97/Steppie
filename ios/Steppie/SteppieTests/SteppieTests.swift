@@ -38,6 +38,27 @@ struct SteppieTests {
         #expect(try repository.routines(in: upcoming.routineSetID) == originalRoutines)
     }
 
+    @Test("오늘의 순서에서 지금 할 일을 누르면 현재 루틴으로 돌아간다")
+    func childRoutineShowFocusReturnsToCurrentRoutine() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let viewModel = ChildRoutineViewModel(repository: repository)
+        viewModel.load()
+        let current = try #require(viewModel.currentRoutine)
+        let upcoming = try #require(viewModel.routines.last)
+
+        viewModel.showList()
+        viewModel.selectRoutine(upcoming, showFocus: true)
+        #expect(viewModel.selectedRoutineID == upcoming.id)
+
+        viewModel.showList()
+        viewModel.showFocus()
+
+        #expect(viewModel.page == .focus)
+        #expect(viewModel.selectedRoutineID == current.id)
+        #expect(viewModel.selectedRoutine?.id == current.id)
+        #expect(viewModel.cardState(for: current) == .current)
+    }
+
     @Test("포커스 카드 완료는 피드백 화면을 유지하고 다음 카드 선택 후 current를 이동한다")
     func childRoutineCompletionWaitsForManualAdvance() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
@@ -260,7 +281,7 @@ struct SteppieTests {
         let hash = try GuardianPinService.makeRecoveryCodeHash(for: "123456", salt: "recovery-test-salt")
 
         #expect(generatedCode.count == 6)
-        #expect(generatedCode.allSatisfy(\.isNumber))
+        #expect(generatedCode.allSatisfy { $0.isNumber })
         #expect(hash != "123456")
         #expect(GuardianPinService.verifyRecoveryCode("123456", against: hash))
         #expect(!GuardianPinService.verifyRecoveryCode("000000", against: hash))
@@ -463,6 +484,43 @@ struct SteppieTests {
         let updated = try #require(try repository.routine(id: added.id))
         #expect(updated.icon.type == .builtin)
         #expect(updated.icon.name == RoutineIconName.star.rawValue)
+    }
+
+    @Test("루틴 세트 단계 편집은 카드 편집처럼 사진을 저장하고 기본 아이콘으로 되돌릴 수 있다")
+    func guardianRoutineSetStepPhotoEditing() throws {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let photoStore = FakeRoutinePhotoStore(
+            icon: try IconRef.photo(
+                localAssetID: UUID(uuidString: "77777777-7777-4777-8777-777777777777")!,
+                backupAssetName: "routine-photo-77777777-7777-4777-8777-777777777777.jpg"
+            )
+        )
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: photoStore) {}
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "사진 루틴 세트"
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "사진 단계"
+        viewModel.updateRoutineSetStepDraftPhoto(data: Data([0xff, 0xd8, 0xff]))
+        viewModel.saveRoutineSetStepDraft()
+        viewModel.saveRoutineSetDraft(localeIdentifier: "ko")
+
+        let activeSet = try #require(try repository.routineSets().first(where: \.isActive))
+        let added = try #require(try repository.routines(in: activeSet.id).first)
+        #expect(added.icon.type == .photo)
+        #expect(added.icon.backupAssetName == "routine-photo-77777777-7777-4777-8777-777777777777.jpg")
+        #expect(photoStore.savedData == Data([0xff, 0xd8, 0xff]))
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "기본 아이콘 루틴 세트"
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "기본 아이콘 단계"
+        viewModel.updateRoutineSetStepDraftPhoto(data: Data([0x01]))
+        viewModel.resetRoutineSetStepDraftIconToDefault()
+        viewModel.saveRoutineSetStepDraft()
+        let resetStep = try #require(viewModel.routineSetDraft?.steps.first)
+        #expect(resetStep.icon.type == .builtin)
+        #expect(resetStep.icon.name == RoutineIconName.star.rawValue)
     }
 
     @Test("보호자 모드는 활성 루틴 세트가 없어도 루틴 세트 생성으로 진입할 수 있다")

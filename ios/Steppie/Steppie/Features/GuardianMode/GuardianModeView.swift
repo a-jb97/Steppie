@@ -7,9 +7,11 @@ struct GuardianModeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedRoutinePhotoItem: PhotosPickerItem?
+    @State private var selectedRoutineSetStepPhotoItem: PhotosPickerItem?
     @State private var draggedRoutineID: UUID?
+    @State private var routineDragOrder: [UUID]?
     @State private var dragStartIndex: Int?
-    @State private var lastDragStep = 0
+    @State private var phoneNavigationPath: [GuardianDestination] = []
     let viewModel: GuardianModeViewModel
     let onDone: () -> Void
     let onInteraction: () -> Void
@@ -58,41 +60,56 @@ struct GuardianModeView: View {
         case .empty, .loaded:
             if isWide, viewModel.selectedDestination != nil {
                 HStack(spacing: 0) {
-                    homeList
+                    homeList(isWide: true)
                         .frame(width: SteppieLayout.splitListWidth)
                     Rectangle()
                         .fill(Color.steppieBorderSubtle)
                         .frame(width: SteppieStroke.divider)
-                    destinationDetail(isWide: true)
+                    if let destination = viewModel.selectedDestination {
+                        destinationDetail(destination, isWide: true)
+                    }
                 }
             } else if isWide {
-                homeList
+                homeList(isWide: true)
                     .frame(maxWidth: 393)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                NavigationStack {
-                    destinationDetail(isWide: false)
+                NavigationStack(path: $phoneNavigationPath) {
+                    homeList(isWide: false)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar(.hidden, for: .navigationBar)
+                        .navigationDestination(for: GuardianDestination.self) { destination in
+                            destinationDetail(destination, isWide: false)
+                        }
+                }
+                .onChange(of: viewModel.selectedDestination) { _, destination in
+                    syncPhoneNavigation(with: destination)
+                }
+                .onChange(of: phoneNavigationPath) { _, path in
+                    viewModel.selectedDestination = path.last
                 }
             }
         }
     }
 
-    private var homeList: some View {
+    private func homeList(isWide: Bool) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
                 header(title: "보호자 모드", subtitle: "완료 또는 3분 미조작 시 아이 모드로 돌아갑니다")
                 menuCard(
                     title: "루틴 세트 생성",
                     subtitle: "새 루틴 제목과 단계 목록 만들기",
-                    assetName: "guardian-menu-routine",
+                    assetName: "guardian-menu-routine-set",
                     destination: .routineSetCreator,
+                    isWide: isWide,
                     isEnabled: true
                 )
                 menuCard(
                     title: "템플릿에서 시작하기",
                     subtitle: "아침, 학교, 취침 루틴으로 빠르게 만들기",
-                    assetName: "guardian-menu-routine",
+                    assetName: "guardian-menu-template",
                     destination: .routineTemplates,
+                    isWide: isWide,
                     isEnabled: true
                 )
                 menuCard(
@@ -100,6 +117,7 @@ struct GuardianModeView: View {
                     subtitle: viewModel.hasRoutineSets ? "루틴 세트 목록, 활동 추가, 순서 변경" : "먼저 루틴 세트를 만들어 주세요",
                     assetName: "guardian-menu-routine",
                     destination: .routineEditor,
+                    isWide: isWide,
                     isEnabled: viewModel.hasRoutineSets
                 )
                 menuCard(
@@ -107,6 +125,7 @@ struct GuardianModeView: View {
                     subtitle: "음성, 효과음, 햅틱, 알림",
                     assetName: "guardian-menu-settings",
                     destination: .feedbackSettings,
+                    isWide: isWide,
                     isEnabled: true
                 )
                 menuCard(
@@ -114,6 +133,7 @@ struct GuardianModeView: View {
                     subtitle: "날짜별 완료 현황",
                     assetName: "guardian-menu-records",
                     destination: .records,
+                    isWide: isWide,
                     isEnabled: true
                 )
                 menuCard(
@@ -121,9 +141,10 @@ struct GuardianModeView: View {
                     subtitle: "PIN, 복구 코드, 백업/복원",
                     assetName: "guardian-menu-security",
                     destination: .security,
+                    isWide: isWide,
                     isEnabled: true
                 )
-                SteppieButton("완료", role: .secondary, action: onDone)
+                SteppieButton("완료", action: onDone)
                     .padding(.top, SteppieSpacing.medium)
             }
             .padding(SteppieLayout.guardianScreenPadding)
@@ -133,44 +154,27 @@ struct GuardianModeView: View {
     }
 
     @ViewBuilder
-    private func destinationDetail(isWide: Bool) -> some View {
-        if !isWide, viewModel.selectedDestination == nil {
-            phoneHome
-        } else {
-            switch viewModel.selectedDestination ?? .security {
-            case .routineSetCreator:
-                routineSetCreator(isWide: isWide)
-            case .routineTemplates:
-                routineTemplateSelector(isWide: isWide)
-            case .routineEditor:
-                routineEditor(isWide: isWide)
-            case .feedbackSettings:
-                feedbackSettingsScreen(isWide: isWide)
-            case .records:
-                recordsScreen(isWide: isWide)
-            case .security:
-                securityScreen(isWide: isWide)
-            case .backupRestore:
-                BackupRestoreView(
-                    viewModel: viewModel,
-                    onDone: onDone,
-                    onInteraction: onInteraction
-                )
-                .toolbar {
-                    if !isWide {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button("뒤로") { viewModel.selectedDestination = .security }
-                        }
-                    }
-                }
-            }
+    private func destinationDetail(_ destination: GuardianDestination, isWide: Bool) -> some View {
+        switch destination {
+        case .routineSetCreator:
+            routineSetCreator(isWide: isWide)
+        case .routineTemplates:
+            routineTemplateSelector(isWide: isWide)
+        case .routineEditor:
+            routineEditor(isWide: isWide)
+        case .feedbackSettings:
+            feedbackSettingsScreen(isWide: isWide)
+        case .records:
+            recordsScreen(isWide: isWide)
+        case .security:
+            securityScreen(isWide: isWide)
+        case .backupRestore:
+            BackupRestoreView(
+                viewModel: viewModel,
+                onDone: onDone,
+                onInteraction: onInteraction
+            )
         }
-    }
-
-    private var phoneHome: some View {
-        homeList
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.hidden, for: .navigationBar)
     }
 
     private func menuCard(
@@ -178,6 +182,7 @@ struct GuardianModeView: View {
         subtitle: String,
         assetName: String,
         destination: GuardianDestination,
+        isWide: Bool,
         isEnabled: Bool
     ) -> some View {
         Button {
@@ -185,7 +190,7 @@ struct GuardianModeView: View {
             if destination == .routineTemplates {
                 viewModel.beginTemplateSelection()
             } else {
-                viewModel.selectedDestination = destination
+                openDestination(destination, isWide: isWide)
             }
             onInteraction()
         } label: {
@@ -231,6 +236,30 @@ struct GuardianModeView: View {
         .accessibilityLabel(Text(title))
         .accessibilityValue(Text(subtitle))
         .accessibilityHint(isEnabled ? Text("열기") : Text("아직 구현되지 않았습니다"))
+    }
+
+    private func openDestination(_ destination: GuardianDestination, isWide: Bool) {
+        if isWide {
+            viewModel.selectedDestination = destination
+        } else if phoneNavigationPath.last != destination {
+            phoneNavigationPath.append(destination)
+        }
+        viewModel.selectedDestination = destination
+    }
+
+    private func syncPhoneNavigation(with destination: GuardianDestination?) {
+        guard let destination else {
+            phoneNavigationPath.removeAll()
+            return
+        }
+
+        if let index = phoneNavigationPath.firstIndex(of: destination) {
+            phoneNavigationPath.removeSubrange(phoneNavigationPath.index(after: index)..<phoneNavigationPath.endIndex)
+        } else if phoneNavigationPath.last == .security, destination == .backupRestore {
+            phoneNavigationPath.append(destination)
+        } else {
+            phoneNavigationPath = [destination]
+        }
     }
 
     private func routineEditor(isWide: Bool) -> some View {
@@ -352,15 +381,14 @@ struct GuardianModeView: View {
         .navigationTitle("")
         .toolbar {
             if !isWide {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("뒤로") {
-                        viewModel.cancelRoutineSetDraft()
-                        viewModel.selectedDestination = nil
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("완료", action: onDone)
                 }
+            }
+        }
+        .onDisappear {
+            if !isWide {
+                viewModel.cancelRoutineSetDraft()
             }
         }
         .sheet(item: routineSetStepDraftBinding) { _ in
@@ -377,7 +405,7 @@ struct GuardianModeView: View {
                 .fill(SteppieCardColor(colorToken: step.colorToken).color)
                 .frame(width: dynamicTypeSize.isAccessibilitySize ? 68 : 20, height: dynamicTypeSize.isAccessibilitySize ? 20 : 68)
                 .accessibilityHidden(true)
-            SteppieRoutineIcon(step.iconName, size: .list)
+            RoutineVisualView(icon: step.icon, size: .list)
                 .frame(width: 52, height: 52)
             VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
                 Text(step.title)
@@ -481,12 +509,7 @@ struct GuardianModeView: View {
                         .textFieldStyle(.plain)
                 }
                 labeledCard("아이콘 또는 사진") {
-                    Picker("아이콘", selection: routineSetStepIconBinding) {
-                        ForEach(RoutineIconName.allCases) { icon in
-                            Text(icon.rawValue).tag(icon)
-                        }
-                    }
-                    .pickerStyle(.menu)
+                    routineSetStepDraftVisualPicker(for: stepDraft)
                 }
                 labeledCard("카드 색상") {
                     HStack(spacing: 10) {
@@ -512,24 +535,16 @@ struct GuardianModeView: View {
                     }
                 }
                 labeledCard("예정 시각") {
-                    adaptiveControlStack {
-                        DatePicker(
-                            "예정 시각",
-                            selection: routineSetStepScheduledDateBinding,
-                            displayedComponents: .hourAndMinute
-                        )
-                        .accessibilityHint(Text("a11y.guardian.scheduledTime.selectHint"))
-                        if !dynamicTypeSize.isAccessibilitySize {
-                            Spacer()
-                        }
-                        Button("시간 없음") {
+                    scheduledTimeEditor(
+                        scheduledTime: stepDraft.scheduledTime,
+                        date: routineSetStepScheduledDateBinding,
+                        setDefaultTime: {
+                            viewModel.routineSetStepDraft?.scheduledTime = defaultScheduledTime
+                        },
+                        clearTime: {
                             viewModel.routineSetStepDraft?.scheduledTime = nil
-                            onInteraction()
                         }
-                        .buttonStyle(.borderless)
-                        .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
-                        .accessibilityHint(Text("a11y.guardian.scheduledTime.clearHint"))
-                    }
+                    )
                 }
                 HStack(spacing: SteppieSpacing.medium) {
                     SteppieButton("취소", role: .secondary) {
@@ -553,28 +568,43 @@ struct GuardianModeView: View {
     private func routineListPane(isWide: Bool) -> some View {
         List {
             Section {
+                routineSetListHeader
+                    .listRowInsets(headerListRowInsets)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+
                 ForEach(viewModel.routineSets) { routineSet in
                     routineSetRow(routineSet)
                         .listRowInsets(routineListRowInsets)
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                 }
-            } header: {
-                routineSetListHeader
             }
 
             Section {
+                header(
+                    title: routineEditorTitle,
+                    subtitle: "각 루틴을 선택하면 해당 루틴을 수정할 수 있습니다."
+                )
+                .padding(.horizontal, SteppieLayout.guardianScreenPadding)
+                .listRowInsets(headerListRowInsets)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+
                 if viewModel.routines.isEmpty {
                     messageState(title: "활동이 없어요", message: "활동 추가로 첫 루틴을 만들어 주세요.")
                         .listRowInsets(routineListRowInsets)
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                 } else {
-                    ForEach(viewModel.routines) { routine in
+                    ForEach(displayedRoutines) { routine in
                         editableRoutineRow(routine, isWide: isWide)
                             .listRowInsets(routineListRowInsets)
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
+                            .transaction { transaction in
+                                transaction.animation = nil
+                            }
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
                                     viewModel.requestDelete(routine)
@@ -585,13 +615,6 @@ struct GuardianModeView: View {
                             }
                     }
                 }
-            } header: {
-                header(
-                    title: routineEditorTitle,
-                    subtitle: "각 루틴을 선택하면 해당 루틴을 수정할 수 있습니다."
-                )
-                .padding(.horizontal, SteppieLayout.guardianScreenPadding)
-                .textCase(nil)
             }
             Section {
                 SteppieButton("템플릿에서 시작하기", role: .secondary) {
@@ -618,9 +641,6 @@ struct GuardianModeView: View {
         .navigationTitle("")
         .toolbar {
             if !isWide {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("뒤로") { viewModel.selectedDestination = nil }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("완료", action: onDone)
                 }
@@ -660,20 +680,22 @@ struct GuardianModeView: View {
     private func routineTemplateListPane(isWide: Bool) -> some View {
         List {
             Section {
-                ForEach(viewModel.routineTemplates) { template in
-                    routineTemplateRow(template)
-                        .listRowInsets(routineListRowInsets)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                }
-            } header: {
                 header(
                     title: "템플릿에서 시작하기",
                     subtitle: "템플릿을 고른 뒤 새 루틴 세트로 저장합니다"
                 )
                 .padding(.top, SteppieSpacing.medium)
                 .padding(.horizontal, SteppieLayout.guardianScreenPadding)
-                .textCase(nil)
+                .listRowInsets(headerListRowInsets)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+
+                ForEach(viewModel.routineTemplates) { template in
+                    routineTemplateRow(template)
+                        .listRowInsets(routineListRowInsets)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
             }
 
             if !isWide {
@@ -691,12 +713,6 @@ struct GuardianModeView: View {
         .navigationTitle("")
         .toolbar {
             if !isWide {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("뒤로") {
-                        viewModel.closeTemplateSelection()
-                        onInteraction()
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("완료", action: onDone)
                 }
@@ -980,6 +996,17 @@ struct GuardianModeView: View {
         )
     }
 
+    private var displayedRoutines: [Routine] {
+        guard let routineDragOrder else { return viewModel.routines }
+        let routinesByID = Dictionary(uniqueKeysWithValues: viewModel.routines.map { ($0.id, $0) })
+        let orderedRoutines = routineDragOrder.compactMap { routinesByID[$0] }
+        return orderedRoutines.count == viewModel.routines.count ? orderedRoutines : viewModel.routines
+    }
+
+    private var headerListRowInsets: EdgeInsets {
+        EdgeInsets(top: 0, leading: 0, bottom: SteppieSpacing.extraSmall, trailing: 0)
+    }
+
     private func editableRoutineRow(_ routine: Routine, isWide: Bool) -> some View {
         adaptiveCardStack(spacing: SteppieSpacing.small) {
             Button {
@@ -1022,13 +1049,24 @@ struct GuardianModeView: View {
                 .gesture(reorderGesture(for: routine))
                 .accessibilityLabel(Text("\(viewModel.localizedTitle(for: routine)) 순서 변경 핸들"))
                 .accessibilityHint(Text("누른 상태로 위아래로 움직여 순서를 바꿉니다"))
+                .accessibilityAction(named: Text("\(viewModel.localizedTitle(for: routine)) 위로 이동")) {
+                    viewModel.moveRoutine(routine, direction: -1)
+                    onInteraction()
+                }
+                .accessibilityAction(named: Text("\(viewModel.localizedTitle(for: routine)) 아래로 이동")) {
+                    viewModel.moveRoutine(routine, direction: 1)
+                    onInteraction()
+                }
         }
         .padding(SteppieSpacing.small)
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
         .background(Color.steppieBackgroundPrimary)
         .overlay {
             RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
-                .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
+                .stroke(
+                    draggedRoutineID == routine.id ? Color.steppieFocusRing : Color.steppieBorderSubtle,
+                    lineWidth: draggedRoutineID == routine.id ? SteppieStroke.focus : SteppieStroke.divider
+                )
         }
         .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
         .contextMenu {
@@ -1097,24 +1135,16 @@ struct GuardianModeView: View {
                     }
                 }
                 labeledCard("예정 시각") {
-                    adaptiveControlStack {
-                        DatePicker(
-                            "예정 시각",
-                            selection: scheduledDateBinding,
-                            displayedComponents: .hourAndMinute
-                        )
-                        .accessibilityHint(Text("a11y.guardian.scheduledTime.selectHint"))
-                        if !dynamicTypeSize.isAccessibilitySize {
-                            Spacer()
-                        }
-                        Button("시간 없음") {
+                    scheduledTimeEditor(
+                        scheduledTime: draft.scheduledTime,
+                        date: scheduledDateBinding,
+                        setDefaultTime: {
+                            viewModel.draft?.scheduledTime = defaultScheduledTime
+                        },
+                        clearTime: {
                             viewModel.draft?.scheduledTime = nil
-                            onInteraction()
                         }
-                        .buttonStyle(.borderless)
-                        .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
-                        .accessibilityHint(Text("a11y.guardian.scheduledTime.clearHint"))
-                    }
+                    )
                 }
                 if viewModel.hasUnsavedDraft {
                     warningNote("저장하지 않고 나가면 확인이 필요합니다.")
@@ -1202,7 +1232,7 @@ struct GuardianModeView: View {
                 quietHoursBlock
                 quietHoursNote
 
-                SteppieButton("완료", role: .secondary, action: onDone)
+                SteppieButton("완료", action: onDone)
                     .padding(.top, SteppieSpacing.large)
             }
             .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
@@ -1210,13 +1240,6 @@ struct GuardianModeView: View {
             .padding(SteppieLayout.guardianScreenPadding)
         }
         .background(Color.steppieBackgroundSecondary)
-        .toolbar {
-            if !isWide {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("뒤로") { viewModel.selectedDestination = nil }
-                }
-            }
-        }
     }
 
     private var notificationLeadTimeBlock: some View {
@@ -1345,13 +1368,6 @@ struct GuardianModeView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.steppieBackgroundSecondary)
-        }
-        .toolbar {
-            if !isWide {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("뒤로") { viewModel.selectedDestination = nil }
-                }
-            }
         }
     }
 
@@ -1603,11 +1619,11 @@ struct GuardianModeView: View {
                     onInteraction()
                 }
                 securityCard(title: "백업/복원", subtitle: "로컬 파일 백업과 Replace 복원", assetName: "guardian-security-backup", iconSize: 50) {
-                    viewModel.selectedDestination = .backupRestore
+                    openDestination(.backupRestore, isWide: isWide)
                     onInteraction()
                 }
                 privacyPolicyNote
-                SteppieButton("완료", role: .secondary, action: onDone)
+                SteppieButton("완료", action: onDone)
                     .padding(.top, SteppieSpacing.large)
             }
             .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
@@ -1615,13 +1631,6 @@ struct GuardianModeView: View {
             .padding(SteppieLayout.guardianScreenPadding)
         }
         .background(Color.steppieBackgroundSecondary)
-        .toolbar {
-            if !isWide {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("뒤로") { viewModel.selectedDestination = nil }
-                }
-            }
-        }
     }
 
     private func securityCard(
@@ -1850,6 +1859,50 @@ struct GuardianModeView: View {
         .accessibilityValue(Text(accessibilityValue))
     }
 
+    private func scheduledTimeEditor(
+        scheduledTime: LocalTime?,
+        date: Binding<Date>,
+        setDefaultTime: @escaping () -> Void,
+        clearTime: @escaping () -> Void
+    ) -> some View {
+        let hasTime = scheduledTime != nil
+        return VStack(alignment: .leading, spacing: SteppieSpacing.small) {
+            adaptiveSegmentRow {
+                settingSegment(
+                    title: "시간 설정",
+                    isSelected: hasTime,
+                    accessibilityValue: hasTime ? "선택됨" : "선택 안 됨"
+                ) {
+                    if !hasTime {
+                        setDefaultTime()
+                    }
+                }
+                settingSegment(
+                    title: "시간 없음",
+                    isSelected: !hasTime,
+                    accessibilityValue: hasTime ? "선택 안 됨" : "선택됨"
+                ) {
+                    clearTime()
+                }
+            }
+
+            Text(hasTime ? "현재 선택: \(scheduledTime?.description ?? "")" : "현재 선택: 시간 없음")
+                .steppieTextStyle(.guardianCaption)
+                .foregroundStyle(Color.steppieTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if hasTime {
+                DatePicker(
+                    "예정 시각",
+                    selection: date,
+                    displayedComponents: .hourAndMinute
+                )
+                .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                .accessibilityHint(Text("a11y.guardian.scheduledTime.selectHint"))
+            }
+        }
+    }
+
     private func warningNote(_ text: String) -> some View {
         HStack(spacing: SteppieSpacing.small) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -1879,7 +1932,7 @@ struct GuardianModeView: View {
                     .frame(width: 64, height: 64)
                 Picker("기본 아이콘", selection: draftIconBinding) {
                     ForEach(RoutineIconName.allCases) { icon in
-                        Text(icon.rawValue).tag(icon)
+                        Text(icon.displayName(for: locale)).tag(icon)
                     }
                 }
                 .pickerStyle(.menu)
@@ -1892,10 +1945,9 @@ struct GuardianModeView: View {
                     matching: .images,
                     photoLibrary: .shared()
                 ) {
-                    Label("사진 선택", systemImage: "photo.on.rectangle")
-                        .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                    secondaryPickerLabel("사진 선택")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
                 .accessibilityHint(Text("사진 앱에서 활동 사진을 선택합니다"))
 
                 RoutineCameraCaptureButton(
@@ -1909,10 +1961,9 @@ struct GuardianModeView: View {
                         selectedRoutinePhotoItem = nil
                         onInteraction()
                     } label: {
-                        Label("사진 삭제", systemImage: "trash")
-                            .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                        secondaryPickerLabel("사진 삭제", foregroundColor: Color.steppieDanger)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
                     .accessibilityHint(Text("기본 아이콘으로 되돌립니다"))
                 }
             }
@@ -1921,6 +1972,76 @@ struct GuardianModeView: View {
             guard let item else { return }
             loadSelectedRoutinePhoto(item)
         }
+    }
+
+    private func routineSetStepDraftVisualPicker(for draft: RoutineSetStepDraft) -> some View {
+        VStack(alignment: .leading, spacing: SteppieSpacing.small) {
+            adaptiveCardStack(spacing: SteppieSpacing.medium) {
+                RoutineVisualView(icon: draft.icon, size: .list)
+                    .frame(width: 64, height: 64)
+                Picker("기본 아이콘", selection: routineSetStepIconBinding) {
+                    ForEach(RoutineIconName.allCases) { icon in
+                        Text(icon.displayName(for: locale)).tag(icon)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+            }
+
+            adaptiveControlStack {
+                PhotosPicker(
+                    selection: $selectedRoutineSetStepPhotoItem,
+                    matching: .images,
+                    photoLibrary: .shared()
+                ) {
+                    secondaryPickerLabel("사진 선택")
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text("사진 앱에서 활동 사진을 선택합니다"))
+
+                RoutineCameraCaptureButton(
+                    onImagePicked: updateRoutineSetStepDraftPhoto(image:),
+                    onInteraction: onInteraction
+                )
+
+                if draft.icon.type == .photo {
+                    Button(role: .destructive) {
+                        viewModel.resetRoutineSetStepDraftIconToDefault()
+                        selectedRoutineSetStepPhotoItem = nil
+                        onInteraction()
+                    } label: {
+                        secondaryPickerLabel("사진 삭제", foregroundColor: Color.steppieDanger)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(Text("기본 아이콘으로 되돌립니다"))
+                }
+            }
+        }
+        .onChange(of: selectedRoutineSetStepPhotoItem) { _, item in
+            guard let item else { return }
+            loadSelectedRoutineSetStepPhoto(item)
+        }
+    }
+
+    private func secondaryPickerLabel(
+        _ title: LocalizedStringKey,
+        foregroundColor: Color = Color.steppieTextPrimary
+    ) -> some View {
+        Text(title)
+            .steppieTextStyle(.button)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 54)
+            .padding(.horizontal, SteppieSpacing.large)
+            .foregroundStyle(foregroundColor)
+            .background(Color.steppieBackgroundPrimary)
+            .overlay {
+                RoundedRectangle(cornerRadius: SteppieCornerRadius.control)
+                    .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
+            }
+            .clipShape(.rect(cornerRadius: SteppieCornerRadius.control))
+            .contentShape(.rect)
     }
 
     private func loadSelectedRoutinePhoto(_ item: PhotosPickerItem) {
@@ -1935,10 +2056,29 @@ struct GuardianModeView: View {
         }
     }
 
+    private func loadSelectedRoutineSetStepPhoto(_ item: PhotosPickerItem) {
+        Task {
+            guard let data = try? await item.loadTransferable(type: Data.self) else {
+                selectedRoutineSetStepPhotoItem = nil
+                return
+            }
+            viewModel.updateRoutineSetStepDraftPhoto(data: data)
+            selectedRoutineSetStepPhotoItem = nil
+            onInteraction()
+        }
+    }
+
     private func updateDraftPhoto(image: UIImage) {
         guard let data = image.jpegData(compressionQuality: 0.9) else { return }
         viewModel.updateDraftPhoto(data: data)
         selectedRoutinePhotoItem = nil
+        onInteraction()
+    }
+
+    private func updateRoutineSetStepDraftPhoto(image: UIImage) {
+        guard let data = image.jpegData(compressionQuality: 0.9) else { return }
+        viewModel.updateRoutineSetStepDraftPhoto(data: data)
+        selectedRoutineSetStepPhotoItem = nil
         onInteraction()
     }
 
@@ -2265,9 +2405,14 @@ struct GuardianModeView: View {
             get: { viewModel.routineSetStepDraft?.iconName ?? .star },
             set: {
                 viewModel.routineSetStepDraft?.iconName = $0
+                selectedRoutineSetStepPhotoItem = nil
                 onInteraction()
             }
         )
+    }
+
+    private var defaultScheduledTime: LocalTime {
+        try! LocalTime(hour: 7, minute: 30)
     }
 
     private var routineSetStepScheduledDateBinding: Binding<Date> {
@@ -2334,24 +2479,35 @@ struct GuardianModeView: View {
                 switch value {
                 case .first(true):
                     draggedRoutineID = routine.id
-                    dragStartIndex = viewModel.routines.firstIndex(where: { $0.id == routine.id })
-                    lastDragStep = 0
-                case .second(true, let drag?):
-                    guard let startIndex = dragStartIndex else { return }
-                    let step = Int((drag.translation.height / 104).rounded())
-                    guard step != lastDragStep else { return }
-                    let destination = min(max(startIndex + step, 0), viewModel.routines.count - 1)
-                    viewModel.moveRoutine(routine, to: destination)
-                    lastDragStep = step
+                    let currentOrder = viewModel.routines.map(\.id)
+                    routineDragOrder = currentOrder
+                    dragStartIndex = currentOrder.firstIndex(of: routine.id)
                     onInteraction()
+                case .second(true, let drag?):
+                    guard let startIndex = dragStartIndex,
+                          var order = routineDragOrder,
+                          let currentIndex = order.firstIndex(of: routine.id)
+                    else { return }
+                    let step = Int((drag.translation.height / 104).rounded())
+                    let destination = min(max(startIndex + step, 0), order.count - 1)
+                    guard currentIndex != destination else { return }
+
+                    let movedID = order.remove(at: currentIndex)
+                    order.insert(movedID, at: destination)
+                    routineDragOrder = order
                 default:
                     break
                 }
             }
             .onEnded { _ in
+                if let routineDragOrder,
+                   routineDragOrder != viewModel.routines.map(\.id) {
+                    viewModel.saveRoutineOrder(orderedIDs: routineDragOrder)
+                    onInteraction()
+                }
                 draggedRoutineID = nil
+                routineDragOrder = nil
                 dragStartIndex = nil
-                lastDragStep = 0
             }
     }
 }
@@ -2418,6 +2574,42 @@ extension SteppieCardColor {
         case .peach: "복숭아색"
         case .lavender: "라벤더색"
         case .rose: "장미색"
+        }
+    }
+}
+
+extension RoutineIconName {
+    func displayName(for locale: Locale) -> String {
+        let isKorean = locale.language.languageCode?.identifier == "ko"
+        switch self {
+        case .wakeUp: return isKorean ? "일어나기" : "Wake up"
+        case .washFace: return isKorean ? "세수하기" : "Wash face"
+        case .brushTeeth: return isKorean ? "양치하기" : "Brush teeth"
+        case .getDressed: return isKorean ? "옷 입기" : "Get dressed"
+        case .breakfast: return isKorean ? "아침 먹기" : "Eat breakfast"
+        case .packBag: return isKorean ? "가방 챙기기" : "Pack bag"
+        case .school: return isKorean ? "학교" : "School"
+        case .book: return isKorean ? "책" : "Book"
+        case .pencil: return isKorean ? "연필" : "Pencil"
+        case .lunch: return isKorean ? "점심 먹기" : "Eat lunch"
+        case .playground: return isKorean ? "놀이터" : "Playground"
+        case .bus: return isKorean ? "버스" : "Bus"
+        case .bath: return isKorean ? "목욕하기" : "Take a bath"
+        case .pajamas: return isKorean ? "잠옷 입기" : "Put on pajamas"
+        case .storyBook: return isKorean ? "이야기책" : "Story book"
+        case .toilet: return isKorean ? "화장실" : "Toilet"
+        case .sleep: return isKorean ? "잠자기" : "Sleep"
+        case .star: return isKorean ? "별" : "Star"
+        case .home: return isKorean ? "집" : "Home"
+        case .meal: return isKorean ? "식사" : "Meal"
+        case .snack: return isKorean ? "간식" : "Snack"
+        case .medicine: return isKorean ? "약" : "Medicine"
+        case .walk: return isKorean ? "산책" : "Walk"
+        case .therapy: return isKorean ? "치료" : "Therapy"
+        case .music: return isKorean ? "음악" : "Music"
+        case .art: return isKorean ? "미술" : "Art"
+        case .cleanUp: return isKorean ? "정리하기" : "Clean up"
+        case .timer: return isKorean ? "타이머" : "Timer"
         }
     }
 }
