@@ -41,6 +41,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +71,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.example.steppie.R
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.BuiltinIconNames
@@ -1145,12 +1147,14 @@ private fun GuardianRoutineEditScreen(
             }
         }
         state.routines.forEach { routine ->
-            EditableRoutineRow(
-                routine = routine,
-                onClick = { onOpenRoutineEditor(routine.id) },
-                onDelete = { onRequestDelete(routine.id) },
-                onMove = { direction -> onMoveRoutine(routine.id, direction) },
-            )
+            key(routine.id) {
+                EditableRoutineRow(
+                    routine = routine,
+                    onClick = { onOpenRoutineEditor(routine.id) },
+                    onDelete = { onRequestDelete(routine.id) },
+                    onMove = { direction -> onMoveRoutine(routine.id, direction) },
+                )
+            }
         }
     }
 }
@@ -2743,16 +2747,20 @@ private fun EditableRoutineRow(
     onClick: () -> Unit,
     onDelete: () -> Unit,
     onMove: (Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val maxRevealPx = with(LocalDensity.current) { 76.dp.toPx() }
     var swipeOffsetPx by remember(routine.id) { mutableFloatStateOf(0f) }
+    var reorderOffsetPx by remember(routine.id) { mutableFloatStateOf(0f) }
+    var isReordering by remember(routine.id) { mutableStateOf(false) }
     val routineTitle = routine.title.resolve(null, Locale.getDefault().toLanguageTag())
     val routineMeta = routine.scheduledTime?.toString() ?: stringResource(R.string.guardian_time_none)
     val rowDescription = stringResource(R.string.a11y_routine_edit_row, routineTitle, routineMeta)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 92.dp),
+            .heightIn(min = 92.dp)
+            .zIndex(if (isReordering) 1f else 0f),
     ) {
         if (swipeOffsetPx < -1f) {
             SwipeDeleteAction(
@@ -2767,7 +2775,13 @@ private fun EditableRoutineRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 92.dp)
-                .graphicsLayer { translationX = swipeOffsetPx }
+                .graphicsLayer {
+                    translationX = swipeOffsetPx
+                    translationY = reorderOffsetPx
+                    scaleX = if (isReordering) 1.02f else 1f
+                    scaleY = if (isReordering) 1.02f else 1f
+                    shadowElevation = if (isReordering) 12f else 0f
+                }
                 .clip(RoundedCornerShape(SteppieCornerRadius.Card))
                 .background(MaterialTheme.colorScheme.surface)
                 .border(SteppieStroke.Divider, MaterialTheme.colorScheme.outline, RoundedCornerShape(SteppieCornerRadius.Card))
@@ -2813,6 +2827,15 @@ private fun EditableRoutineRow(
             }
             DragHandle(
                 onMove = onMove,
+                onDragStateChange = { dragging ->
+                    isReordering = dragging
+                    if (dragging) {
+                        swipeOffsetPx = 0f
+                    }
+                },
+                onDragOffsetChange = { offset ->
+                    reorderOffsetPx = offset
+                },
                 contentDescription = stringResource(
                     R.string.a11y_item_action,
                     routineTitle,
@@ -2871,6 +2894,8 @@ private fun SwipeDeleteAction(
 @Composable
 private fun DragHandle(
     onMove: (Int) -> Unit,
+    onDragStateChange: (Boolean) -> Unit,
+    onDragOffsetChange: (Float) -> Unit,
     contentDescription: String,
     modifier: Modifier = Modifier,
 ) {
@@ -2886,18 +2911,30 @@ private fun DragHandle(
                 orientation = Orientation.Vertical,
                 state = rememberDraggableState { delta ->
                     dragDistance += delta
+                    onDragOffsetChange(dragDistance.coerceIn(-thresholdPx, thresholdPx))
                     when {
                         dragDistance <= -thresholdPx -> {
                             onMove(-1)
-                            dragDistance = 0f
+                            dragDistance += thresholdPx
+                            onDragOffsetChange(dragDistance.coerceIn(-thresholdPx, thresholdPx))
                         }
                         dragDistance >= thresholdPx -> {
                             onMove(1)
-                            dragDistance = 0f
+                            dragDistance -= thresholdPx
+                            onDragOffsetChange(dragDistance.coerceIn(-thresholdPx, thresholdPx))
                         }
                     }
                 },
-                onDragStopped = { dragDistance = 0f },
+                onDragStarted = {
+                    dragDistance = 0f
+                    onDragStateChange(true)
+                    onDragOffsetChange(0f)
+                },
+                onDragStopped = {
+                    dragDistance = 0f
+                    onDragOffsetChange(0f)
+                    onDragStateChange(false)
+                },
             ),
         contentAlignment = Alignment.Center,
     ) {
