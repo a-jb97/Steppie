@@ -1965,10 +1965,9 @@ struct GuardianModeView: View {
                         selectedRoutinePhotoItem = nil
                         onInteraction()
                     } label: {
-                        Label("사진 삭제", systemImage: "trash")
-                            .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                        secondaryPickerLabel("사진 삭제", foregroundColor: Color.steppieDanger)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
                     .accessibilityHint(Text("기본 아이콘으로 되돌립니다"))
                 }
             }
@@ -1979,7 +1978,10 @@ struct GuardianModeView: View {
         }
     }
 
-    private func secondaryPickerLabel(_ title: LocalizedStringKey) -> some View {
+    private func secondaryPickerLabel(
+        _ title: LocalizedStringKey,
+        foregroundColor: Color = Color.steppieTextPrimary
+    ) -> some View {
         Text(title)
             .steppieTextStyle(.button)
             .multilineTextAlignment(.center)
@@ -1987,7 +1989,7 @@ struct GuardianModeView: View {
             .frame(maxWidth: .infinity)
             .frame(minHeight: 54)
             .padding(.horizontal, SteppieSpacing.large)
-            .foregroundStyle(Color.steppieTextPrimary)
+            .foregroundStyle(foregroundColor)
             .background(Color.steppieBackgroundPrimary)
             .overlay {
                 RoundedRectangle(cornerRadius: SteppieCornerRadius.control)
