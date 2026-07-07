@@ -184,6 +184,9 @@
     <string name="guardian_field_title">활동 이름</string>
     <string name="guardian_field_time">예정 시각</string>
     <string name="guardian_time_placeholder">07:40</string>
+    <string name="guardian_time_set">시간 설정</string>
+    <string name="guardian_time_none_short">시간 없음</string>
+    <string name="guardian_time_current_selection">현재 선택: %1$s</string>
     <string name="guardian_icon_picker_title">아이콘 또는 사진</string>
     <string name="guardian_icon_picker_body">기본 아이콘을 쓰거나 사진을 선택합니다</string>
     <string name="guardian_photo_pick">사진 선택</string>

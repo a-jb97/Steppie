@@ -1,5 +1,6 @@
 package com.example.steppie.ui.guardian
 
+import android.app.TimePickerDialog
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -54,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -89,12 +91,13 @@ import com.example.steppie.ui.theme.SteppieLayout
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
-import java.util.Locale
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.TextStyle
+import java.util.Locale
 
 private val GuardianSplitMinimumWidth = 905.dp
 
@@ -1454,13 +1457,9 @@ private fun RoutineSetStepEditor(
             onPhotoRemove = onPhotoRemove,
         )
         ColorPicker(selectedColorToken = draft.colorToken, onSelected = onColorChange)
-        OutlinedTextField(
-            value = draft.scheduledTime,
-            onValueChange = onScheduledTimeChange,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.guardian_field_time)) },
-            placeholder = { Text(stringResource(R.string.guardian_time_placeholder)) },
-            singleLine = true,
+        ScheduledTimePicker(
+            scheduledTime = draft.scheduledTime,
+            onScheduledTimeChange = onScheduledTimeChange,
         )
         SteppieButton(
             label = stringResource(if (isEditing) R.string.guardian_update_step else R.string.guardian_add_step),
@@ -1908,20 +1907,160 @@ private fun GuardianCardEditScreen(
             onPhotoPick = onDraftPhotoPick,
             onCameraCapture = onDraftCameraCapture,
             onPhotoRemove = onDraftPhotoRemove,
+            showPhotoRemoveAction = false,
         )
         ColorPicker(selectedColorToken = draft.colorToken, onSelected = onDraftColorChange)
-        OutlinedTextField(
-            value = draft.scheduledTime,
-            onValueChange = onDraftScheduledTimeChange,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.guardian_field_time)) },
-            placeholder = { Text(stringResource(R.string.guardian_time_placeholder)) },
-            singleLine = true,
+        ScheduledTimePicker(
+            scheduledTime = draft.scheduledTime,
+            onScheduledTimeChange = onDraftScheduledTimeChange,
         )
         WarningMessage(stringResource(R.string.guardian_unsaved_warning))
         state.draftError?.let { ErrorMessage(it) }
     }
 }
+
+@Composable
+private fun ScheduledTimePicker(
+    scheduledTime: String,
+    onScheduledTimeChange: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val selectedTime = remember(scheduledTime) { scheduledTime.toLocalTimeOrNull() }
+    val hasScheduledTime = scheduledTime.isNotBlank()
+    val fallbackTime = selectedTime ?: LocalTime.NOON
+    val normalizedTime = selectedTime?.toStorageString().orEmpty()
+    val selectedText = normalizedTime.ifBlank { stringResource(R.string.guardian_time_none) }
+    val displayText = selectedTime?.formatLocalizedTime()
+        ?: scheduledTime.ifBlank { stringResource(R.string.guardian_time_none) }
+
+    fun showTimePicker() {
+        TimePickerDialog(
+            context,
+            { _, hour, minute ->
+                onScheduledTimeChange(LocalTime.of(hour, minute).toStorageString())
+            },
+            fallbackTime.hour,
+            fallbackTime.minute,
+            false,
+        ).show()
+    }
+
+    GuardianPanel(title = stringResource(R.string.guardian_field_time)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+        ) {
+            ScheduledTimeSegment(
+                label = stringResource(R.string.guardian_time_set),
+                selected = hasScheduledTime,
+                onClick = {
+                    if (!hasScheduledTime) onScheduledTimeChange(LocalTime.NOON.toStorageString())
+                    showTimePicker()
+                },
+                modifier = Modifier.weight(1f),
+            )
+            ScheduledTimeSegment(
+                label = stringResource(R.string.guardian_time_none_short),
+                selected = !hasScheduledTime,
+                onClick = { onScheduledTimeChange("") },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Text(
+            text = stringResource(R.string.guardian_time_current_selection, selectedText),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = SteppieTheme.typography.guardianBody,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.guardian_field_time),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianSection,
+            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(SteppieCornerRadius.Control))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .heightIn(min = 52.dp)
+                    .clickable(
+                        enabled = hasScheduledTime,
+                        role = Role.Button,
+                        onClick = ::showTimePicker,
+                    )
+                    .semantics {
+                        contentDescription = displayText
+                        role = Role.Button
+                    }
+                    .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.ExtraSmall),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = displayText,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = SteppieTheme.typography.guardianBody,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduledTimeSegment(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selectionState = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(SteppieCornerRadius.Control))
+            .background(containerColor)
+            .heightIn(min = 52.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics {
+                contentDescription = label
+                stateDescription = selectionState
+                role = Role.Button
+            }
+            .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.Small),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = contentColor,
+            style = SteppieTheme.typography.guardianBody,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+private fun String.toLocalTimeOrNull(): LocalTime? =
+    runCatching { LocalTime.parse(this) }.getOrNull()
+        ?.takeIf { it.second == 0 && it.nano == 0 }
+
+private fun LocalTime.toStorageString(): String =
+    String.format(Locale.US, "%02d:%02d", hour, minute)
+
+private fun LocalTime.formatLocalizedTime(): String =
+    DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+        .withLocale(Locale.getDefault())
+        .format(this)
 
 @Composable
 private fun GuardianRecordsScreen(
@@ -2949,6 +3088,7 @@ private fun IconPicker(
     onPhotoPick: () -> Unit,
     onCameraCapture: () -> Unit,
     onPhotoRemove: () -> Unit,
+    showPhotoRemoveAction: Boolean = true,
 ) {
     GuardianPanel(title = stringResource(R.string.guardian_icon_picker_title), body = stringResource(R.string.guardian_icon_picker_body)) {
         Row(
@@ -2987,7 +3127,7 @@ private fun IconPicker(
                     modifier = Modifier.fillMaxWidth(),
                     style = SteppieButtonStyle.Secondary,
                 )
-                if (selectedIcon is IconRef.Photo) {
+                if (showPhotoRemoveAction && selectedIcon is IconRef.Photo) {
                     SteppieButton(
                         label = stringResource(R.string.guardian_photo_remove),
                         onClick = onPhotoRemove,

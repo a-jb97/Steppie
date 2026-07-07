@@ -184,6 +184,9 @@
     <string name="guardian_field_title">Activity name</string>
     <string name="guardian_field_time">Scheduled time</string>
     <string name="guardian_time_placeholder">07:40</string>
+    <string name="guardian_time_set">Set time</string>
+    <string name="guardian_time_none_short">No time</string>
+    <string name="guardian_time_current_selection">Current selection: %1$s</string>
     <string name="guardian_icon_picker_title">Icon or photo</string>
     <string name="guardian_icon_picker_body">Use a built-in icon or choose a photo</string>
     <string name="guardian_photo_pick">Choose photo</string>
