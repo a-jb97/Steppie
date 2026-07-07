@@ -2,6 +2,7 @@ package com.example.steppie.ui.guardian
 
 import android.app.TimePickerDialog
 import androidx.annotation.DrawableRes
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,6 +38,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -108,6 +111,7 @@ fun GuardianModeScreen(
     onDeletePinDigit: () -> Unit,
     onCloseToChild: () -> Unit,
     onInteraction: () -> Unit,
+    onNavigateBack: () -> Unit,
     onOpenHome: () -> Unit,
     onOpenRoutineEdit: () -> Unit,
     onOpenEnvironmentSettings: () -> Unit = {},
@@ -197,6 +201,23 @@ fun GuardianModeScreen(
                 }
             },
     ) {
+        BackHandler(
+            enabled = true,
+            onBack = {
+                when (state.destination) {
+                    GuardianDestination.Home -> onCloseToChild()
+                    GuardianDestination.Pin -> {
+                        if (state.pinMode == GuardianPinMode.Enter || state.destinationBackStack.isEmpty()) {
+                            onCloseToChild()
+                        } else {
+                            onNavigateBack()
+                        }
+                    }
+                    else -> onNavigateBack()
+                }
+            },
+        )
+
         when (state.destination) {
             GuardianDestination.Pin -> GuardianPinScreen(
                 state = state,
@@ -218,7 +239,7 @@ fun GuardianModeScreen(
                 if (maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight) {
                     GuardianRoutineSplitScreen(
                         state = state,
-                        onOpenHome = onOpenHome,
+                        onNavigateBack = onNavigateBack,
                         onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                         onOpenTemplateSelect = onOpenTemplateSelect,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
@@ -234,7 +255,7 @@ fun GuardianModeScreen(
                 } else {
                     GuardianRoutineEditScreen(
                         state = state,
-                        onOpenHome = onOpenHome,
+                        onNavigateBack = onNavigateBack,
                         onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                         onOpenTemplateSelect = onOpenTemplateSelect,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
@@ -272,6 +293,7 @@ fun GuardianModeScreen(
             GuardianDestination.RoutineSetCreate -> GuardianRoutineSetCreateScreen(
                 state = state,
                 useSplitLayout = maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight,
+                onNavigateBack = onNavigateBack,
                 onOpenHome = onOpenHome,
                 onRoutineSetNameChange = onRoutineSetNameChange,
                 onRoutineSetStepTitleChange = onRoutineSetStepTitleChange,
@@ -289,7 +311,7 @@ fun GuardianModeScreen(
             GuardianDestination.EnvironmentSettings -> GuardianEnvironmentSettingsScreen(
                 settings = state.appSettings,
                 useWideLayout = maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight,
-                onOpenHome = onOpenHome,
+                onNavigateBack = onNavigateBack,
                 onFeedbackIntensityChange = onFeedbackIntensityChange,
                 onTtsEnabledChange = onTtsEnabledChange,
                 onTtsRateChange = onTtsRateChange,
@@ -304,11 +326,11 @@ fun GuardianModeScreen(
             GuardianDestination.Records -> GuardianRecordsScreen(
                 state = state,
                 useWideLayout = maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight,
-                onOpenHome = onOpenHome,
+                onNavigateBack = onNavigateBack,
                 onSelectRecordsDate = onSelectRecordsDate,
             )
             GuardianDestination.Security -> GuardianSecurityScreen(
-                onOpenHome = onOpenHome,
+                onNavigateBack = onNavigateBack,
                 onOpenPinChange = onOpenPinChange,
                 onOpenRecoveryCode = onOpenRecoveryCode,
                 onOpenBackupRestore = onOpenBackupRestore,
@@ -698,7 +720,7 @@ private fun GuardianHomeScreen(
 private fun GuardianEnvironmentSettingsScreen(
     settings: AppSettings,
     useWideLayout: Boolean,
-    onOpenHome: () -> Unit,
+    onNavigateBack: () -> Unit,
     onFeedbackIntensityChange: (FeedbackIntensity) -> Unit,
     onTtsEnabledChange: (Boolean) -> Unit,
     onTtsRateChange: (Double) -> Unit,
@@ -713,7 +735,7 @@ private fun GuardianEnvironmentSettingsScreen(
     GuardianScaffold(
         title = stringResource(R.string.guardian_environment_title),
         subtitle = stringResource(R.string.guardian_environment_subtitle),
-        onBack = onOpenHome,
+        onBack = onNavigateBack,
     ) {
         val firstColumn: @Composable ColumnScope.() -> Unit = {
             SettingBlock(title = stringResource(R.string.guardian_setting_feedback_intensity)) {
@@ -1069,7 +1091,7 @@ private fun QuietHoursNotice(settings: AppSettings) {
 @Composable
 private fun GuardianRoutineEditScreen(
     state: GuardianModeUiState,
-    onOpenHome: () -> Unit,
+    onNavigateBack: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
     onOpenTemplateSelect: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
@@ -1085,7 +1107,7 @@ private fun GuardianRoutineEditScreen(
     GuardianScaffold(
         title = stringResource(R.string.guardian_menu_routine),
         subtitle = stringResource(R.string.guardian_routine_edit_subtitle),
-        onBack = onOpenHome,
+        onBack = onNavigateBack,
         topActionLabel = stringResource(
             if (state.routineSetListEditing) R.string.action_done_editing else R.string.action_edit,
         ),
@@ -1323,6 +1345,7 @@ private fun IconTextButton(
 private fun GuardianRoutineSetCreateScreen(
     state: GuardianModeUiState,
     useSplitLayout: Boolean,
+    onNavigateBack: () -> Unit,
     onOpenHome: () -> Unit,
     onRoutineSetNameChange: (String) -> Unit,
     onRoutineSetStepTitleChange: (String) -> Unit,
@@ -1341,7 +1364,7 @@ private fun GuardianRoutineSetCreateScreen(
     GuardianScaffold(
         title = stringResource(R.string.guardian_routine_set_create_title),
         subtitle = stringResource(R.string.guardian_routine_set_create_subtitle),
-        onBack = onOpenHome,
+        onBack = onNavigateBack,
         bottom = {
             Row(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium)) {
                 SteppieButton(
@@ -1563,7 +1586,7 @@ private fun EmptyRoutineSetPanel(onOpenNewRoutineSet: () -> Unit) {
 @Composable
 private fun GuardianRoutineSplitScreen(
     state: GuardianModeUiState,
-    onOpenHome: () -> Unit,
+    onNavigateBack: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
     onOpenTemplateSelect: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
@@ -1584,7 +1607,7 @@ private fun GuardianRoutineSplitScreen(
         ) {
             GuardianRoutineEditScreen(
                 state = state,
-                onOpenHome = onOpenHome,
+                onNavigateBack = onNavigateBack,
                 onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                 onOpenTemplateSelect = onOpenTemplateSelect,
                 onOpenNewRoutineEditor = onOpenNewRoutineEditor,
@@ -2066,13 +2089,13 @@ private fun LocalTime.formatLocalizedTime(): String =
 private fun GuardianRecordsScreen(
     state: GuardianModeUiState,
     useWideLayout: Boolean,
-    onOpenHome: () -> Unit,
+    onNavigateBack: () -> Unit,
     onSelectRecordsDate: (LocalDate) -> Unit,
 ) {
     GuardianScaffold(
         title = stringResource(R.string.guardian_records_title),
         subtitle = stringResource(R.string.guardian_records_subtitle),
-        onBack = onOpenHome,
+        onBack = onNavigateBack,
     ) {
         if (useWideLayout) {
             Row(
@@ -2475,7 +2498,7 @@ private fun recordCompletedTimeText(completedAt: java.time.Instant): String =
 
 @Composable
 private fun GuardianSecurityScreen(
-    onOpenHome: () -> Unit,
+    onNavigateBack: () -> Unit,
     onOpenPinChange: () -> Unit,
     onOpenRecoveryCode: () -> Unit,
     onOpenBackupRestore: () -> Unit,
@@ -2483,7 +2506,7 @@ private fun GuardianSecurityScreen(
     GuardianScaffold(
         title = stringResource(R.string.guardian_security_title),
         subtitle = stringResource(R.string.guardian_security_subtitle),
-        onBack = onOpenHome,
+        onBack = onNavigateBack,
     ) {
         GuardianMenuCard(R.drawable.ic_guardian_security_warning, stringResource(R.string.guardian_pin_change), stringResource(R.string.guardian_pin_change_desc), onOpenPinChange)
         GuardianMenuCard(R.drawable.ic_guardian_security_warning, stringResource(R.string.guardian_recovery_code), stringResource(R.string.guardian_recovery_code_desc), onOpenRecoveryCode)
@@ -2793,14 +2816,18 @@ private fun GuardianTopBar(
         verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
     ) {
         if (onBack != null) {
-            Text(
-                text = stringResource(R.string.action_back),
+            IconButton(
+                onClick = onBack,
                 modifier = Modifier
-                    .heightIn(min = SteppieLayout.GuardianMinimumTouchTarget)
-                    .clickable(role = Role.Button, onClick = onBack),
-                color = MaterialTheme.colorScheme.primary,
-                style = SteppieTheme.typography.button,
-            )
+                    .size(SteppieLayout.GuardianMinimumTouchTarget),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_arrow_back),
+                    contentDescription = stringResource(R.string.action_back),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),

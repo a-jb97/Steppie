@@ -177,6 +177,7 @@ class MainActivity : ComponentActivity() {
                         onDeletePinDigit = guardianViewModel::deletePinDigit,
                         onCloseToChild = guardianViewModel::closeToChild,
                         onInteraction = guardianViewModel::markInteraction,
+                        onNavigateBack = guardianViewModel::navigateBack,
                         onOpenHome = guardianViewModel::openHome,
                         onOpenRoutineEdit = guardianViewModel::openRoutineEdit,
                         onOpenEnvironmentSettings = guardianViewModel::openEnvironmentSettings,
