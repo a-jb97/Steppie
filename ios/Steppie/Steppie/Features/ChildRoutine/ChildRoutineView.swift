@@ -105,7 +105,8 @@ struct ChildRoutineView: View {
                     childHeader(
                         title: "screen.feedback.title",
                         subtitle: "screen.feedback.subtitle",
-                        titleStyle: .childFeedbackTitle
+                        titleStyle: .childFeedbackTitle,
+                        titleColor: .steppieSuccess
                     )
                 } else {
                     childHeader(
@@ -223,12 +224,13 @@ struct ChildRoutineView: View {
     private func childHeader(
         title: LocalizedStringKey,
         subtitle: LocalizedStringKey,
-        titleStyle: SteppieTextStyle
+        titleStyle: SteppieTextStyle,
+        titleColor: Color = .steppieTextSecondary
     ) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
             Text(title)
                 .steppieTextStyle(titleStyle)
-                .foregroundStyle(Color.steppieTextSecondary)
+                .foregroundStyle(titleColor)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
 
