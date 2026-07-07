@@ -420,9 +420,15 @@ private fun FocusRoutineContent(
     val title = routine.localizedTitle()
     val isFeedback = state.feedbackRoutineId == routine.id
     val isCompleted = routine.id in state.completedRoutineIds || isFeedback
+    val isCurrent = state.currentRoutine?.id == routine.id
+    val cardState = when {
+        isCompleted -> RoutineCardState.Completed
+        isCurrent -> RoutineCardState.Current
+        else -> RoutineCardState.Upcoming
+    }
     RoutineCard(
         title = if (isFeedback) stringResource(R.string.child_completed_card_title, title) else title,
-        state = if (isCompleted) RoutineCardState.Completed else RoutineCardState.Current,
+        state = cardState,
         onClick = onCompleteRoutine,
         modifier = Modifier
             .fillMaxWidth()
@@ -432,8 +438,10 @@ private fun FocusRoutineContent(
         cardColor = routine.cardColor(),
         meta = if (isCompleted) {
             stringResource(R.string.routine_state_completed)
-        } else {
+        } else if (isCurrent) {
             stringResource(R.string.child_focus_tap_hint)
+        } else {
+            stringResource(R.string.child_focus_upcoming_hint)
         },
         focusMaxWidth = if (tablet) {
             SteppieLayout.FocusCardTabletMaxWidth
@@ -470,7 +478,7 @@ private fun RoutineList(
         contentPadding = PaddingValues(bottom = contentBottomPadding),
     ) {
         items(state.routines, key = Routine::id) { routine ->
-            val isCurrent = routine.id == state.selectedRoutineId
+            val isCurrent = routine.id == state.currentRoutine?.id
             val isCompleted = routine.id in state.completedRoutineIds
             RoutineCard(
                 title = routine.localizedTitle(),

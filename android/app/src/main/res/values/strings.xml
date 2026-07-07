@@ -9,6 +9,7 @@
     <string name="child_focus_title">지금 할 일</string>
     <string name="child_focus_subtitle">지금은 이 활동을 해요</string>
     <string name="child_focus_tap_hint">카드를 누르면 완료</string>
+    <string name="child_focus_upcoming_hint">앞으로 할 일이에요</string>
     <string name="child_feedback_title">잘했어요!</string>
     <string name="child_feedback_subtitle">다음 활동으로 넘어가요</string>
     <string name="child_completed_card_title">%1$s 완료!</string>

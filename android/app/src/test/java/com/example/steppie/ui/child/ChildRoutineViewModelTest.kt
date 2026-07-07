@@ -89,4 +89,27 @@ class ChildRoutineViewModelTest {
         assertEquals(routines[0].id, feedback.feedbackRoutine?.id)
         assertEquals(routines[1].id, feedback.nextIncompleteRoutine?.id)
     }
+
+    @Test
+    fun `future selection is not completable until previous routines are done`() {
+        val routines = RoutineSampleData.morning.routines
+
+        val futureSelection = childRoutineState(
+            routines = routines,
+            completedRoutineIds = emptySet(),
+            selectedRoutineId = routines[2].id,
+            singlePane = ChildSinglePane.Focus,
+        )
+        val currentSelection = childRoutineState(
+            routines = routines,
+            completedRoutineIds = setOf(routines[0].id, routines[1].id),
+            selectedRoutineId = routines[2].id,
+            singlePane = ChildSinglePane.Focus,
+        )
+
+        assertEquals(routines[0].id, futureSelection.currentRoutine?.id)
+        assertEquals(false, futureSelection.isSelectedRoutineCompletable)
+        assertEquals(routines[2].id, currentSelection.currentRoutine?.id)
+        assertEquals(true, currentSelection.isSelectedRoutineCompletable)
+    }
 }

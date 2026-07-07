@@ -42,8 +42,12 @@ data class ChildRoutineUiState(
         get() = routines.firstOrNull { it.id == feedbackRoutineId }
     val undoRoutine: Routine?
         get() = routines.firstOrNull { it.id == undoRoutineId }
-    val nextIncompleteRoutine: Routine?
+    val currentRoutine: Routine?
         get() = routines.firstOrNull { it.id !in completedRoutineIds && it.id != feedbackRoutineId }
+    val nextIncompleteRoutine: Routine?
+        get() = currentRoutine
+    val isSelectedRoutineCompletable: Boolean
+        get() = feedbackRoutineId == null && selectedRoutineId != null && selectedRoutineId == currentRoutine?.id
     val progressCount: Int
         get() = routines.count { it.id in completedRoutineIds || it.id == feedbackRoutineId }
     val progressTotal: Int
@@ -138,7 +142,15 @@ class ChildRoutineViewModel(
     }
 
     fun showFocus() {
-        _uiState.value = _uiState.value.copy(singlePane = ChildSinglePane.Focus)
+        val state = _uiState.value
+        _uiState.value = state.copy(
+            selectedRoutineId = if (state.feedbackRoutineId == null) {
+                state.currentRoutine?.id
+            } else {
+                state.selectedRoutineId
+            },
+            singlePane = ChildSinglePane.Focus,
+        )
     }
 
     fun selectRoutine(routineId: String) {
@@ -154,7 +166,7 @@ class ChildRoutineViewModel(
     fun completeSelectedRoutine() {
         val state = _uiState.value
         val routine = state.selectedRoutine ?: return
-        if (routine.id in state.completedRoutineIds || state.feedbackRoutineId != null) return
+        if (!state.isSelectedRoutineCompletable || routine.id in state.completedRoutineIds) return
 
         _uiState.value = state.copy(
             feedbackRoutineId = routine.id,

@@ -9,6 +9,7 @@
     <string name="child_focus_title">Now</string>
     <string name="child_focus_subtitle">This is the step to do now</string>
     <string name="child_focus_tap_hint">Tap the card when finished</string>
+    <string name="child_focus_upcoming_hint">This comes later</string>
     <string name="child_feedback_title">Well done!</string>
     <string name="child_feedback_subtitle">Moving to the next activity</string>
     <string name="child_completed_card_title">%1$s done!</string>
