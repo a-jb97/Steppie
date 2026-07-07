@@ -1,5 +1,10 @@
 package com.example.steppie.ui.child
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,10 +42,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
@@ -55,17 +64,20 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.steppie.R
+import com.example.steppie.domain.model.FeedbackIntensity
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.ui.components.RoutineCard
 import com.example.steppie.ui.components.RoutineCardColor
 import com.example.steppie.ui.components.RoutineCardPresentation
 import com.example.steppie.ui.components.RoutineCardState
+import com.example.steppie.ui.components.rememberAnimationsEnabled
 import com.example.steppie.ui.theme.SteppieCornerRadius
 import com.example.steppie.ui.theme.SteppieLayout
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
 private val SplitLayoutMinimumWidth = 905.dp
@@ -186,7 +198,10 @@ private fun PhoneFocusView(
                 tablet = false,
                 onCompleteRoutine = onCompleteRoutine,
             )
-            state.isAllComplete -> AllCompleteContent(modifier = Modifier.weightlessFill())
+            state.isAllComplete -> AllCompleteContent(
+                feedbackIntensity = state.feedbackIntensity,
+                modifier = Modifier.weightlessFill(),
+            )
             else -> EmptyRoutineContent(modifier = Modifier.weightlessFill())
         }
         if (state.undoRoutine != null) {
@@ -348,7 +363,7 @@ private fun SplitRoutineLayout(
                         }
                     }
                 }
-                state.isAllComplete -> AllCompleteContent()
+                state.isAllComplete -> AllCompleteContent(feedbackIntensity = state.feedbackIntensity)
                 else -> EmptyRoutineContent()
             }
         }
@@ -421,6 +436,7 @@ private fun FocusRoutineContent(
     val isFeedback = state.feedbackRoutineId == routine.id
     val isCompleted = routine.id in state.completedRoutineIds || isFeedback
     val isCurrent = state.currentRoutine?.id == routine.id
+    val animationsEnabled = rememberAnimationsEnabled()
     val cardState = when {
         isCompleted -> RoutineCardState.Completed
         isCurrent -> RoutineCardState.Current
@@ -450,11 +466,20 @@ private fun FocusRoutineContent(
         },
     ) {
         if (isFeedback) {
-            Image(
-                painter = painterResource(R.drawable.ic_feedback_check),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-            )
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (animationsEnabled && state.feedbackIntensity == FeedbackIntensity.Strong) {
+                    CheckParticleBurstLayer(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .testTag("check_particle_burst_layer"),
+                    )
+                }
+                Image(
+                    painter = painterResource(R.drawable.ic_feedback_check),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         } else {
             RoutineIcon(icon = routine.icon, focus = true, modifier = Modifier.fillMaxSize())
         }
@@ -648,9 +673,34 @@ private fun AllCompletePreview(onClick: () -> Unit) {
 }
 
 @Composable
-private fun AllCompleteContent(modifier: Modifier = Modifier) {
+private fun AllCompleteContent(
+    feedbackIntensity: FeedbackIntensity,
+    modifier: Modifier = Modifier,
+) {
     val description = stringResource(R.string.a11y_all_complete)
-    Column(
+    val animationsEnabled = rememberAnimationsEnabled()
+    val shouldPulseStamp =
+        animationsEnabled &&
+        feedbackIntensity in setOf(FeedbackIntensity.Strong, FeedbackIntensity.Normal)
+    val stampPulse = remember { Animatable(0f) }
+    LaunchedEffect(shouldPulseStamp) {
+        if (shouldPulseStamp) {
+            stampPulse.snapTo(0f)
+            stampPulse.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing),
+            )
+        } else {
+            stampPulse.snapTo(0f)
+        }
+    }
+    val stampScale = if (shouldPulseStamp) {
+        1f + 0.10f * kotlin.math.sin(stampPulse.value * Math.PI).toFloat()
+    } else {
+        1f
+    }
+
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 620.dp)
@@ -660,30 +710,172 @@ private fun AllCompleteContent(modifier: Modifier = Modifier) {
                 contentDescription = description
             }
             .padding(SteppieSpacing.ExtraLarge),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        contentAlignment = Alignment.Center,
     ) {
-        Image(
-            painter = painterResource(R.drawable.complete_stamp),
-            contentDescription = null,
-            modifier = Modifier.size(width = 168.dp, height = 164.dp),
-        )
-        Spacer(Modifier.size(SteppieSpacing.Large))
-        Text(
-            text = stringResource(R.string.child_all_complete_title),
-            color = MaterialTheme.colorScheme.onSurface,
-            style = SteppieTheme.typography.childCardTitle,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.size(SteppieSpacing.Medium))
-        Text(
-            text = stringResource(R.string.child_all_complete_subtitle),
-            color = Color(0xFF44499E),
-            style = SteppieTheme.typography.guardianSection,
-            textAlign = TextAlign.Center,
-        )
+        if (animationsEnabled && feedbackIntensity == FeedbackIntensity.Strong) {
+            BirthdayFireworksLayer(
+                modifier = Modifier
+                    .matchParentSize()
+                    .testTag("birthday_fireworks_layer"),
+            )
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Image(
+                painter = painterResource(R.drawable.complete_stamp),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(width = 168.dp, height = 164.dp)
+                    .scale(stampScale),
+            )
+            Spacer(Modifier.size(SteppieSpacing.Large))
+            Text(
+                text = stringResource(R.string.child_all_complete_title),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.childCardTitle,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.size(SteppieSpacing.Medium))
+            Text(
+                text = stringResource(R.string.child_all_complete_subtitle),
+                color = Color(0xFF44499E),
+                style = SteppieTheme.typography.guardianSection,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
+
+@Composable
+private fun CheckParticleBurstLayer(modifier: Modifier = Modifier) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 860, easing = FastOutSlowInEasing),
+        )
+    }
+    val colors = listOf(
+        Color(0xFFFFD54F),
+        Color(0xFF80CBC4),
+        Color(0xFFF48FB1),
+        Color(0xFF64B5F6),
+        Color(0xFFFF8A65),
+        Color(0xFFA5D6A7),
+        Color(0xFFB39DDB),
+        Color(0xFFFFF176),
+    )
+
+    Canvas(modifier = modifier) {
+        val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+        val eased = 1f - (1f - progress.value) * (1f - progress.value)
+        val alpha = (1f - progress.value).coerceIn(0f, 1f)
+        val primaryRadius = size.minDimension * 0.52f
+        val secondaryRadius = size.minDimension * 0.34f
+        repeat(24) { particle ->
+            val angle = Math.PI * 2.0 * particle / 24.0
+            val stagger = if (particle % 2 == 0) 1f else 0.78f
+            val distance = primaryRadius * eased * stagger
+            val particleCenter = androidx.compose.ui.geometry.Offset(
+                x = center.x + kotlin.math.cos(angle).toFloat() * distance,
+                y = center.y + kotlin.math.sin(angle).toFloat() * distance,
+            )
+            val trailStart = androidx.compose.ui.geometry.Offset(
+                x = center.x + kotlin.math.cos(angle).toFloat() * distance * 0.58f,
+                y = center.y + kotlin.math.sin(angle).toFloat() * distance * 0.58f,
+            )
+            val color = colors[particle % colors.size].copy(alpha = alpha)
+            drawLine(
+                color = color.copy(alpha = alpha * 0.65f),
+                start = trailStart,
+                end = particleCenter,
+                strokeWidth = 3.5f * (1f - progress.value) + 1f,
+                cap = StrokeCap.Round,
+            )
+            drawCircle(
+                color = color,
+                radius = 3.5f + 5.5f * (1f - progress.value),
+                center = particleCenter,
+            )
+        }
+        repeat(12) { particle ->
+            val angle = (Math.PI * 2.0 * particle / 12.0) + 0.26
+            val distance = secondaryRadius * eased
+            drawCircle(
+                color = colors[(particle + 3) % colors.size].copy(alpha = alpha * 0.80f),
+                radius = 2.5f + 3.5f * (1f - progress.value),
+                center = androidx.compose.ui.geometry.Offset(
+                    x = center.x + kotlin.math.cos(angle).toFloat() * distance,
+                    y = center.y + kotlin.math.sin(angle).toFloat() * distance,
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun BirthdayFireworksLayer(modifier: Modifier = Modifier) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay(80)
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 1_360, easing = LinearEasing),
+        )
+    }
+    val colors = listOf(
+        Color(0xFFFFD54F),
+        Color(0xFF80CBC4),
+        Color(0xFFF48FB1),
+        Color(0xFF64B5F6),
+        Color(0xFFFFAB91),
+    )
+    val bursts = remember {
+        listOf(
+            FireworkBurst(x = 0.22f, y = 0.26f, delay = 0.00f, radius = 0.20f),
+            FireworkBurst(x = 0.76f, y = 0.22f, delay = 0.10f, radius = 0.22f),
+            FireworkBurst(x = 0.50f, y = 0.34f, delay = 0.22f, radius = 0.18f),
+            FireworkBurst(x = 0.32f, y = 0.52f, delay = 0.34f, radius = 0.16f),
+            FireworkBurst(x = 0.70f, y = 0.50f, delay = 0.42f, radius = 0.16f),
+        )
+    }
+
+    Canvas(modifier = modifier) {
+        bursts.forEachIndexed { burstIndex, burst ->
+            val localProgress = ((progress.value - burst.delay) / 0.58f).coerceIn(0f, 1f)
+            if (localProgress <= 0f || localProgress >= 1f) return@forEachIndexed
+            val eased = 1f - (1f - localProgress) * (1f - localProgress)
+            val alpha = (1f - localProgress).coerceIn(0f, 1f)
+            val center = androidx.compose.ui.geometry.Offset(
+                x = size.width * burst.x,
+                y = size.height * burst.y,
+            )
+            val maxRadius = size.minDimension * burst.radius
+            repeat(12) { particle ->
+                val angle = (Math.PI * 2.0 * particle / 12.0) + (burstIndex * 0.18)
+                val distance = maxRadius * eased
+                val particleCenter = androidx.compose.ui.geometry.Offset(
+                    x = center.x + kotlin.math.cos(angle).toFloat() * distance,
+                    y = center.y + kotlin.math.sin(angle).toFloat() * distance,
+                )
+                drawCircle(
+                    color = colors[(particle + burstIndex) % colors.size].copy(alpha = alpha),
+                    radius = 5f + 4f * (1f - localProgress),
+                    center = particleCenter,
+                )
+            }
+        }
+    }
+}
+
+private data class FireworkBurst(
+    val x: Float,
+    val y: Float,
+    val delay: Float,
+    val radius: Float,
+)
 
 @Composable
 private fun FocusListNavigation(
