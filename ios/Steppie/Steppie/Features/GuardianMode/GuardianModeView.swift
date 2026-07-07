@@ -539,24 +539,16 @@ struct GuardianModeView: View {
                     }
                 }
                 labeledCard("예정 시각") {
-                    adaptiveControlStack {
-                        DatePicker(
-                            "예정 시각",
-                            selection: routineSetStepScheduledDateBinding,
-                            displayedComponents: .hourAndMinute
-                        )
-                        .accessibilityHint(Text("a11y.guardian.scheduledTime.selectHint"))
-                        if !dynamicTypeSize.isAccessibilitySize {
-                            Spacer()
-                        }
-                        Button("시간 없음") {
+                    scheduledTimeEditor(
+                        scheduledTime: stepDraft.scheduledTime,
+                        date: routineSetStepScheduledDateBinding,
+                        setDefaultTime: {
+                            viewModel.routineSetStepDraft?.scheduledTime = defaultScheduledTime
+                        },
+                        clearTime: {
                             viewModel.routineSetStepDraft?.scheduledTime = nil
-                            onInteraction()
                         }
-                        .buttonStyle(.borderless)
-                        .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
-                        .accessibilityHint(Text("a11y.guardian.scheduledTime.clearHint"))
-                    }
+                    )
                 }
                 HStack(spacing: SteppieSpacing.medium) {
                     SteppieButton("취소", role: .secondary) {
@@ -1147,24 +1139,16 @@ struct GuardianModeView: View {
                     }
                 }
                 labeledCard("예정 시각") {
-                    adaptiveControlStack {
-                        DatePicker(
-                            "예정 시각",
-                            selection: scheduledDateBinding,
-                            displayedComponents: .hourAndMinute
-                        )
-                        .accessibilityHint(Text("a11y.guardian.scheduledTime.selectHint"))
-                        if !dynamicTypeSize.isAccessibilitySize {
-                            Spacer()
-                        }
-                        Button("시간 없음") {
+                    scheduledTimeEditor(
+                        scheduledTime: draft.scheduledTime,
+                        date: scheduledDateBinding,
+                        setDefaultTime: {
+                            viewModel.draft?.scheduledTime = defaultScheduledTime
+                        },
+                        clearTime: {
                             viewModel.draft?.scheduledTime = nil
-                            onInteraction()
                         }
-                        .buttonStyle(.borderless)
-                        .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
-                        .accessibilityHint(Text("a11y.guardian.scheduledTime.clearHint"))
-                    }
+                    )
                 }
                 if viewModel.hasUnsavedDraft {
                     warningNote("저장하지 않고 나가면 확인이 필요합니다.")
@@ -1879,6 +1863,50 @@ struct GuardianModeView: View {
         .accessibilityValue(Text(accessibilityValue))
     }
 
+    private func scheduledTimeEditor(
+        scheduledTime: LocalTime?,
+        date: Binding<Date>,
+        setDefaultTime: @escaping () -> Void,
+        clearTime: @escaping () -> Void
+    ) -> some View {
+        let hasTime = scheduledTime != nil
+        return VStack(alignment: .leading, spacing: SteppieSpacing.small) {
+            adaptiveSegmentRow {
+                settingSegment(
+                    title: "시간 설정",
+                    isSelected: hasTime,
+                    accessibilityValue: hasTime ? "선택됨" : "선택 안 됨"
+                ) {
+                    if !hasTime {
+                        setDefaultTime()
+                    }
+                }
+                settingSegment(
+                    title: "시간 없음",
+                    isSelected: !hasTime,
+                    accessibilityValue: hasTime ? "선택 안 됨" : "선택됨"
+                ) {
+                    clearTime()
+                }
+            }
+
+            Text(hasTime ? "현재 선택: \(scheduledTime?.description ?? "")" : "현재 선택: 시간 없음")
+                .steppieTextStyle(.guardianCaption)
+                .foregroundStyle(Color.steppieTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if hasTime {
+                DatePicker(
+                    "예정 시각",
+                    selection: date,
+                    displayedComponents: .hourAndMinute
+                )
+                .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                .accessibilityHint(Text("a11y.guardian.scheduledTime.selectHint"))
+            }
+        }
+    }
+
     private func warningNote(_ text: String) -> some View {
         HStack(spacing: SteppieSpacing.small) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -2314,6 +2342,10 @@ struct GuardianModeView: View {
                 onInteraction()
             }
         )
+    }
+
+    private var defaultScheduledTime: LocalTime {
+        try! LocalTime(hour: 7, minute: 30)
     }
 
     private var routineSetStepScheduledDateBinding: Binding<Date> {
