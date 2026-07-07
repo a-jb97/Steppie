@@ -5,14 +5,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.example.steppie.data.sample.RoutineSampleData
+import com.example.steppie.domain.model.FeedbackIntensity
 import com.example.steppie.ui.theme.SteppieTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -321,10 +324,131 @@ class ChildRoutineScreenTest {
         composeRule.onNodeWithText("오늘 할 일 완료!").assertIsDisplayed()
     }
 
+    @Test
+    fun strongRoutineFeedbackShowsCheckParticles() {
+        composeRule.setContent {
+            SteppieTheme {
+                ChildRoutineScreen(
+                    state = routineFeedbackState(FeedbackIntensity.Strong),
+                    onShowList = {},
+                    onShowFocus = {},
+                    onSelectRoutine = {},
+                    onCompleteRoutine = {},
+                    onAdvanceFromFeedback = {},
+                    onUndoRoutine = {},
+                    modifier = Modifier.requiredSize(393.dp, 852.dp),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("일어나기 완료!").assertIsDisplayed()
+        composeRule.onNodeWithTag("check_particle_burst_layer", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun nonStrongRoutineFeedbackDoesNotShowCheckParticles() {
+        listOf(
+            FeedbackIntensity.Normal,
+            FeedbackIntensity.Quiet,
+            FeedbackIntensity.Off,
+        ).forEach { intensity ->
+            composeRule.setContent {
+                SteppieTheme {
+                    ChildRoutineScreen(
+                        state = routineFeedbackState(intensity),
+                        onShowList = {},
+                        onShowFocus = {},
+                        onSelectRoutine = {},
+                        onCompleteRoutine = {},
+                        onAdvanceFromFeedback = {},
+                        onUndoRoutine = {},
+                        modifier = Modifier.requiredSize(393.dp, 852.dp),
+                    )
+                }
+            }
+
+            composeRule.onNodeWithText("일어나기 완료!").assertIsDisplayed()
+            composeRule.onAllNodesWithTag("check_particle_burst_layer", useUnmergedTree = true).assertCountEquals(0)
+        }
+    }
+
+    @Test
+    fun strongAllCompleteShowsBirthdayFireworks() {
+        composeRule.setContent {
+            SteppieTheme {
+                ChildRoutineScreen(
+                    state = allCompleteState(FeedbackIntensity.Strong),
+                    onShowList = {},
+                    onShowFocus = {},
+                    onSelectRoutine = {},
+                    onCompleteRoutine = {},
+                    onAdvanceFromFeedback = {},
+                    onUndoRoutine = {},
+                    modifier = Modifier.requiredSize(393.dp, 852.dp),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("오늘 할 일 완료!").assertIsDisplayed()
+        composeRule.onNodeWithTag("birthday_fireworks_layer", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun nonStrongAllCompleteDoesNotShowBirthdayFireworks() {
+        listOf(
+            FeedbackIntensity.Normal,
+            FeedbackIntensity.Quiet,
+            FeedbackIntensity.Off,
+        ).forEach { intensity ->
+            composeRule.setContent {
+                SteppieTheme {
+                    ChildRoutineScreen(
+                        state = allCompleteState(intensity),
+                        onShowList = {},
+                        onShowFocus = {},
+                        onSelectRoutine = {},
+                        onCompleteRoutine = {},
+                        onAdvanceFromFeedback = {},
+                        onUndoRoutine = {},
+                        modifier = Modifier.requiredSize(393.dp, 852.dp),
+                    )
+                }
+            }
+
+            composeRule.onNodeWithText("오늘 할 일 완료!").assertIsDisplayed()
+            composeRule.onAllNodesWithTag("birthday_fireworks_layer", useUnmergedTree = true).assertCountEquals(0)
+        }
+    }
+
     private fun sampleState(): ChildRoutineUiState = childRoutineState(
         routines = RoutineSampleData.morning.routines,
         completedRoutineIds = emptySet(),
         selectedRoutineId = null,
         singlePane = ChildSinglePane.Focus,
     )
+
+    private fun allCompleteState(intensity: FeedbackIntensity): ChildRoutineUiState {
+        val routines = RoutineSampleData.morning.routines
+        return childRoutineState(
+            routines = routines,
+            completedRoutineIds = routines.mapTo(mutableSetOf()) { it.id },
+            selectedRoutineId = null,
+            singlePane = ChildSinglePane.Focus,
+            feedbackIntensity = intensity,
+        )
+    }
+
+    private fun routineFeedbackState(intensity: FeedbackIntensity): ChildRoutineUiState {
+        val routines = RoutineSampleData.morning.routines
+        val routine = routines.first()
+        return childRoutineState(
+            routines = routines,
+            completedRoutineIds = setOf(routine.id),
+            selectedRoutineId = routine.id,
+            singlePane = ChildSinglePane.Focus,
+            feedbackRoutineId = routine.id,
+            undoRoutineId = routine.id,
+            feedbackIntensity = intensity,
+        )
+    }
 }

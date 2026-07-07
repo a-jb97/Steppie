@@ -1,6 +1,7 @@
 package com.example.steppie.ui.child
 
 import com.example.steppie.data.sample.RoutineSampleData
+import com.example.steppie.domain.model.FeedbackIntensity
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -111,5 +112,18 @@ class ChildRoutineViewModelTest {
         assertEquals(false, futureSelection.isSelectedRoutineCompletable)
         assertEquals(routines[2].id, currentSelection.currentRoutine?.id)
         assertEquals(true, currentSelection.isSelectedRoutineCompletable)
+    }
+
+    @Test
+    fun `state keeps feedback intensity for presentation`() {
+        val state = childRoutineState(
+            routines = RoutineSampleData.morning.routines,
+            completedRoutineIds = emptySet(),
+            selectedRoutineId = null,
+            singlePane = ChildSinglePane.Focus,
+            feedbackIntensity = FeedbackIntensity.Strong,
+        )
+
+        assertEquals(FeedbackIntensity.Strong, state.feedbackIntensity)
     }
 }
