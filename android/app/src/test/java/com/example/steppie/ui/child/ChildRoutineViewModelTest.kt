@@ -1,6 +1,7 @@
 package com.example.steppie.ui.child
 
 import com.example.steppie.data.sample.RoutineSampleData
+import com.example.steppie.domain.model.FeedbackIntensity
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -88,5 +89,41 @@ class ChildRoutineViewModelTest {
         assertEquals(routines[0].id, feedback.selectedRoutineId)
         assertEquals(routines[0].id, feedback.feedbackRoutine?.id)
         assertEquals(routines[1].id, feedback.nextIncompleteRoutine?.id)
+    }
+
+    @Test
+    fun `future selection is not completable until previous routines are done`() {
+        val routines = RoutineSampleData.morning.routines
+
+        val futureSelection = childRoutineState(
+            routines = routines,
+            completedRoutineIds = emptySet(),
+            selectedRoutineId = routines[2].id,
+            singlePane = ChildSinglePane.Focus,
+        )
+        val currentSelection = childRoutineState(
+            routines = routines,
+            completedRoutineIds = setOf(routines[0].id, routines[1].id),
+            selectedRoutineId = routines[2].id,
+            singlePane = ChildSinglePane.Focus,
+        )
+
+        assertEquals(routines[0].id, futureSelection.currentRoutine?.id)
+        assertEquals(false, futureSelection.isSelectedRoutineCompletable)
+        assertEquals(routines[2].id, currentSelection.currentRoutine?.id)
+        assertEquals(true, currentSelection.isSelectedRoutineCompletable)
+    }
+
+    @Test
+    fun `state keeps feedback intensity for presentation`() {
+        val state = childRoutineState(
+            routines = RoutineSampleData.morning.routines,
+            completedRoutineIds = emptySet(),
+            selectedRoutineId = null,
+            singlePane = ChildSinglePane.Focus,
+            feedbackIntensity = FeedbackIntensity.Strong,
+        )
+
+        assertEquals(FeedbackIntensity.Strong, state.feedbackIntensity)
     }
 }

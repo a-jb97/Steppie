@@ -9,6 +9,7 @@
     <string name="child_focus_title">지금 할 일</string>
     <string name="child_focus_subtitle">지금은 이 활동을 해요</string>
     <string name="child_focus_tap_hint">카드를 누르면 완료</string>
+    <string name="child_focus_upcoming_hint">앞으로 할 일이에요</string>
     <string name="child_feedback_title">잘했어요!</string>
     <string name="child_feedback_subtitle">다음 활동으로 넘어가요</string>
     <string name="child_completed_card_title">%1$s 완료!</string>
@@ -43,7 +44,7 @@
     <string name="a11y_color_mint">민트색</string>
     <string name="a11y_color_lemon">레몬색</string>
     <string name="a11y_color_peach">복숭아색</string>
-    <string name="a11y_color_lavender">라벤더색</string>
+    <string name="a11y_color_lavender">갈색</string>
     <string name="a11y_color_rose">장미색</string>
     <string name="a11y_all_complete">오늘 할 일 완료. 모든 활동을 차례대로 끝냈어요</string>
     <string name="a11y_show_list">오늘의 순서 보기</string>
@@ -183,6 +184,9 @@
     <string name="guardian_field_title">활동 이름</string>
     <string name="guardian_field_time">예정 시각</string>
     <string name="guardian_time_placeholder">07:40</string>
+    <string name="guardian_time_set">시간 설정</string>
+    <string name="guardian_time_none_short">시간 없음</string>
+    <string name="guardian_time_current_selection">현재 선택: %1$s</string>
     <string name="guardian_icon_picker_title">아이콘 또는 사진</string>
     <string name="guardian_icon_picker_body">기본 아이콘을 쓰거나 사진을 선택합니다</string>
     <string name="guardian_photo_pick">사진 선택</string>

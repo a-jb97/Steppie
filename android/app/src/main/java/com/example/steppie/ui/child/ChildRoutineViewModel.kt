@@ -31,6 +31,7 @@ data class ChildRoutineUiState(
     val isLoading: Boolean = true,
     val feedbackRoutineId: String? = null,
     val undoRoutineId: String? = null,
+    val feedbackIntensity: FeedbackIntensity = FeedbackIntensity.Normal,
 ) {
     val selectedRoutine: Routine?
         get() = if (isAllComplete && feedbackRoutineId == null) {
@@ -42,8 +43,12 @@ data class ChildRoutineUiState(
         get() = routines.firstOrNull { it.id == feedbackRoutineId }
     val undoRoutine: Routine?
         get() = routines.firstOrNull { it.id == undoRoutineId }
-    val nextIncompleteRoutine: Routine?
+    val currentRoutine: Routine?
         get() = routines.firstOrNull { it.id !in completedRoutineIds && it.id != feedbackRoutineId }
+    val nextIncompleteRoutine: Routine?
+        get() = currentRoutine
+    val isSelectedRoutineCompletable: Boolean
+        get() = feedbackRoutineId == null && selectedRoutineId != null && selectedRoutineId == currentRoutine?.id
     val progressCount: Int
         get() = routines.count { it.id in completedRoutineIds || it.id == feedbackRoutineId }
     val progressTotal: Int
@@ -67,6 +72,7 @@ internal fun childRoutineState(
     singlePane: ChildSinglePane,
     feedbackRoutineId: String? = null,
     undoRoutineId: String? = null,
+    feedbackIntensity: FeedbackIntensity = FeedbackIntensity.Normal,
 ): ChildRoutineUiState {
     val visibleRoutines = routines
         .filter { it.isActive && it.deletedAt == null }
@@ -87,6 +93,7 @@ internal fun childRoutineState(
         isLoading = false,
         feedbackRoutineId = resolvedFeedbackId,
         undoRoutineId = undoRoutineId?.takeIf { it in visibleIds },
+        feedbackIntensity = feedbackIntensity,
     )
 }
 
@@ -105,15 +112,12 @@ class ChildRoutineViewModel(
 
     init {
         viewModelScope.launch {
-            appSettingsRepository.observeAppSettings().collectLatest { appSettings ->
-                settings.value = appSettings
-            }
-        }
-        viewModelScope.launch {
             combine(
+                appSettingsRepository.observeAppSettings(),
                 repository.observeRoutineSets(),
                 repository.observeDailyLogs(today),
-            ) { routineSets, logs ->
+            ) { appSettings, routineSets, logs ->
+                settings.value = appSettings
                 val activeSet = routineSets.firstOrNull { it.isActive && it.deletedAt == null }
                 val completedIds = logs
                     .filter { it.status == LogStatus.Completed }
@@ -125,6 +129,7 @@ class ChildRoutineViewModel(
                     singlePane = _uiState.value.singlePane,
                     feedbackRoutineId = _uiState.value.feedbackRoutineId,
                     undoRoutineId = _uiState.value.undoRoutineId,
+                    feedbackIntensity = appSettings.feedbackIntensity,
                 )
             }.collectLatest { state ->
                 _uiState.value = state
@@ -138,7 +143,15 @@ class ChildRoutineViewModel(
     }
 
     fun showFocus() {
-        _uiState.value = _uiState.value.copy(singlePane = ChildSinglePane.Focus)
+        val state = _uiState.value
+        _uiState.value = state.copy(
+            selectedRoutineId = if (state.feedbackRoutineId == null) {
+                state.currentRoutine?.id
+            } else {
+                state.selectedRoutineId
+            },
+            singlePane = ChildSinglePane.Focus,
+        )
     }
 
     fun selectRoutine(routineId: String) {
@@ -154,7 +167,7 @@ class ChildRoutineViewModel(
     fun completeSelectedRoutine() {
         val state = _uiState.value
         val routine = state.selectedRoutine ?: return
-        if (routine.id in state.completedRoutineIds || state.feedbackRoutineId != null) return
+        if (!state.isSelectedRoutineCompletable || routine.id in state.completedRoutineIds) return
 
         _uiState.value = state.copy(
             feedbackRoutineId = routine.id,

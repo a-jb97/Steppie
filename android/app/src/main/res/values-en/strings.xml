@@ -9,6 +9,7 @@
     <string name="child_focus_title">Now</string>
     <string name="child_focus_subtitle">This is the step to do now</string>
     <string name="child_focus_tap_hint">Tap the card when finished</string>
+    <string name="child_focus_upcoming_hint">This comes later</string>
     <string name="child_feedback_title">Well done!</string>
     <string name="child_feedback_subtitle">Moving to the next activity</string>
     <string name="child_completed_card_title">%1$s done!</string>
@@ -43,7 +44,7 @@
     <string name="a11y_color_mint">Mint</string>
     <string name="a11y_color_lemon">Lemon</string>
     <string name="a11y_color_peach">Peach</string>
-    <string name="a11y_color_lavender">Lavender</string>
+    <string name="a11y_color_lavender">Brown</string>
     <string name="a11y_color_rose">Rose</string>
     <string name="a11y_all_complete">Today\'s steps are done. You finished every activity in order</string>
     <string name="a11y_show_list">Show today\'s steps</string>
@@ -183,6 +184,9 @@
     <string name="guardian_field_title">Activity name</string>
     <string name="guardian_field_time">Scheduled time</string>
     <string name="guardian_time_placeholder">07:40</string>
+    <string name="guardian_time_set">Set time</string>
+    <string name="guardian_time_none_short">No time</string>
+    <string name="guardian_time_current_selection">Current selection: %1$s</string>
     <string name="guardian_icon_picker_title">Icon or photo</string>
     <string name="guardian_icon_picker_body">Use a built-in icon or choose a photo</string>
     <string name="guardian_photo_pick">Choose photo</string>

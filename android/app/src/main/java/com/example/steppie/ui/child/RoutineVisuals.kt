@@ -2,9 +2,11 @@ package com.example.steppie.ui.child
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
-import androidx.compose.runtime.remember
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -45,7 +47,7 @@ internal fun RoutineIcon(
             painter = BitmapPainter(photoBitmap),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = modifier,
+            modifier = modifier.clip(RoundedCornerShape(percent = 25)),
         )
         return
     }

@@ -103,6 +103,7 @@ data class GuardianModeUiState(
     val isActive: Boolean = false,
     val isAuthenticated: Boolean = false,
     val destination: GuardianDestination = GuardianDestination.Pin,
+    val destinationBackStack: List<GuardianDestination> = emptyList(),
     val pinMode: GuardianPinMode = GuardianPinMode.Enter,
     val pinDigits: String = "",
     val pinError: String? = null,
@@ -222,6 +223,7 @@ class GuardianModeViewModel(
                 isActive = true,
                 isAuthenticated = false,
                 destination = GuardianDestination.Pin,
+                destinationBackStack = emptyList(),
                 pinMode = if (state.hasGuardianPin) GuardianPinMode.Enter else GuardianPinMode.Setup,
                 pinDigits = "",
                 pinError = null,
@@ -270,6 +272,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.Home,
+                destinationBackStack = emptyList(),
                 draft = null,
                 routineSetDraft = null,
                 selectedTemplate = null,
@@ -290,6 +293,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.RoutineEdit,
+                destinationBackStack = it.backStackFor(GuardianDestination.RoutineEdit),
                 draft = null,
                 routineSetDraft = null,
                 selectedTemplate = null,
@@ -308,6 +312,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.Security,
+                destinationBackStack = it.backStackFor(GuardianDestination.Security),
                 draft = null,
                 routineSetDraft = null,
                 selectedTemplate = null,
@@ -332,6 +337,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.EnvironmentSettings,
+                destinationBackStack = it.backStackFor(GuardianDestination.EnvironmentSettings),
                 draft = null,
                 routineSetDraft = null,
                 selectedTemplate = null,
@@ -354,6 +360,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.Records,
+                destinationBackStack = it.backStackFor(GuardianDestination.Records),
                 selectedRecordsDate = today,
                 draft = null,
                 routineSetDraft = null,
@@ -452,6 +459,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.BackupRestore,
+                destinationBackStack = it.backStackFor(GuardianDestination.BackupRestore),
                 draft = null,
                 routineSetDraft = null,
                 selectedTemplate = null,
@@ -477,6 +485,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.Pin,
+                destinationBackStack = it.backStackFor(GuardianDestination.Pin),
                 pinMode = GuardianPinMode.ChangeCurrent,
                 pinDigits = "",
                 pinError = null,
@@ -495,6 +504,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.Pin,
+                destinationBackStack = it.backStackFor(GuardianDestination.Pin),
                 pinMode = GuardianPinMode.RecoveryRegenerateConfirm,
                 pinDigits = "",
                 pinError = null,
@@ -513,6 +523,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.RecoveryCode,
+                destinationBackStack = it.backStackFor(GuardianDestination.RecoveryCode),
                 recoveryStep = GuardianRecoveryStep.EnterCodeForPinReset,
                 recoveryCodeToShow = null,
                 recoveryDigits = "",
@@ -593,6 +604,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.CardEdit,
+                destinationBackStack = it.backStackFor(GuardianDestination.CardEdit),
                 draft = RoutineDraft(),
                 routineSetDraft = null,
                 selectedTemplate = null,
@@ -610,6 +622,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.CardEdit,
+                destinationBackStack = it.backStackFor(GuardianDestination.CardEdit),
                 routineSetDraft = null,
                 selectedTemplate = null,
                 templateReturnDestination = GuardianDestination.RoutineEdit,
@@ -631,6 +644,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.RoutineSetCreate,
+                destinationBackStack = it.backStackFor(GuardianDestination.RoutineSetCreate),
                 draft = null,
                 routineSetDraft = RoutineSetDraft(),
                 selectedTemplate = null,
@@ -648,6 +662,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.TemplateSelect,
+                destinationBackStack = it.backStackFor(GuardianDestination.TemplateSelect),
                 draft = null,
                 routineSetDraft = null,
                 selectedTemplate = RoutineTemplates.find(RoutineTemplateId.Morning),
@@ -668,6 +683,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 destination = destination,
+                destinationBackStack = it.destinationBackStack.dropLastMatching(destination),
                 selectedTemplate = null,
                 draftError = null,
                 notice = null,
@@ -701,6 +717,7 @@ class GuardianModeViewModel(
                 _uiState.update { state ->
                     state.copy(
                         destination = GuardianDestination.RoutineEdit,
+                        destinationBackStack = state.destinationBackStack.dropLastMatching(GuardianDestination.RoutineEdit),
                         selectedTemplate = null,
                         draft = null,
                         routineSetDraft = null,
@@ -954,7 +971,7 @@ class GuardianModeViewModel(
 
         viewModelScope.launch {
             routineRepository.createRoutineSet(routineSet)
-            openRoutineEdit()
+            returnToRoutineEdit()
         }
     }
 
@@ -1005,7 +1022,25 @@ class GuardianModeViewModel(
                     ),
                 )
             }
-            openRoutineEdit()
+            returnToRoutineEdit()
+        }
+    }
+
+    private fun returnToRoutineEdit() {
+        _uiState.update {
+            it.copy(
+                destination = GuardianDestination.RoutineEdit,
+                destinationBackStack = it.destinationBackStack.dropLastMatching(GuardianDestination.RoutineEdit),
+                draft = null,
+                routineSetDraft = null,
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
+                draftError = null,
+                pendingDeleteRoutineId = null,
+                pendingDeleteRoutineSetId = null,
+                notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
         }
     }
 
@@ -1044,6 +1079,7 @@ class GuardianModeViewModel(
             _uiState.update {
                 it.copy(
                     destination = GuardianDestination.RoutineEdit,
+                    destinationBackStack = it.destinationBackStack.dropLastMatching(GuardianDestination.RoutineEdit),
                     draft = null,
                     draftError = null,
                     pendingDeleteRoutineId = null,
@@ -1109,6 +1145,37 @@ class GuardianModeViewModel(
 
     fun clearNotice() {
         _uiState.update { it.copy(notice = null) }
+    }
+
+    fun navigateBack() {
+        _uiState.update {
+            val destination = it.destinationBackStack.lastOrNull() ?: GuardianDestination.Home
+            it.copy(
+                destination = destination,
+                destinationBackStack = it.destinationBackStack.dropLast(1),
+                draft = null,
+                routineSetDraft = null,
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
+                routineSetListEditing = false,
+                editingRoutineSetId = null,
+                editingRoutineSetName = "",
+                draftError = null,
+                pendingDeleteRoutineId = null,
+                pendingDeleteRoutineSetId = null,
+                backupError = null,
+                backupMessage = null,
+                pendingRestoreUri = null,
+                pendingRestorePreview = null,
+                restorePinDigits = "",
+                recoveryStep = null,
+                recoveryCodeToShow = null,
+                recoveryDigits = "",
+                recoveryError = null,
+                notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
     }
 
     fun exportBackup(uri: Uri) {
@@ -1273,6 +1340,7 @@ class GuardianModeViewModel(
                             it.copy(
                                 isAuthenticated = true,
                                 destination = GuardianDestination.Home,
+                                destinationBackStack = emptyList(),
                                 pinDigits = "",
                                 pinError = null,
                                 interactionToken = it.interactionToken + 1,
@@ -1288,6 +1356,7 @@ class GuardianModeViewModel(
                         it.copy(
                             isAuthenticated = true,
                             destination = GuardianDestination.Home,
+                            destinationBackStack = emptyList(),
                             pinDigits = "",
                             pinError = null,
                             recoveryStep = GuardianRecoveryStep.ShowCode,
@@ -1323,6 +1392,7 @@ class GuardianModeViewModel(
                             it.copy(
                                 isAuthenticated = true,
                                 destination = GuardianDestination.Security,
+                                destinationBackStack = it.destinationBackStack.dropLastMatching(GuardianDestination.Security),
                                 pinDigits = "",
                                 pinError = null,
                                 recoveryStep = GuardianRecoveryStep.ShowCode,
@@ -1344,6 +1414,7 @@ class GuardianModeViewModel(
                             it.copy(
                                 isAuthenticated = true,
                                 destination = GuardianDestination.Security,
+                                destinationBackStack = it.destinationBackStack.dropLastMatching(GuardianDestination.Security),
                                 pinDigits = "",
                                 pinError = null,
                                 recoveryStep = GuardianRecoveryStep.ShowCode,
@@ -1369,6 +1440,7 @@ class GuardianModeViewModel(
                             it.copy(
                                 isAuthenticated = true,
                                 destination = GuardianDestination.Home,
+                                destinationBackStack = emptyList(),
                                 pinDigits = "",
                                 pinError = null,
                                 recoveryStep = null,
@@ -1497,6 +1569,15 @@ class GuardianModeViewModel(
         }
     }
 }
+
+private fun GuardianModeUiState.backStackFor(destination: GuardianDestination): List<GuardianDestination> = when {
+    this.destination == destination -> destinationBackStack
+    this.destination == GuardianDestination.Pin && destination == GuardianDestination.Home -> emptyList()
+    else -> destinationBackStack + this.destination
+}
+
+private fun List<GuardianDestination>.dropLastMatching(destination: GuardianDestination): List<GuardianDestination> =
+    if (lastOrNull() == destination) dropLast(1) else this
 
 private fun backupErrorMessage(error: Throwable): String = when (error) {
     is BackupValidationException -> error.message ?: "백업 파일을 확인할 수 없습니다."

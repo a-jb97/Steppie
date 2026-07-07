@@ -1,6 +1,8 @@
 package com.example.steppie.ui.guardian
 
+import android.app.TimePickerDialog
 import androidx.annotation.DrawableRes
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,11 +38,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -70,6 +76,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.example.steppie.R
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.BuiltinIconNames
@@ -87,12 +94,13 @@ import com.example.steppie.ui.theme.SteppieLayout
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
-import java.util.Locale
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.TextStyle
+import java.util.Locale
 
 private val GuardianSplitMinimumWidth = 905.dp
 
@@ -103,6 +111,7 @@ fun GuardianModeScreen(
     onDeletePinDigit: () -> Unit,
     onCloseToChild: () -> Unit,
     onInteraction: () -> Unit,
+    onNavigateBack: () -> Unit,
     onOpenHome: () -> Unit,
     onOpenRoutineEdit: () -> Unit,
     onOpenEnvironmentSettings: () -> Unit = {},
@@ -192,6 +201,23 @@ fun GuardianModeScreen(
                 }
             },
     ) {
+        BackHandler(
+            enabled = true,
+            onBack = {
+                when (state.destination) {
+                    GuardianDestination.Home -> onCloseToChild()
+                    GuardianDestination.Pin -> {
+                        if (state.pinMode == GuardianPinMode.Enter || state.destinationBackStack.isEmpty()) {
+                            onCloseToChild()
+                        } else {
+                            onNavigateBack()
+                        }
+                    }
+                    else -> onNavigateBack()
+                }
+            },
+        )
+
         when (state.destination) {
             GuardianDestination.Pin -> GuardianPinScreen(
                 state = state,
@@ -213,7 +239,7 @@ fun GuardianModeScreen(
                 if (maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight) {
                     GuardianRoutineSplitScreen(
                         state = state,
-                        onOpenHome = onOpenHome,
+                        onNavigateBack = onNavigateBack,
                         onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                         onOpenTemplateSelect = onOpenTemplateSelect,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
@@ -229,7 +255,7 @@ fun GuardianModeScreen(
                 } else {
                     GuardianRoutineEditScreen(
                         state = state,
-                        onOpenHome = onOpenHome,
+                        onNavigateBack = onNavigateBack,
                         onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                         onOpenTemplateSelect = onOpenTemplateSelect,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
@@ -267,6 +293,7 @@ fun GuardianModeScreen(
             GuardianDestination.RoutineSetCreate -> GuardianRoutineSetCreateScreen(
                 state = state,
                 useSplitLayout = maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight,
+                onNavigateBack = onNavigateBack,
                 onOpenHome = onOpenHome,
                 onRoutineSetNameChange = onRoutineSetNameChange,
                 onRoutineSetStepTitleChange = onRoutineSetStepTitleChange,
@@ -284,7 +311,7 @@ fun GuardianModeScreen(
             GuardianDestination.EnvironmentSettings -> GuardianEnvironmentSettingsScreen(
                 settings = state.appSettings,
                 useWideLayout = maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight,
-                onOpenHome = onOpenHome,
+                onNavigateBack = onNavigateBack,
                 onFeedbackIntensityChange = onFeedbackIntensityChange,
                 onTtsEnabledChange = onTtsEnabledChange,
                 onTtsRateChange = onTtsRateChange,
@@ -299,11 +326,11 @@ fun GuardianModeScreen(
             GuardianDestination.Records -> GuardianRecordsScreen(
                 state = state,
                 useWideLayout = maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight,
-                onOpenHome = onOpenHome,
+                onNavigateBack = onNavigateBack,
                 onSelectRecordsDate = onSelectRecordsDate,
             )
             GuardianDestination.Security -> GuardianSecurityScreen(
-                onOpenHome = onOpenHome,
+                onNavigateBack = onNavigateBack,
                 onOpenPinChange = onOpenPinChange,
                 onOpenRecoveryCode = onOpenRecoveryCode,
                 onOpenBackupRestore = onOpenBackupRestore,
@@ -680,8 +707,8 @@ private fun GuardianHomeScreen(
             )
         },
     ) {
-        GuardianMenuCard(R.drawable.ic_guardian_menu_routine, stringResource(R.string.guardian_menu_create_routine_set), stringResource(R.string.guardian_menu_create_routine_set_desc), onOpenRoutineSetCreate)
-        GuardianMenuCard(R.drawable.ic_guardian_menu_routine, stringResource(R.string.guardian_template_action), stringResource(R.string.guardian_template_home_desc), onOpenTemplateSelect)
+        GuardianMenuCard(R.drawable.ic_guardian_menu_routine_set_create, stringResource(R.string.guardian_menu_create_routine_set), stringResource(R.string.guardian_menu_create_routine_set_desc), onOpenRoutineSetCreate)
+        GuardianMenuCard(R.drawable.ic_guardian_menu_template, stringResource(R.string.guardian_template_action), stringResource(R.string.guardian_template_home_desc), onOpenTemplateSelect)
         GuardianMenuCard(R.drawable.ic_guardian_menu_routine, stringResource(R.string.guardian_menu_routine), stringResource(R.string.guardian_menu_routine_desc), onOpenRoutineEdit)
         GuardianMenuCard(R.drawable.ic_guardian_menu_settings, stringResource(R.string.guardian_menu_feedback), stringResource(R.string.guardian_menu_feedback_desc), onOpenEnvironmentSettings)
         GuardianMenuCard(R.drawable.ic_guardian_menu_records, stringResource(R.string.guardian_menu_records), stringResource(R.string.guardian_menu_records_desc), onOpenRecords)
@@ -693,7 +720,7 @@ private fun GuardianHomeScreen(
 private fun GuardianEnvironmentSettingsScreen(
     settings: AppSettings,
     useWideLayout: Boolean,
-    onOpenHome: () -> Unit,
+    onNavigateBack: () -> Unit,
     onFeedbackIntensityChange: (FeedbackIntensity) -> Unit,
     onTtsEnabledChange: (Boolean) -> Unit,
     onTtsRateChange: (Double) -> Unit,
@@ -708,7 +735,7 @@ private fun GuardianEnvironmentSettingsScreen(
     GuardianScaffold(
         title = stringResource(R.string.guardian_environment_title),
         subtitle = stringResource(R.string.guardian_environment_subtitle),
-        onBack = onOpenHome,
+        onBack = onNavigateBack,
     ) {
         val firstColumn: @Composable ColumnScope.() -> Unit = {
             SettingBlock(title = stringResource(R.string.guardian_setting_feedback_intensity)) {
@@ -1064,7 +1091,7 @@ private fun QuietHoursNotice(settings: AppSettings) {
 @Composable
 private fun GuardianRoutineEditScreen(
     state: GuardianModeUiState,
-    onOpenHome: () -> Unit,
+    onNavigateBack: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
     onOpenTemplateSelect: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
@@ -1080,7 +1107,7 @@ private fun GuardianRoutineEditScreen(
     GuardianScaffold(
         title = stringResource(R.string.guardian_menu_routine),
         subtitle = stringResource(R.string.guardian_routine_edit_subtitle),
-        onBack = onOpenHome,
+        onBack = onNavigateBack,
         topActionLabel = stringResource(
             if (state.routineSetListEditing) R.string.action_done_editing else R.string.action_edit,
         ),
@@ -1145,12 +1172,14 @@ private fun GuardianRoutineEditScreen(
             }
         }
         state.routines.forEach { routine ->
-            EditableRoutineRow(
-                routine = routine,
-                onClick = { onOpenRoutineEditor(routine.id) },
-                onDelete = { onRequestDelete(routine.id) },
-                onMove = { direction -> onMoveRoutine(routine.id, direction) },
-            )
+            key(routine.id) {
+                EditableRoutineRow(
+                    routine = routine,
+                    onClick = { onOpenRoutineEditor(routine.id) },
+                    onDelete = { onRequestDelete(routine.id) },
+                    onMove = { direction -> onMoveRoutine(routine.id, direction) },
+                )
+            }
         }
     }
 }
@@ -1316,6 +1345,7 @@ private fun IconTextButton(
 private fun GuardianRoutineSetCreateScreen(
     state: GuardianModeUiState,
     useSplitLayout: Boolean,
+    onNavigateBack: () -> Unit,
     onOpenHome: () -> Unit,
     onRoutineSetNameChange: (String) -> Unit,
     onRoutineSetStepTitleChange: (String) -> Unit,
@@ -1334,7 +1364,7 @@ private fun GuardianRoutineSetCreateScreen(
     GuardianScaffold(
         title = stringResource(R.string.guardian_routine_set_create_title),
         subtitle = stringResource(R.string.guardian_routine_set_create_subtitle),
-        onBack = onOpenHome,
+        onBack = onNavigateBack,
         bottom = {
             Row(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium)) {
                 SteppieButton(
@@ -1450,13 +1480,9 @@ private fun RoutineSetStepEditor(
             onPhotoRemove = onPhotoRemove,
         )
         ColorPicker(selectedColorToken = draft.colorToken, onSelected = onColorChange)
-        OutlinedTextField(
-            value = draft.scheduledTime,
-            onValueChange = onScheduledTimeChange,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.guardian_field_time)) },
-            placeholder = { Text(stringResource(R.string.guardian_time_placeholder)) },
-            singleLine = true,
+        ScheduledTimePicker(
+            scheduledTime = draft.scheduledTime,
+            onScheduledTimeChange = onScheduledTimeChange,
         )
         SteppieButton(
             label = stringResource(if (isEditing) R.string.guardian_update_step else R.string.guardian_add_step),
@@ -1560,7 +1586,7 @@ private fun EmptyRoutineSetPanel(onOpenNewRoutineSet: () -> Unit) {
 @Composable
 private fun GuardianRoutineSplitScreen(
     state: GuardianModeUiState,
-    onOpenHome: () -> Unit,
+    onNavigateBack: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
     onOpenTemplateSelect: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
@@ -1581,7 +1607,7 @@ private fun GuardianRoutineSplitScreen(
         ) {
             GuardianRoutineEditScreen(
                 state = state,
-                onOpenHome = onOpenHome,
+                onNavigateBack = onNavigateBack,
                 onOpenRoutineSetCreate = onOpenRoutineSetCreate,
                 onOpenTemplateSelect = onOpenTemplateSelect,
                 onOpenNewRoutineEditor = onOpenNewRoutineEditor,
@@ -1904,15 +1930,12 @@ private fun GuardianCardEditScreen(
             onPhotoPick = onDraftPhotoPick,
             onCameraCapture = onDraftCameraCapture,
             onPhotoRemove = onDraftPhotoRemove,
+            showPhotoRemoveAction = true,
         )
         ColorPicker(selectedColorToken = draft.colorToken, onSelected = onDraftColorChange)
-        OutlinedTextField(
-            value = draft.scheduledTime,
-            onValueChange = onDraftScheduledTimeChange,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.guardian_field_time)) },
-            placeholder = { Text(stringResource(R.string.guardian_time_placeholder)) },
-            singleLine = true,
+        ScheduledTimePicker(
+            scheduledTime = draft.scheduledTime,
+            onScheduledTimeChange = onDraftScheduledTimeChange,
         )
         WarningMessage(stringResource(R.string.guardian_unsaved_warning))
         state.draftError?.let { ErrorMessage(it) }
@@ -1920,16 +1943,159 @@ private fun GuardianCardEditScreen(
 }
 
 @Composable
+private fun ScheduledTimePicker(
+    scheduledTime: String,
+    onScheduledTimeChange: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val selectedTime = remember(scheduledTime) { scheduledTime.toLocalTimeOrNull() }
+    val hasScheduledTime = scheduledTime.isNotBlank()
+    val fallbackTime = selectedTime ?: LocalTime.NOON
+    val normalizedTime = selectedTime?.toStorageString().orEmpty()
+    val selectedText = normalizedTime.ifBlank { stringResource(R.string.guardian_time_none) }
+    val displayText = selectedTime?.formatLocalizedTime()
+        ?: scheduledTime.ifBlank { stringResource(R.string.guardian_time_none) }
+
+    fun showTimePicker() {
+        TimePickerDialog(
+            context,
+            { _, hour, minute ->
+                onScheduledTimeChange(LocalTime.of(hour, minute).toStorageString())
+            },
+            fallbackTime.hour,
+            fallbackTime.minute,
+            false,
+        ).show()
+    }
+
+    GuardianPanel(title = stringResource(R.string.guardian_field_time)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+        ) {
+            ScheduledTimeSegment(
+                label = stringResource(R.string.guardian_time_set),
+                selected = hasScheduledTime,
+                onClick = {
+                    if (!hasScheduledTime) onScheduledTimeChange(LocalTime.NOON.toStorageString())
+                    showTimePicker()
+                },
+                modifier = Modifier.weight(1f),
+            )
+            ScheduledTimeSegment(
+                label = stringResource(R.string.guardian_time_none_short),
+                selected = !hasScheduledTime,
+                onClick = { onScheduledTimeChange("") },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Text(
+            text = stringResource(R.string.guardian_time_current_selection, selectedText),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = SteppieTheme.typography.guardianBody,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.guardian_field_time),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.guardianSection,
+            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(SteppieCornerRadius.Control))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .heightIn(min = 52.dp)
+                    .clickable(
+                        enabled = hasScheduledTime,
+                        role = Role.Button,
+                        onClick = ::showTimePicker,
+                    )
+                    .semantics {
+                        contentDescription = displayText
+                        role = Role.Button
+                    }
+                    .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.ExtraSmall),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = displayText,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = SteppieTheme.typography.guardianBody,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduledTimeSegment(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selectionState = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(SteppieCornerRadius.Control))
+            .background(containerColor)
+            .heightIn(min = 52.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics {
+                contentDescription = label
+                stateDescription = selectionState
+                role = Role.Button
+            }
+            .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.Small),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = contentColor,
+            style = SteppieTheme.typography.guardianBody,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+private fun String.toLocalTimeOrNull(): LocalTime? =
+    runCatching { LocalTime.parse(this) }.getOrNull()
+        ?.takeIf { it.second == 0 && it.nano == 0 }
+
+private fun LocalTime.toStorageString(): String =
+    String.format(Locale.US, "%02d:%02d", hour, minute)
+
+private fun LocalTime.formatLocalizedTime(): String =
+    DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+        .withLocale(Locale.getDefault())
+        .format(this)
+
+@Composable
 private fun GuardianRecordsScreen(
     state: GuardianModeUiState,
     useWideLayout: Boolean,
-    onOpenHome: () -> Unit,
+    onNavigateBack: () -> Unit,
     onSelectRecordsDate: (LocalDate) -> Unit,
 ) {
     GuardianScaffold(
         title = stringResource(R.string.guardian_records_title),
         subtitle = stringResource(R.string.guardian_records_subtitle),
-        onBack = onOpenHome,
+        onBack = onNavigateBack,
     ) {
         if (useWideLayout) {
             Row(
@@ -2332,7 +2498,7 @@ private fun recordCompletedTimeText(completedAt: java.time.Instant): String =
 
 @Composable
 private fun GuardianSecurityScreen(
-    onOpenHome: () -> Unit,
+    onNavigateBack: () -> Unit,
     onOpenPinChange: () -> Unit,
     onOpenRecoveryCode: () -> Unit,
     onOpenBackupRestore: () -> Unit,
@@ -2340,7 +2506,7 @@ private fun GuardianSecurityScreen(
     GuardianScaffold(
         title = stringResource(R.string.guardian_security_title),
         subtitle = stringResource(R.string.guardian_security_subtitle),
-        onBack = onOpenHome,
+        onBack = onNavigateBack,
     ) {
         GuardianMenuCard(R.drawable.ic_guardian_security_warning, stringResource(R.string.guardian_pin_change), stringResource(R.string.guardian_pin_change_desc), onOpenPinChange)
         GuardianMenuCard(R.drawable.ic_guardian_security_warning, stringResource(R.string.guardian_recovery_code), stringResource(R.string.guardian_recovery_code_desc), onOpenRecoveryCode)
@@ -2650,14 +2816,18 @@ private fun GuardianTopBar(
         verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
     ) {
         if (onBack != null) {
-            Text(
-                text = stringResource(R.string.action_back),
+            IconButton(
+                onClick = onBack,
                 modifier = Modifier
-                    .heightIn(min = SteppieLayout.GuardianMinimumTouchTarget)
-                    .clickable(role = Role.Button, onClick = onBack),
-                color = MaterialTheme.colorScheme.primary,
-                style = SteppieTheme.typography.button,
-            )
+                    .size(SteppieLayout.GuardianMinimumTouchTarget),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_arrow_back),
+                    contentDescription = stringResource(R.string.action_back),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -2743,16 +2913,20 @@ private fun EditableRoutineRow(
     onClick: () -> Unit,
     onDelete: () -> Unit,
     onMove: (Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val maxRevealPx = with(LocalDensity.current) { 76.dp.toPx() }
     var swipeOffsetPx by remember(routine.id) { mutableFloatStateOf(0f) }
+    var reorderOffsetPx by remember(routine.id) { mutableFloatStateOf(0f) }
+    var isReordering by remember(routine.id) { mutableStateOf(false) }
     val routineTitle = routine.title.resolve(null, Locale.getDefault().toLanguageTag())
     val routineMeta = routine.scheduledTime?.toString() ?: stringResource(R.string.guardian_time_none)
     val rowDescription = stringResource(R.string.a11y_routine_edit_row, routineTitle, routineMeta)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 92.dp),
+            .heightIn(min = 92.dp)
+            .zIndex(if (isReordering) 1f else 0f),
     ) {
         if (swipeOffsetPx < -1f) {
             SwipeDeleteAction(
@@ -2767,7 +2941,13 @@ private fun EditableRoutineRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 92.dp)
-                .graphicsLayer { translationX = swipeOffsetPx }
+                .graphicsLayer {
+                    translationX = swipeOffsetPx
+                    translationY = reorderOffsetPx
+                    scaleX = if (isReordering) 1.02f else 1f
+                    scaleY = if (isReordering) 1.02f else 1f
+                    shadowElevation = if (isReordering) 12f else 0f
+                }
                 .clip(RoundedCornerShape(SteppieCornerRadius.Card))
                 .background(MaterialTheme.colorScheme.surface)
                 .border(SteppieStroke.Divider, MaterialTheme.colorScheme.outline, RoundedCornerShape(SteppieCornerRadius.Card))
@@ -2813,6 +2993,15 @@ private fun EditableRoutineRow(
             }
             DragHandle(
                 onMove = onMove,
+                onDragStateChange = { dragging ->
+                    isReordering = dragging
+                    if (dragging) {
+                        swipeOffsetPx = 0f
+                    }
+                },
+                onDragOffsetChange = { offset ->
+                    reorderOffsetPx = offset
+                },
                 contentDescription = stringResource(
                     R.string.a11y_item_action,
                     routineTitle,
@@ -2871,6 +3060,8 @@ private fun SwipeDeleteAction(
 @Composable
 private fun DragHandle(
     onMove: (Int) -> Unit,
+    onDragStateChange: (Boolean) -> Unit,
+    onDragOffsetChange: (Float) -> Unit,
     contentDescription: String,
     modifier: Modifier = Modifier,
 ) {
@@ -2886,18 +3077,30 @@ private fun DragHandle(
                 orientation = Orientation.Vertical,
                 state = rememberDraggableState { delta ->
                     dragDistance += delta
+                    onDragOffsetChange(dragDistance.coerceIn(-thresholdPx, thresholdPx))
                     when {
                         dragDistance <= -thresholdPx -> {
                             onMove(-1)
-                            dragDistance = 0f
+                            dragDistance += thresholdPx
+                            onDragOffsetChange(dragDistance.coerceIn(-thresholdPx, thresholdPx))
                         }
                         dragDistance >= thresholdPx -> {
                             onMove(1)
-                            dragDistance = 0f
+                            dragDistance -= thresholdPx
+                            onDragOffsetChange(dragDistance.coerceIn(-thresholdPx, thresholdPx))
                         }
                     }
                 },
-                onDragStopped = { dragDistance = 0f },
+                onDragStarted = {
+                    dragDistance = 0f
+                    onDragStateChange(true)
+                    onDragOffsetChange(0f)
+                },
+                onDragStopped = {
+                    dragDistance = 0f
+                    onDragOffsetChange(0f)
+                    onDragStateChange(false)
+                },
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -2912,6 +3115,7 @@ private fun IconPicker(
     onPhotoPick: () -> Unit,
     onCameraCapture: () -> Unit,
     onPhotoRemove: () -> Unit,
+    showPhotoRemoveAction: Boolean = true,
 ) {
     GuardianPanel(title = stringResource(R.string.guardian_icon_picker_title), body = stringResource(R.string.guardian_icon_picker_body)) {
         Row(
@@ -2950,12 +3154,13 @@ private fun IconPicker(
                     modifier = Modifier.fillMaxWidth(),
                     style = SteppieButtonStyle.Secondary,
                 )
-                if (selectedIcon is IconRef.Photo) {
+                if (showPhotoRemoveAction && selectedIcon is IconRef.Photo) {
                     SteppieButton(
                         label = stringResource(R.string.guardian_photo_remove),
                         onClick = onPhotoRemove,
                         modifier = Modifier.fillMaxWidth(),
                         style = SteppieButtonStyle.Secondary,
+                        contentColorOverride = MaterialTheme.colorScheme.error,
                     )
                 }
             }
