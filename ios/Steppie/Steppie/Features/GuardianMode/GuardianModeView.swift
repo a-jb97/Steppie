@@ -143,7 +143,7 @@ struct GuardianModeView: View {
                     isWide: isWide,
                     isEnabled: true
                 )
-                SteppieButton("완료", role: .secondary, action: onDone)
+                SteppieButton("완료", action: onDone)
                     .padding(.top, SteppieSpacing.medium)
             }
             .padding(SteppieLayout.guardianScreenPadding)
@@ -1236,7 +1236,7 @@ struct GuardianModeView: View {
                 quietHoursBlock
                 quietHoursNote
 
-                SteppieButton("완료", role: .secondary, action: onDone)
+                SteppieButton("완료", action: onDone)
                     .padding(.top, SteppieSpacing.large)
             }
             .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
@@ -1627,7 +1627,7 @@ struct GuardianModeView: View {
                     onInteraction()
                 }
                 privacyPolicyNote
-                SteppieButton("완료", role: .secondary, action: onDone)
+                SteppieButton("완료", action: onDone)
                     .padding(.top, SteppieSpacing.large)
             }
             .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)

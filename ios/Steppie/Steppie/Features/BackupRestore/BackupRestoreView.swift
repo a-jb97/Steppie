@@ -24,7 +24,7 @@ struct BackupRestoreView: View {
                 if let errorMessage = viewModel.errorMessage {
                     warningNote(errorMessage)
                 }
-                SteppieButton("완료", role: .secondary, action: onDone)
+                SteppieButton("완료", action: onDone)
                     .padding(.top, SteppieSpacing.large)
             }
             .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
