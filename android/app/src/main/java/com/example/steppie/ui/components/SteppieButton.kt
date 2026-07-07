@@ -1,6 +1,5 @@
 package com.example.steppie.ui.components
 
-import android.provider.Settings
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -29,7 +28,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -68,16 +66,7 @@ fun SteppieButton(
     val isPressed = state == SteppieButtonState.Pressed ||
         (state == SteppieButtonState.Enabled && isPointerPressed)
     val acceptsInput = state == SteppieButtonState.Enabled || state == SteppieButtonState.Pressed
-    val context = LocalContext.current
-    val animationsEnabled = remember(context) {
-        runCatching {
-            Settings.Global.getFloat(
-                context.contentResolver,
-                Settings.Global.ANIMATOR_DURATION_SCALE,
-                1f,
-            ) > 0f
-        }.getOrDefault(true)
-    }
+    val animationsEnabled = rememberAnimationsEnabled()
     val targetScale = if (isPressed && animationsEnabled) 0.96f else 1f
     val scale by animateFloatAsState(
         targetValue = targetScale,
