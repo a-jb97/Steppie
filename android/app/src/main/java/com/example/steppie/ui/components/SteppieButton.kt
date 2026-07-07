@@ -58,6 +58,7 @@ fun SteppieButton(
     state: SteppieButtonState = SteppieButtonState.Enabled,
     accessibilityLabel: String? = null,
     loadingStateDescription: String? = null,
+    contentColorOverride: Color? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val resolvedLoadingStateDescription = loadingStateDescription
@@ -75,6 +76,7 @@ fun SteppieButton(
     )
     val shape = RoundedCornerShape(SteppieCornerRadius.Control)
     val colors = buttonColors(style)
+    val contentColor = contentColorOverride ?: colors.content
     val opacity = when {
         state == SteppieButtonState.Disabled -> 0.40f
         isPressed -> 0.86f
@@ -124,13 +126,13 @@ fun SteppieButton(
         if (state == SteppieButtonState.Loading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(24.dp),
-                color = colors.content,
+                color = contentColor,
                 strokeWidth = 3.dp,
             )
         } else {
             Text(
                 text = label,
-                color = colors.content,
+                color = contentColor,
                 style = SteppieTheme.typography.button,
             )
         }

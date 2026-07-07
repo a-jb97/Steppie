@@ -1930,7 +1930,7 @@ private fun GuardianCardEditScreen(
             onPhotoPick = onDraftPhotoPick,
             onCameraCapture = onDraftCameraCapture,
             onPhotoRemove = onDraftPhotoRemove,
-            showPhotoRemoveAction = false,
+            showPhotoRemoveAction = true,
         )
         ColorPicker(selectedColorToken = draft.colorToken, onSelected = onDraftColorChange)
         ScheduledTimePicker(
@@ -3160,6 +3160,7 @@ private fun IconPicker(
                         onClick = onPhotoRemove,
                         modifier = Modifier.fillMaxWidth(),
                         style = SteppieButtonStyle.Secondary,
+                        contentColorOverride = MaterialTheme.colorScheme.error,
                     )
                 }
             }
