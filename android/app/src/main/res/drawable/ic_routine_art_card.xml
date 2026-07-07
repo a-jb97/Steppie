@@ -27,7 +27,7 @@
       android:fillColor="#7FB77E"/>
   <path
       android:pathData="M55,78C57.76,78 60,75.76 60,73C60,70.24 57.76,68 55,68C52.24,68 50,70.24 50,73C50,75.76 52.24,78 55,78Z"
-      android:fillColor="#B8A0D8"/>
+      android:fillColor="#C77A4A"/>
   <path
       android:pathData="M85,86L97,98"
       android:strokeLineJoin="round"

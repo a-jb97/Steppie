@@ -740,7 +740,7 @@ private fun AllCompleteContent(
             Spacer(Modifier.size(SteppieSpacing.Medium))
             Text(
                 text = stringResource(R.string.child_all_complete_subtitle),
-                color = Color(0xFF44499E),
+                color = MaterialTheme.colorScheme.primary,
                 style = SteppieTheme.typography.guardianSection,
                 textAlign = TextAlign.Center,
             )
@@ -764,7 +764,7 @@ private fun CheckParticleBurstLayer(modifier: Modifier = Modifier) {
         Color(0xFF64B5F6),
         Color(0xFFFF8A65),
         Color(0xFFA5D6A7),
-        Color(0xFFB39DDB),
+        Color(0xFFC77A4A),
         Color(0xFFFFF176),
     )
 
