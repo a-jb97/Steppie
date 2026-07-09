@@ -243,6 +243,37 @@ final class SwiftDataRoutineRepository: RoutineRepository {
         return log
     }
 
+    func dailyRoutineAssignment(on date: String) throws -> DailyRoutineAssignment? {
+        guard DailyLog.isValidLocalDate(date) else {
+            throw RoutineDomainError.invalidLocalDate(date)
+        }
+        return try dailyRoutineAssignmentRecord(on: date)?.domainModel()
+    }
+
+    func assignRoutineSet(_ routineSetID: UUID, on date: String, at updatedAt: Date) throws -> DailyRoutineAssignment {
+        guard DailyLog.isValidLocalDate(date) else {
+            throw RoutineDomainError.invalidLocalDate(date)
+        }
+        try validateParent(routineSetID)
+
+        let existing = try dailyRoutineAssignmentRecord(on: date)
+        let assignment = try DailyRoutineAssignment(
+            id: existing?.id ?? UUID(),
+            date: date,
+            routineSetID: routineSetID,
+            createdAt: existing?.createdAt ?? updatedAt,
+            updatedAt: updatedAt
+        )
+
+        if let existing {
+            existing.apply(assignment)
+        } else {
+            context.insert(DailyRoutineAssignmentRecord(domain: assignment))
+        }
+        try context.save()
+        return assignment
+    }
+
     func appSettings() throws -> AppSettings {
         if let record = try appSettingsRecord() {
             return try record.domainModel()
@@ -272,12 +303,17 @@ final class SwiftDataRoutineRepository: RoutineRepository {
                 .map { try $0.domainModel() },
             dailyLogs: context.fetch(FetchDescriptor<DailyLogRecord>())
                 .map { try $0.domainModel() },
+            dailyRoutineAssignments: context.fetch(FetchDescriptor<DailyRoutineAssignmentRecord>())
+                .map { try $0.domainModel() },
             appSettings: appSettings()
         )
     }
 
     func replaceAll(with snapshot: RoutineRepositorySnapshot) throws {
         do {
+            for record in try context.fetch(FetchDescriptor<DailyRoutineAssignmentRecord>()) {
+                context.delete(record)
+            }
             for record in try context.fetch(FetchDescriptor<DailyLogRecord>()) {
                 context.delete(record)
             }
@@ -299,6 +335,9 @@ final class SwiftDataRoutineRepository: RoutineRepository {
             }
             for dailyLog in snapshot.dailyLogs {
                 context.insert(DailyLogRecord(domain: dailyLog))
+            }
+            for assignment in snapshot.dailyRoutineAssignments {
+                context.insert(DailyRoutineAssignmentRecord(domain: assignment))
             }
             context.insert(AppSettingsRecord(domain: snapshot.appSettings))
             try context.save()
@@ -355,6 +394,15 @@ final class SwiftDataRoutineRepository: RoutineRepository {
             throw RoutineRepositoryError.duplicateDailyLog(date: date, routineID: routineID)
         }
         return records.first
+    }
+
+    private func dailyRoutineAssignmentRecord(on date: String) throws -> DailyRoutineAssignmentRecord? {
+        let date = date
+        let descriptor = FetchDescriptor<DailyRoutineAssignmentRecord>(
+            predicate: #Predicate { $0.date == date },
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        return try context.fetch(descriptor).first
     }
 
     private func appSettingsRecord() throws -> AppSettingsRecord? {

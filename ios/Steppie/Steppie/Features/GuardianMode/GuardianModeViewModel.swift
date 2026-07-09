@@ -358,6 +358,8 @@ final class GuardianModeViewModel {
     private(set) var loadState: GuardianLoadState = .idle
     private(set) var routineSets: [RoutineSet] = []
     private(set) var activeRoutineSet: RoutineSet?
+    private(set) var todayRoutineAssignment: DailyRoutineAssignment?
+    private(set) var todayAssignedRoutineSetID: UUID?
     private(set) var routines: [Routine] = []
     private(set) var settings: AppSettings?
     private(set) var errorMessage: String?
@@ -421,6 +423,10 @@ final class GuardianModeViewModel {
         !routineSets.isEmpty
     }
 
+    var requiresTodayRoutineSelection: Bool {
+        hasRoutineSets && todayAssignedRoutineSetID == nil
+    }
+
     var hasUnsavedDraft: Bool {
         guard let draft else { return false }
         if draft.isNew { return draft.isValid }
@@ -468,6 +474,14 @@ final class GuardianModeViewModel {
             let fetchedRoutineSets = try repository.routineSets()
             routineSets = fetchedRoutineSets
             activeRoutineSet = fetchedRoutineSets.first(where: \.isActive)
+            let today = DailyLog.localDateString(for: now(), calendar: calendar)
+            todayRoutineAssignment = try repository.dailyRoutineAssignment(on: today)
+            if let todayRoutineAssignment,
+               fetchedRoutineSets.contains(where: { $0.id == todayRoutineAssignment.routineSetID }) {
+                todayAssignedRoutineSetID = todayRoutineAssignment.routineSetID
+            } else {
+                todayAssignedRoutineSetID = nil
+            }
             refreshRecords()
 
             guard !fetchedRoutineSets.isEmpty else {
@@ -554,7 +568,7 @@ final class GuardianModeViewModel {
             let createdAt = now()
             let routineSet = try RoutineSet(
                 name: selectedTemplate.name,
-                isActive: true,
+                isActive: false,
                 createdAt: createdAt,
                 updatedAt: createdAt
             )
@@ -642,7 +656,7 @@ final class GuardianModeViewModel {
             let createdAt = now()
             let routineSet = try RoutineSet(
                 name: LocalizedText([localeIdentifier: routineSetDraft.name]),
-                isActive: true,
+                isActive: false,
                 createdAt: createdAt,
                 updatedAt: createdAt
             )
@@ -844,6 +858,27 @@ final class GuardianModeViewModel {
         load()
     }
 
+    func isRoutineSetAssignedToday(_ routineSet: RoutineSet) -> Bool {
+        todayAssignedRoutineSetID == routineSet.id
+    }
+
+    func assignRoutineSetForToday(_ routineSet: RoutineSet) {
+        guard routineSets.contains(where: { $0.id == routineSet.id }) else { return }
+        let today = DailyLog.localDateString(for: now(), calendar: calendar)
+        do {
+            todayRoutineAssignment = try repository.assignRoutineSet(
+                routineSet.id,
+                on: today,
+                at: now()
+            )
+            todayAssignedRoutineSetID = routineSet.id
+            load()
+            onDataChanged()
+        } catch {
+            errorMessage = "오늘 루틴으로 설정하지 못했어요."
+        }
+    }
+
     func beginRenameRoutineSet(_ routineSet: RoutineSet) {
         routineSetNameDraft = RoutineSetNameDraft(
             id: routineSet.id,
@@ -884,6 +919,11 @@ final class GuardianModeViewModel {
     func confirmDeleteRoutineSet() {
         guard let routineSet = pendingDeleteRoutineSet else { return }
         do {
+            if todayAssignedRoutineSetID == routineSet.id {
+                errorMessage = "오늘 사용 중인 루틴 세트는 삭제할 수 없어요. 먼저 다른 루틴 세트를 오늘 루틴으로 설정해 주세요."
+                pendingDeleteRoutineSet = nil
+                return
+            }
             let visibleSets = try repository.routineSets()
             if routineSet.isActive {
                 guard let nextActiveSet = visibleSets.first(where: { $0.id != routineSet.id }) else {
@@ -1093,6 +1133,10 @@ final class GuardianModeViewModel {
 
     func reportBackupFileError(_ message: String) {
         errorMessage = message
+    }
+
+    func clearErrorMessage() {
+        errorMessage = nil
     }
 
     func localizedTitle(for routine: Routine) -> String {

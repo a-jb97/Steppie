@@ -76,6 +76,7 @@ final class PreviewRoutineRepository: RoutineRepository {
     private var routineSets: [RoutineSet]
     private var routines: [Routine]
     private var dailyLogs: [DailyLog] = []
+    private var dailyRoutineAssignments: [DailyRoutineAssignment] = []
     private var settings: AppSettings
 
     init(seed: RoutineSampleData) throws {
@@ -238,6 +239,30 @@ final class PreviewRoutineRepository: RoutineRepository {
         return log
     }
 
+    func dailyRoutineAssignment(on date: String) throws -> DailyRoutineAssignment? {
+        dailyRoutineAssignments.first { $0.date == date }
+    }
+
+    func assignRoutineSet(_ routineSetID: UUID, on date: String, at updatedAt: Date) throws -> DailyRoutineAssignment {
+        guard let routineSet = routineSets.first(where: { $0.id == routineSetID }) else {
+            throw RoutineRepositoryError.routineSetNotFound(routineSetID)
+        }
+        if routineSet.deletedAt != nil {
+            throw RoutineRepositoryError.routineSetIsDeleted(routineSetID)
+        }
+        let existing = dailyRoutineAssignments.first { $0.date == date }
+        let assignment = try DailyRoutineAssignment(
+            id: existing?.id ?? UUID(),
+            date: date,
+            routineSetID: routineSetID,
+            createdAt: existing?.createdAt ?? updatedAt,
+            updatedAt: updatedAt
+        )
+        dailyRoutineAssignments.removeAll { $0.date == date }
+        dailyRoutineAssignments.append(assignment)
+        return assignment
+    }
+
     func appSettings() throws -> AppSettings {
         settings
     }
@@ -251,6 +276,7 @@ final class PreviewRoutineRepository: RoutineRepository {
             routineSets: routineSets,
             routines: routines,
             dailyLogs: dailyLogs,
+            dailyRoutineAssignments: dailyRoutineAssignments,
             appSettings: settings
         )
     }
@@ -259,6 +285,7 @@ final class PreviewRoutineRepository: RoutineRepository {
         routineSets = snapshot.routineSets
         routines = snapshot.routines
         dailyLogs = snapshot.dailyLogs
+        dailyRoutineAssignments = snapshot.dailyRoutineAssignments
         settings = snapshot.appSettings
     }
 

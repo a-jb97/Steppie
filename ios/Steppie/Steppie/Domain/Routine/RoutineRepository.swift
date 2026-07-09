@@ -20,6 +20,7 @@ nonisolated struct RoutineRepositorySnapshot: Equatable, Sendable {
     let routineSets: [RoutineSet]
     let routines: [Routine]
     let dailyLogs: [DailyLog]
+    let dailyRoutineAssignments: [DailyRoutineAssignment]
     let appSettings: AppSettings
 }
 
@@ -56,6 +57,9 @@ protocol RoutineRepository {
         on date: String,
         at updatedAt: Date
     ) throws -> DailyLog?
+
+    func dailyRoutineAssignment(on date: String) throws -> DailyRoutineAssignment?
+    func assignRoutineSet(_ routineSetID: UUID, on date: String, at updatedAt: Date) throws -> DailyRoutineAssignment
 
     func appSettings() throws -> AppSettings
     func updateAppSettings(_ settings: AppSettings) throws

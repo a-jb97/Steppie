@@ -159,12 +159,36 @@ final class AppSettingsRecord {
     }
 }
 
+@Model
+final class DailyRoutineAssignmentRecord {
+    @Attribute(.unique) var id: UUID
+    var date: String
+    var routineSetID: UUID
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(
+        id: UUID,
+        date: String,
+        routineSetID: UUID,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.date = date
+        self.routineSetID = routineSetID
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
 enum RoutinePersistenceSchema {
     static let models: [any PersistentModel.Type] = [
         RoutineSetRecord.self,
         RoutineRecord.self,
         DailyLogRecord.self,
         AppSettingsRecord.self,
+        DailyRoutineAssignmentRecord.self,
     ]
 
     static var schema: Schema {
