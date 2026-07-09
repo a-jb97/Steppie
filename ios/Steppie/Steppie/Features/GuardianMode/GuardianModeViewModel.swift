@@ -7,6 +7,7 @@ enum GuardianDestination: Hashable {
     case routineEditor
     case feedbackSettings
     case records
+    case recordCalendar
     case security
     case backupRestore
 }
@@ -375,8 +376,11 @@ final class GuardianModeViewModel {
     var selectedTemplateID: String?
     var templateReturnDestination: GuardianDestination?
     private(set) var recordSummaries: [GuardianRecordSummary] = []
+    private(set) var recordCalendarDates: Set<String> = []
     private(set) var selectedRecordDate: String?
     private(set) var selectedRecordDetail: GuardianRecordDetail?
+    private(set) var selectedCalendarRecordDate: String?
+    private(set) var selectedCalendarRecordDetail: GuardianRecordDetail?
     private(set) var backupPackage: BackupPackage?
     private(set) var validatedRestorePayload: BackupRestorePayload?
     private(set) var backupStatusMessage: String?
@@ -502,6 +506,18 @@ final class GuardianModeViewModel {
         guard recordSummaries.contains(where: { $0.date == date }) else { return }
         selectedRecordDate = date
         refreshSelectedRecordDetail()
+    }
+
+    func prepareRecordCalendar() {
+        refreshRecordCalendarDates()
+        selectedCalendarRecordDate = DailyLog.localDateString(for: now(), calendar: calendar)
+        refreshSelectedCalendarRecordDetail()
+    }
+
+    func selectCalendarRecordDate(_ date: String) {
+        guard recordCalendarDates.contains(date) else { return }
+        selectedCalendarRecordDate = date
+        refreshSelectedCalendarRecordDetail()
     }
 
     func beginCreateRoutineSet() {
@@ -1094,6 +1110,7 @@ final class GuardianModeViewModel {
     }
 
     private func refreshRecords() {
+        refreshRecordCalendarDates()
         let dates = recentRecordDates()
         if selectedRecordDate.map({ !dates.contains($0) }) != false {
             selectedRecordDate = dates.first
@@ -1108,6 +1125,10 @@ final class GuardianModeViewModel {
             )
         }
         refreshSelectedRecordDetail()
+        if selectedCalendarRecordDate.map({ !recordCalendarDates.contains($0) }) == true {
+            selectedCalendarRecordDate = recordCalendarDates.sorted(by: >).first
+        }
+        refreshSelectedCalendarRecordDetail()
     }
 
     private func refreshSelectedRecordDetail() {
@@ -1116,6 +1137,22 @@ final class GuardianModeViewModel {
             return
         }
         selectedRecordDetail = try? makeRecordDetail(for: selectedRecordDate)
+    }
+
+    private func refreshRecordCalendarDates() {
+        recordCalendarDates = Set((try? repository.dailyLogDates()) ?? [])
+    }
+
+    private func refreshSelectedCalendarRecordDetail() {
+        guard let selectedCalendarRecordDate else {
+            selectedCalendarRecordDetail = nil
+            return
+        }
+        guard recordCalendarDates.contains(selectedCalendarRecordDate) else {
+            selectedCalendarRecordDetail = nil
+            return
+        }
+        selectedCalendarRecordDetail = try? makeRecordDetail(for: selectedCalendarRecordDate)
     }
 
     private func recentRecordDates() -> [String] {

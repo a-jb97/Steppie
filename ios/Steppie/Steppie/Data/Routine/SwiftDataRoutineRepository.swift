@@ -177,6 +177,11 @@ final class SwiftDataRoutineRepository: RoutineRepository {
             .map { try $0.domainModel() }
     }
 
+    func dailyLogDates() throws -> [String] {
+        let records = try context.fetch(FetchDescriptor<DailyLogRecord>())
+        return Array(Set(records.map(\.date))).sorted(by: >)
+    }
+
     func dailyLog(on date: String, routineID: UUID) throws -> DailyLog? {
         guard DailyLog.isValidLocalDate(date) else {
             throw RoutineDomainError.invalidLocalDate(date)

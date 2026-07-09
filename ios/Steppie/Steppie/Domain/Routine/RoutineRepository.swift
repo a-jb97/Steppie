@@ -43,6 +43,7 @@ protocol RoutineRepository {
     func reorderRoutines(in routineSetID: UUID, orderedIDs: [UUID], at date: Date) throws
 
     func dailyLogs(on date: String, routineSetID: UUID?) throws -> [DailyLog]
+    func dailyLogDates() throws -> [String]
     func dailyLog(on date: String, routineID: UUID) throws -> DailyLog?
     func setRoutineCompleted(
         routineID: UUID,
