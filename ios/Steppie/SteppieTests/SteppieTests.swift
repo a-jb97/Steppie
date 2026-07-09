@@ -20,6 +20,37 @@ struct SteppieTests {
         #expect(viewModel.totalCount == 3)
     }
 
+    @Test("아이 모드는 오늘 배정된 루틴 세트를 활성 세트보다 우선 불러온다")
+    func childRoutineViewModelLoadsAssignedRoutineSetForToday() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let now = Date(timeIntervalSince1970: 1_767_312_000)
+        let date = DailyLog.localDateString(for: now)
+        let afternoonSet = try RoutineSet(
+            name: LocalizedText(["ko": "오후 루틴"]),
+            isActive: false,
+            createdAt: now,
+            updatedAt: now
+        )
+        try repository.createRoutineSet(afternoonSet)
+        let routine = try Routine(
+            routineSetID: afternoonSet.id,
+            title: LocalizedText(["ko": "간식 먹기"]),
+            icon: IconRef.builtin(name: "snack"),
+            colorToken: "color.card.mint",
+            order: 0,
+            createdAt: now,
+            updatedAt: now
+        )
+        try repository.createRoutine(routine)
+        _ = try repository.assignRoutineSet(afternoonSet.id, on: date, at: now)
+
+        let viewModel = ChildRoutineViewModel(repository: repository, now: { now })
+        viewModel.load()
+
+        #expect(viewModel.activeRoutineSet?.id == afternoonSet.id)
+        #expect(viewModel.routines.map { $0.title.resolved(appLocale: "ko") } == ["간식 먹기"])
+    }
+
     @Test("목록의 upcoming 항목 선택은 포커스만 바꾸고 저장 데이터를 변경하지 않는다")
     func childRoutineSelectionIsReadOnly() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
@@ -144,7 +175,9 @@ struct SteppieTests {
         )
 
         viewModel.load()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        for _ in 0..<20 where scheduler.rescheduleCalls.isEmpty {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
 
         #expect(scheduler.authorizationRequestCount == 1)
         let call = try #require(scheduler.rescheduleCalls.first)
@@ -505,8 +538,8 @@ struct SteppieTests {
         viewModel.saveRoutineSetStepDraft()
         viewModel.saveRoutineSetDraft(localeIdentifier: "ko")
 
-        let activeSet = try #require(try repository.routineSets().first(where: \.isActive))
-        let added = try #require(try repository.routines(in: activeSet.id).first)
+        let createdSet = try #require(viewModel.selectedRoutineSet)
+        let added = try #require(try repository.routines(in: createdSet.id).first)
         #expect(added.icon.type == .photo)
         #expect(added.icon.backupAssetName == "routine-photo-77777777-7777-4777-8777-777777777777.jpg")
         #expect(photoStore.savedData == Data([0xff, 0xd8, 0xff]))
@@ -557,8 +590,8 @@ struct SteppieTests {
         #expect(viewModel.canSaveRoutineSetDraft)
     }
 
-    @Test("루틴 세트 생성은 활성 세트와 단계들을 0부터 연속 order로 저장한다")
-    func guardianRoutineSetCreationSavesActiveSetAndOrderedSteps() throws {
+    @Test("루틴 세트 생성은 보관 세트와 단계들을 0부터 연속 order로 저장한다")
+    func guardianRoutineSetCreationSavesStoredSetAndOrderedSteps() throws {
         let repository = try RoutinePreviewStore.makeRepository()
         var changeCount = 0
         let viewModel = GuardianModeViewModel(repository: repository) {
@@ -583,15 +616,16 @@ struct SteppieTests {
 
         viewModel.saveRoutineSetDraft(localeIdentifier: "ko")
 
-        let activeSet = try #require(try repository.routineSets().first(where: \.isActive))
-        let routines = try repository.routines(in: activeSet.id)
-        #expect(activeSet.name.resolved(appLocale: "ko") == "아침 준비")
+        let createdSet = try #require(viewModel.selectedRoutineSet)
+        let routines = try repository.routines(in: createdSet.id)
+        #expect(createdSet.name.resolved(appLocale: "ko") == "아침 준비")
+        #expect(!createdSet.isActive)
         #expect(routines.map { $0.title.resolved(appLocale: "ko") } == ["일어나기", "세수하기"])
         #expect(routines.map(\.order) == [0, 1])
         #expect(routines.map(\.colorToken) == ["color.card.sky", "color.card.lemon"])
         #expect(routines[1].scheduledTime?.description == "07:40")
         #expect(viewModel.loadState == .loaded)
-        #expect(viewModel.activeRoutineSet?.id == activeSet.id)
+        #expect(viewModel.activeRoutineSet == nil)
         #expect(viewModel.selectedDestination == .routineEditor)
         #expect(changeCount == 1)
     }
@@ -614,8 +648,8 @@ struct SteppieTests {
         }
     }
 
-    @Test("템플릿 저장은 새 활성 루틴 세트와 ordered 루틴을 생성한다")
-    func guardianTemplateSaveCreatesActiveRoutineSetAndOrderedRoutines() throws {
+    @Test("템플릿 저장은 새 보관 루틴 세트와 ordered 루틴을 생성한다")
+    func guardianTemplateSaveCreatesStoredRoutineSetAndOrderedRoutines() throws {
         let repository = try RoutinePreviewStore.makeRepository()
         var changeCount = 0
         let viewModel = GuardianModeViewModel(repository: repository) {
@@ -626,15 +660,16 @@ struct SteppieTests {
         viewModel.selectTemplate(try #require(viewModel.routineTemplates.first { $0.id == "morning" }))
         viewModel.saveSelectedTemplate()
 
-        let activeSet = try #require(try repository.routineSets().first(where: \.isActive))
-        let routines = try repository.routines(in: activeSet.id)
-        #expect(activeSet.name.resolved(appLocale: "ko") == "아침 루틴")
-        #expect(activeSet.name.resolved(appLocale: "en") == "Morning routine")
+        let createdSet = try #require(viewModel.selectedRoutineSet)
+        let routines = try repository.routines(in: createdSet.id)
+        #expect(createdSet.name.resolved(appLocale: "ko") == "아침 루틴")
+        #expect(createdSet.name.resolved(appLocale: "en") == "Morning routine")
+        #expect(!createdSet.isActive)
         #expect(routines.map { $0.title.resolved(appLocale: "ko") } == ["일어나기", "세수하기", "양치하기", "옷 입기", "아침 먹기", "가방 챙기기"])
         #expect(routines.map(\.order) == [0, 1, 2, 3, 4, 5])
         #expect(routines.map(\.titleKey) == ["routine.wakeUp", "routine.washFace", "routine.brushTeeth", "routine.getDressed", "routine.breakfast", "routine.packBag"])
         #expect(Set(routines.map(\.id)).count == routines.count)
-        #expect(viewModel.selectedRoutineSet?.id == activeSet.id)
+        #expect(viewModel.selectedRoutineSet?.id == createdSet.id)
         #expect(viewModel.selectedDestination == .routineEditor)
         #expect(changeCount == 1)
     }
@@ -692,7 +727,7 @@ struct SteppieTests {
         #expect(try repository.routine(id: last.id)?.deletedAt != nil)
     }
 
-    @Test("템플릿 저장 후 아이 모드는 새 활성 루틴 세트를 읽고 백업에도 포함된다")
+    @Test("템플릿 저장 후 설정하면 아이 모드는 오늘 배정 세트를 읽고 백업에도 포함된다")
     func templateSaveRefreshesChildModeAndBackupSnapshot() throws {
         let repository = try RoutinePreviewStore.makeRepository()
         let childViewModel = ChildRoutineViewModel(repository: repository)
@@ -707,6 +742,7 @@ struct SteppieTests {
         guardianViewModel.beginTemplateSelection()
         guardianViewModel.selectTemplate(bedtime)
         guardianViewModel.saveSelectedTemplate()
+        guardianViewModel.assignRoutineSetForToday(try #require(guardianViewModel.selectedRoutineSet))
 
         let activeSet = try #require(childViewModel.activeRoutineSet)
         #expect(childViewModel.loadState == .loaded)
@@ -736,7 +772,8 @@ struct SteppieTests {
 
         #expect(viewModel.routineSets.count == 2)
         #expect(viewModel.routineSets.map { $0.name.resolved(appLocale: "ko") } == ["아침 루틴", "하교 루틴"])
-        #expect(viewModel.activeRoutineSet?.name.resolved(appLocale: "ko") == "하교 루틴")
+        #expect(viewModel.activeRoutineSet?.name.resolved(appLocale: "ko") == "아침 루틴")
+        #expect(viewModel.todayAssignedRoutineSetID == nil)
         #expect(viewModel.selectedRoutineSet?.name.resolved(appLocale: "ko") == "하교 루틴")
         #expect(viewModel.routines.map { $0.title.resolved(appLocale: "ko") } == ["가방 정리"])
 
@@ -754,7 +791,39 @@ struct SteppieTests {
         let latestActiveSet = try #require(try repository.routineSets().first(where: \.isActive))
         let latestActiveRoutines = try repository.routines(in: latestActiveSet.id)
         #expect(originalRoutines.map { $0.title.resolved(appLocale: "ko") }.contains("물 마시기"))
-        #expect(latestActiveRoutines.map { $0.title.resolved(appLocale: "ko") } == ["가방 정리"])
+        #expect(latestActiveRoutines.map { $0.title.resolved(appLocale: "ko") }.contains("물 마시기"))
+    }
+
+    @Test("루틴 관리 설정 액션은 선택한 세트를 오늘 루틴으로 배정하고 아이 모드를 갱신한다")
+    func guardianRoutineSetAssignmentSetsTodayRoutine() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let now = Date(timeIntervalSince1970: 1_767_312_000)
+        var childReloadCount = 0
+        let viewModel = GuardianModeViewModel(repository: repository, now: { now }) {
+            childReloadCount += 1
+        }
+        viewModel.load()
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "하교 루틴"
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "가방 정리"
+        viewModel.routineSetStepDraft?.iconName = .packBag
+        viewModel.routineSetStepDraft?.colorToken = "color.card.peach"
+        viewModel.saveRoutineSetStepDraft()
+        viewModel.saveRoutineSetDraft(localeIdentifier: "ko")
+        let createdSet = try #require(viewModel.selectedRoutineSet)
+
+        #expect(viewModel.todayAssignedRoutineSetID == nil)
+        #expect(viewModel.requiresTodayRoutineSelection)
+
+        viewModel.assignRoutineSetForToday(createdSet)
+
+        let date = DailyLog.localDateString(for: now)
+        #expect(try repository.dailyRoutineAssignment(on: date)?.routineSetID == createdSet.id)
+        #expect(viewModel.todayAssignedRoutineSetID == createdSet.id)
+        #expect(!viewModel.requiresTodayRoutineSelection)
+        #expect(childReloadCount == 2)
     }
 
     @Test("루틴 세트 편집 모드는 세트 이름 변경과 세트 삭제를 Repository에 반영한다")
@@ -1004,7 +1073,7 @@ struct SteppieTests {
         #expect(deletedRow.availabilityText == "삭제된 활동")
     }
 
-    @Test("새 루틴 세트 생성 후 아이 모드는 새 활성 세트를 읽는다")
+    @Test("새 루틴 세트 생성 후 설정하면 아이 모드는 오늘 배정 세트를 읽는다")
     func childRoutineLoadsNewlyCreatedRoutineSet() throws {
         let repository = try RoutinePreviewStore.makeRepository()
         let childViewModel = ChildRoutineViewModel(repository: repository)
@@ -1023,6 +1092,7 @@ struct SteppieTests {
         guardianViewModel.routineSetStepDraft?.colorToken = "color.card.lavender"
         guardianViewModel.saveRoutineSetStepDraft()
         guardianViewModel.saveRoutineSetDraft(localeIdentifier: "ko")
+        guardianViewModel.assignRoutineSetForToday(try #require(guardianViewModel.selectedRoutineSet))
 
         #expect(childViewModel.loadState == .loaded)
         #expect(childViewModel.activeRoutineSet?.name.resolved(appLocale: "ko") == "저녁 루틴")
@@ -1446,6 +1516,7 @@ struct SteppieTests {
                 routineSets: [],
                 routines: [],
                 dailyLogs: [],
+                dailyRoutineAssignments: [],
                 appSettings: try AppSettings()
             ),
             assets: [assetName: Data([0xff, 0xd8, 0xff])]
@@ -1495,6 +1566,7 @@ struct SteppieTests {
             routineSets: [first, second],
             routines: [],
             dailyLogs: [],
+            dailyRoutineAssignments: [],
             appSettings: try AppSettings()
         )
         try repository.replaceAll(with: snapshot)
@@ -1785,6 +1857,10 @@ private final class FailingReplaceRepository: RoutineRepository {
         throw ReplaceError.failed
     }
     func undoRoutineCompletion(routineID: UUID, on date: String, at updatedAt: Date) throws -> DailyLog? { nil }
+    func dailyRoutineAssignment(on date: String) throws -> DailyRoutineAssignment? { nil }
+    func assignRoutineSet(_ routineSetID: UUID, on date: String, at updatedAt: Date) throws -> DailyRoutineAssignment {
+        throw ReplaceError.failed
+    }
     func appSettings() throws -> AppSettings { try AppSettings() }
     func updateAppSettings(_ settings: AppSettings) throws {}
     func backupSnapshot() throws -> RoutineRepositorySnapshot {
@@ -1792,6 +1868,7 @@ private final class FailingReplaceRepository: RoutineRepository {
             routineSets: [],
             routines: [],
             dailyLogs: [],
+            dailyRoutineAssignments: [],
             appSettings: try AppSettings()
         )
     }
