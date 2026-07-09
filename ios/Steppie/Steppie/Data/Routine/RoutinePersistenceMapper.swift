@@ -233,6 +233,35 @@ extension AppSettingsRecord {
     }
 }
 
+extension DailyRoutineAssignmentRecord {
+    convenience init(domain: DailyRoutineAssignment) {
+        self.init(
+            id: domain.id,
+            date: domain.date,
+            routineSetID: domain.routineSetID,
+            createdAt: domain.createdAt,
+            updatedAt: domain.updatedAt
+        )
+    }
+
+    func domainModel() throws -> DailyRoutineAssignment {
+        try DailyRoutineAssignment(
+            id: id,
+            date: date,
+            routineSetID: routineSetID,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+
+    func apply(_ domain: DailyRoutineAssignment) {
+        date = domain.date
+        routineSetID = domain.routineSetID
+        createdAt = domain.createdAt
+        updatedAt = domain.updatedAt
+    }
+}
+
 private enum RoutineDataCoder {
     static func encode<T: Encodable>(_ value: T) throws -> Data {
         try JSONEncoder().encode(value)

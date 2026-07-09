@@ -35,7 +35,50 @@ struct BackupData: Codable, Equatable, Sendable {
     let routineSets: [RoutineSet]
     let routines: [Routine]
     let dailyLogs: [DailyLog]
+    let dailyRoutineAssignments: [DailyRoutineAssignment]
     let appSettings: AppSettings
+
+    init(
+        schemaVersion: Int,
+        exportedAt: Date,
+        routineSets: [RoutineSet],
+        routines: [Routine],
+        dailyLogs: [DailyLog],
+        dailyRoutineAssignments: [DailyRoutineAssignment] = [],
+        appSettings: AppSettings
+    ) {
+        self.schemaVersion = schemaVersion
+        self.exportedAt = exportedAt
+        self.routineSets = routineSets
+        self.routines = routines
+        self.dailyLogs = dailyLogs
+        self.dailyRoutineAssignments = dailyRoutineAssignments
+        self.appSettings = appSettings
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case exportedAt
+        case routineSets
+        case routines
+        case dailyLogs
+        case dailyRoutineAssignments
+        case appSettings
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        exportedAt = try container.decode(Date.self, forKey: .exportedAt)
+        routineSets = try container.decode([RoutineSet].self, forKey: .routineSets)
+        routines = try container.decode([Routine].self, forKey: .routines)
+        dailyLogs = try container.decode([DailyLog].self, forKey: .dailyLogs)
+        dailyRoutineAssignments = try container.decodeIfPresent(
+            [DailyRoutineAssignment].self,
+            forKey: .dailyRoutineAssignments
+        ) ?? []
+        appSettings = try container.decode(AppSettings.self, forKey: .appSettings)
+    }
 }
 
 struct BackupPackage: Equatable, Sendable {
@@ -134,6 +177,7 @@ struct BackupService {
             routineSets: snapshot.routineSets,
             routines: snapshot.routines,
             dailyLogs: snapshot.dailyLogs,
+            dailyRoutineAssignments: snapshot.dailyRoutineAssignments,
             appSettings: snapshot.appSettings
         )
         let dataJson = try Self.jsonEncoder.encode(backupData)
@@ -264,6 +308,7 @@ struct BackupService {
                 routineSets: [],
                 routines: [],
                 dailyLogs: [],
+                dailyRoutineAssignments: [],
                 appSettings: data.appSettings
             )
         }
@@ -293,11 +338,22 @@ struct BackupService {
             }
         }
 
+        var assignmentDates: Set<String> = []
+        for assignment in data.dailyRoutineAssignments {
+            guard routineSetIDs.contains(assignment.routineSetID) else {
+                throw BackupError.invalidReference("DailyRoutineAssignment.routineSetId")
+            }
+            guard assignmentDates.insert(assignment.date).inserted else {
+                throw BackupError.duplicateID("DailyRoutineAssignment.date")
+            }
+        }
+
         let routineSets = try normalizedRoutineSets(data.routineSets)
         return RoutineRepositorySnapshot(
             routineSets: routineSets,
             routines: routines,
             dailyLogs: data.dailyLogs,
+            dailyRoutineAssignments: data.dailyRoutineAssignments,
             appSettings: data.appSettings
         )
     }
