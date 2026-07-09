@@ -158,6 +158,10 @@
     <string name="guardian_routine_set_list_title">루틴 세트 %1$d개</string>
     <string name="guardian_routine_set_meta">단계 %1$d개</string>
     <string name="guardian_routine_set_active_meta">사용 중 · 단계 %1$d개</string>
+    <string name="guardian_routine_set_today_meta">오늘 설정됨 · 단계 %1$d개</string>
+    <string name="guardian_routine_set_set_today">설정</string>
+    <string name="guardian_daily_routine_prompt_title">오늘의 루틴을 선택해 주세요</string>
+    <string name="guardian_daily_routine_prompt_body">저장된 루틴 세트 중 하나를 선택하면 오늘의 루틴으로 설정됩니다.</string>
     <string name="guardian_active_routine_steps_title">%1$s</string>
     <string name="guardian_active_routine_steps_desc">각 루틴을 선택하면 해당 루틴을 수정할 수 있습니다.</string>
     <string name="guardian_routine_set_rename_title">루틴 세트 이름 수정</string>

@@ -158,6 +158,10 @@
     <string name="guardian_routine_set_list_title">%1$d routine sets</string>
     <string name="guardian_routine_set_meta">%1$d steps</string>
     <string name="guardian_routine_set_active_meta">Active · %1$d steps</string>
+    <string name="guardian_routine_set_today_meta">Set for today · %1$d steps</string>
+    <string name="guardian_routine_set_set_today">Set</string>
+    <string name="guardian_daily_routine_prompt_title">Choose today\'s routine</string>
+    <string name="guardian_daily_routine_prompt_body">Select one saved routine set to use as today\'s routine.</string>
     <string name="guardian_active_routine_steps_title">%1$s</string>
     <string name="guardian_active_routine_steps_desc">Select a routine to edit it.</string>
     <string name="guardian_routine_set_rename_title">Edit routine set name</string>
