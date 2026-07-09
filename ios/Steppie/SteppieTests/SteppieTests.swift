@@ -854,6 +854,123 @@ struct SteppieTests {
         #expect(!detail.rows.map(\.title).contains("다음 날 추가"))
     }
 
+    @Test("진행 기록 달력은 저장된 DailyLog 날짜를 전체 범위에서 제공한다")
+    func guardianRecordCalendarLoadsAllDailyLogDates() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let routineSet = try #require(try repository.routineSets().first)
+        let routines = try repository.routines(in: routineSet.id)
+        let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
+        try repository.setRoutineCompleted(
+            routineID: routines[0].id,
+            routineSetID: routineSet.id,
+            on: "2025-12-20",
+            at: completedAt
+        )
+        try repository.setRoutineCompleted(
+            routineID: routines[1].id,
+            routineSetID: routineSet.id,
+            on: "2026-01-01",
+            at: completedAt
+        )
+        try repository.setRoutineCompleted(
+            routineID: routines[2].id,
+            routineSetID: routineSet.id,
+            on: "2026-01-01",
+            at: completedAt
+        )
+
+        #expect(try repository.dailyLogDates() == ["2026-01-01", "2025-12-20"])
+
+        let viewModel = GuardianModeViewModel(
+            repository: repository,
+            now: { Date(timeIntervalSince1970: 1_769_000_000) }
+        ) {}
+        viewModel.load()
+        viewModel.prepareRecordCalendar()
+
+        #expect(viewModel.recordCalendarDates == ["2025-12-20", "2026-01-01"])
+        #expect(viewModel.selectedCalendarRecordDate == "2026-01-21")
+        #expect(viewModel.selectedCalendarRecordDetail == nil)
+    }
+
+    @Test("진행 기록 달력은 오늘 기록이 있으면 처음 진입 시 오늘을 선택한다")
+    func guardianRecordCalendarSelectsTodayOnEntryWhenTodayHasLog() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let routineSet = try #require(try repository.routineSets().first)
+        let routine = try #require(try repository.routines(in: routineSet.id).first)
+        let today = "2026-01-21"
+        try repository.setRoutineCompleted(
+            routineID: routine.id,
+            routineSetID: routineSet.id,
+            on: today,
+            at: Date(timeIntervalSince1970: 1_769_000_000)
+        )
+        let viewModel = GuardianModeViewModel(
+            repository: repository,
+            now: { Date(timeIntervalSince1970: 1_769_000_000) }
+        ) {}
+
+        viewModel.load()
+        viewModel.prepareRecordCalendar()
+
+        #expect(viewModel.selectedCalendarRecordDate == today)
+        #expect(viewModel.selectedCalendarRecordDetail?.date == today)
+    }
+
+    @Test("진행 기록 달력은 최근 7일 밖의 기록 날짜를 선택해 상세를 계산한다")
+    func guardianRecordCalendarSelectsOlderRecordDate() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let routineSet = try #require(try repository.routineSets().first)
+        let routines = try repository.routines(in: routineSet.id)
+        let oldLogDate = "2026-01-01"
+        let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
+        try repository.setRoutineCompleted(
+            routineID: routines[0].id,
+            routineSetID: routineSet.id,
+            on: oldLogDate,
+            at: completedAt
+        )
+        let viewModel = GuardianModeViewModel(
+            repository: repository,
+            now: { Date(timeIntervalSince1970: 1_769_000_000) }
+        ) {}
+
+        viewModel.load()
+        #expect(!viewModel.recordSummaries.map(\.date).contains(oldLogDate))
+
+        viewModel.prepareRecordCalendar()
+        viewModel.selectCalendarRecordDate(oldLogDate)
+
+        let detail = try #require(viewModel.selectedCalendarRecordDetail)
+        #expect(detail.date == oldLogDate)
+        #expect(detail.completedCount == 1)
+        #expect(detail.totalCount == 3)
+    }
+
+    @Test("진행 기록 달력은 기록 없는 날짜 선택 요청을 무시한다")
+    func guardianRecordCalendarIgnoresDatesWithoutLogs() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let routineSet = try #require(try repository.routineSets().first)
+        let routine = try #require(try repository.routines(in: routineSet.id).first)
+        try repository.setRoutineCompleted(
+            routineID: routine.id,
+            routineSetID: routineSet.id,
+            on: "2026-01-01",
+            at: Date(timeIntervalSince1970: 1_767_229_200)
+        )
+        let viewModel = GuardianModeViewModel(
+            repository: repository,
+            now: { Date(timeIntervalSince1970: 1_769_000_000) }
+        ) {}
+
+        viewModel.load()
+        viewModel.prepareRecordCalendar()
+        viewModel.selectCalendarRecordDate("2025-12-31")
+
+        #expect(viewModel.selectedCalendarRecordDate == "2026-01-21")
+        #expect(viewModel.selectedCalendarRecordDetail == nil)
+    }
+
     @Test("진행 기록은 삭제된 루틴의 완료 이력을 이해 가능한 상태로 유지한다")
     func guardianRecordsKeepDeletedRoutineHistoryVisible() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
@@ -1662,6 +1779,7 @@ private final class FailingReplaceRepository: RoutineRepository {
     func deleteRoutine(id: UUID, at date: Date) throws {}
     func reorderRoutines(in routineSetID: UUID, orderedIDs: [UUID], at date: Date) throws {}
     func dailyLogs(on date: String, routineSetID: UUID?) throws -> [DailyLog] { [] }
+    func dailyLogDates() throws -> [String] { [] }
     func dailyLog(on date: String, routineID: UUID) throws -> DailyLog? { nil }
     func setRoutineCompleted(routineID: UUID, routineSetID: UUID, on date: String, at completedAt: Date) throws -> DailyLog {
         throw ReplaceError.failed
