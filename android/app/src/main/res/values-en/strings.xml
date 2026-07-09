@@ -128,6 +128,14 @@
     <string name="guardian_records_completion_rate">Rate</string>
     <string name="guardian_records_percent_value">%1$d%%</string>
     <string name="guardian_records_routine_status_title">Routine status</string>
+    <string name="guardian_records_calendar_title">All records</string>
+    <string name="guardian_records_calendar_subtitle">Select a date with records on the calendar</string>
+    <string name="guardian_records_calendar_has_records">Dates with dots have records</string>
+    <string name="guardian_records_month_picker_title">Select year and month</string>
+    <string name="guardian_records_previous_month">Previous</string>
+    <string name="guardian_records_next_month">Next</string>
+    <string name="guardian_records_calendar_date_has_records">Has records</string>
+    <string name="guardian_records_calendar_date_no_records">No records</string>
     <string name="guardian_records_completed_at">Done at %1$s</string>
     <string name="guardian_records_all_done">Done</string>
     <string name="guardian_records_remaining_count">%1$d left</string>
@@ -138,6 +146,7 @@
     <string name="guardian_records_deleted_routine">Deleted activity</string>
     <string name="guardian_records_inactive_routine">Inactive activity</string>
     <string name="a11y_guardian_record_day">%1$s, %2$d of %3$d completed, %4$d percent, %5$s</string>
+    <string name="a11y_guardian_records_calendar">Open all records calendar</string>
     <string name="a11y_guardian_records_summary">%1$d of %2$d completed, %3$d percent</string>
     <string name="a11y_guardian_record_routine">%1$s, %2$s</string>
     <string name="a11y_guardian_record_routine_with_lifecycle">%1$s, %2$s, %3$s</string>
