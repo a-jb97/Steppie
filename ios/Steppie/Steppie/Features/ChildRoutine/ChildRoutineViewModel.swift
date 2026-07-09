@@ -116,7 +116,7 @@ final class ChildRoutineViewModel {
         do {
             today = DailyLog.localDateString(for: now(), calendar: calendar)
             settings = try repository.appSettings()
-            guard let activeSet = try repository.routineSets().first(where: \.isActive) else {
+            guard let activeSet = try routineSetForToday() else {
                 reset(to: .empty)
                 return
             }
@@ -148,6 +148,15 @@ final class ChildRoutineViewModel {
         } catch {
             reset(to: .failed)
         }
+    }
+
+    private func routineSetForToday() throws -> RoutineSet? {
+        if let assignment = try repository.dailyRoutineAssignment(on: today),
+           let assignedSet = try repository.routineSet(id: assignment.routineSetID),
+           assignedSet.deletedAt == nil {
+            return assignedSet
+        }
+        return try repository.routineSets().first(where: \.isActive)
     }
 
     func selectRoutine(_ routine: Routine, showFocus: Bool) {

@@ -46,6 +46,13 @@ struct GuardianModeView: View {
         } message: {
             Text("이 루틴 세트와 포함된 활동은 보호자 모드 목록에서 보이지 않게 됩니다.")
         }
+        .alert("문제가 생겼어요", isPresented: errorMessageBinding) {
+            Button("확인", role: .cancel) {
+                viewModel.clearErrorMessage()
+            }
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
         .sheet(item: routineSetNameDraftBinding) { _ in
             NavigationStack {
                 routineSetNameEditor
@@ -55,6 +62,13 @@ struct GuardianModeView: View {
         .sheet(isPresented: $isRecordCalendarDatePickerPresented) {
             recordCalendarDatePickerSheet
                 .presentationDetents([.medium])
+        }
+        .sheet(isPresented: todayRoutineSelectionBinding) {
+            NavigationStack {
+                todayRoutineSelectionSheet
+            }
+            .interactiveDismissDisabled(true)
+            .presentationDetents([.medium, .large])
         }
     }
 
@@ -897,6 +911,8 @@ struct GuardianModeView: View {
 
             if viewModel.isEditingRoutineSets {
                 routineSetEditActions(for: routineSet)
+            } else if isSelected {
+                todayRoutineSetAction(for: routineSet)
             }
         }
         .padding(SteppieSpacing.small)
@@ -910,6 +926,34 @@ struct GuardianModeView: View {
                 )
         }
         .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
+    }
+
+    @ViewBuilder
+    private func todayRoutineSetAction(for routineSet: RoutineSet) -> some View {
+        if viewModel.isRoutineSetAssignedToday(routineSet) {
+            Text("오늘 사용 중")
+                .steppieTextStyle(.guardianCaption)
+                .foregroundStyle(Color.steppieFocusRing)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minWidth: SteppieLayout.guardianMinimumTouchTarget, minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 오늘 사용 중"))
+        } else {
+            Button {
+                viewModel.assignRoutineSetForToday(routineSet)
+                onInteraction()
+            } label: {
+                Text("설정")
+                    .steppieTextStyle(.button)
+                    .foregroundStyle(Color.steppieBackgroundPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, SteppieSpacing.small)
+                    .frame(minWidth: SteppieLayout.guardianMinimumTouchTarget, minHeight: SteppieLayout.guardianMinimumTouchTarget)
+                    .background(Color.steppieFocusRing)
+                    .clipShape(.rect(cornerRadius: SteppieCornerRadius.control))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 오늘 루틴으로 설정"))
+        }
     }
 
     private var routineSetListHeader: some View {
@@ -1085,6 +1129,70 @@ struct GuardianModeView: View {
             Button("수정") { viewModel.beginEditRoutine(routine) }
             Button("삭제", role: .destructive) { viewModel.requestDelete(routine) }
         }
+    }
+
+    private var todayRoutineSelectionSheet: some View {
+        List {
+            Section {
+                header(
+                    title: "오늘의 루틴 선택",
+                    subtitle: "오늘 사용할 루틴 세트를 선택해 주세요"
+                )
+                .padding(.top, SteppieSpacing.medium)
+                .padding(.horizontal, SteppieLayout.guardianScreenPadding)
+                .listRowInsets(headerListRowInsets)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+
+                ForEach(viewModel.routineSets) { routineSet in
+                    Button {
+                        viewModel.assignRoutineSetForToday(routineSet)
+                        onInteraction()
+                    } label: {
+                        adaptiveCardStack(spacing: SteppieSpacing.small) {
+                            Image(systemName: viewModel.isRoutineSetAssignedToday(routineSet) ? "checkmark.circle.fill" : "circle")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(viewModel.isRoutineSetAssignedToday(routineSet) ? Color.steppieFocusRing : Color.steppieTextSecondary)
+                                .frame(
+                                    width: SteppieLayout.guardianMinimumTouchTarget,
+                                    height: SteppieLayout.guardianMinimumTouchTarget
+                                )
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
+                                Text(routineSetTitle(routineSet))
+                                    .steppieTextStyle(.button)
+                                    .foregroundStyle(Color.steppieTextPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text(viewModel.isRoutineSetAssignedToday(routineSet) ? "오늘 사용 중" : "오늘 루틴으로 설정")
+                                    .steppieTextStyle(.guardianCaption)
+                                    .foregroundStyle(Color.steppieTextSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            if !dynamicTypeSize.isAccessibilitySize {
+                                Spacer()
+                            }
+                        }
+                        .padding(SteppieSpacing.small)
+                        .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
+                        .background(Color.steppieBackgroundPrimary)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
+                                .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
+                        }
+                        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(routineSetTitle(routineSet)))
+                    .accessibilityValue(Text(viewModel.isRoutineSetAssignedToday(routineSet) ? "오늘 사용 중" : "오늘 루틴으로 설정 가능"))
+                    .listRowInsets(routineListRowInsets)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.steppieBackgroundSecondary)
     }
 
     private var cardEditorPane: some View {
@@ -2733,6 +2841,20 @@ struct GuardianModeView: View {
         Binding(
             get: { viewModel.pendingDeleteRoutineSet != nil },
             set: { if !$0 { viewModel.pendingDeleteRoutineSet = nil } }
+        )
+    }
+
+    private var todayRoutineSelectionBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.requiresTodayRoutineSelection },
+            set: { _ in }
+        )
+    }
+
+    private var errorMessageBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.clearErrorMessage() } }
         )
     }
 
