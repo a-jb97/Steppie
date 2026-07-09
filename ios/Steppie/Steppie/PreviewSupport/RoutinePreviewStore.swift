@@ -187,6 +187,10 @@ final class PreviewRoutineRepository: RoutineRepository {
             .filter { routineSetID == nil || $0.routineSetID == routineSetID }
     }
 
+    func dailyLogDates() throws -> [String] {
+        Array(Set(dailyLogs.map(\.date))).sorted(by: >)
+    }
+
     func dailyLog(on date: String, routineID: UUID) throws -> DailyLog? {
         dailyLogs.first { $0.date == date && $0.routineID == routineID }
     }
