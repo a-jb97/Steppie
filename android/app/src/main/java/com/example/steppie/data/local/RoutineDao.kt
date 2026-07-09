@@ -23,6 +23,12 @@ interface RoutineDao {
     @Query("SELECT * FROM routine_sets WHERE id = :id AND deletedAtEpochMillis IS NULL")
     fun observeRoutineSet(id: String): Flow<RoutineSetWithRoutines?>
 
+    @Query("SELECT * FROM daily_routine_selections WHERE date = :date LIMIT 1")
+    fun observeDailyRoutineSelection(date: String): Flow<DailyRoutineSelectionEntity?>
+
+    @Query("SELECT * FROM daily_routine_selections WHERE date = :date LIMIT 1")
+    suspend fun getDailyRoutineSelection(date: String): DailyRoutineSelectionEntity?
+
     @Transaction
     @Query("SELECT * FROM routine_sets WHERE id = :id AND deletedAtEpochMillis IS NULL")
     suspend fun getRoutineSet(id: String): RoutineSetWithRoutines?
@@ -92,6 +98,9 @@ interface RoutineDao {
     @Upsert
     suspend fun upsertDailyLog(entity: DailyLogEntity)
 
+    @Upsert
+    suspend fun upsertDailyRoutineSelection(entity: DailyRoutineSelectionEntity)
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertRoutineSets(entities: List<RoutineSetEntity>)
 
@@ -103,6 +112,9 @@ interface RoutineDao {
 
     @Query("DELETE FROM daily_logs")
     suspend fun deleteAllDailyLogs()
+
+    @Query("DELETE FROM daily_routine_selections")
+    suspend fun deleteAllDailyRoutineSelections()
 
     @Query("DELETE FROM routines")
     suspend fun deleteAllRoutines()

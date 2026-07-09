@@ -61,6 +61,7 @@ class BackupDataSource(
         routines: List<RoutineEntity>,
         dailyLogs: List<DailyLogEntity>,
     ) = database.withTransaction {
+        dao.deleteAllDailyRoutineSelections()
         dao.deleteAllDailyLogs()
         dao.deleteAllRoutines()
         dao.deleteAllRoutineSets()

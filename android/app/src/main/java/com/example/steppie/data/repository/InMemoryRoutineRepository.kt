@@ -10,6 +10,7 @@ import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -21,6 +22,7 @@ class InMemoryRoutineRepository(
     private val mutex = Mutex()
     private val state = MutableStateFlow(initialData.associateBy(RoutineSet::id))
     private val logs = MutableStateFlow<Map<Pair<LocalDate, String>, DailyLog>>(emptyMap())
+    private val selections = MutableStateFlow<Map<LocalDate, String>>(emptyMap())
 
     override fun observeRoutineSets(): Flow<List<RoutineSet>> = state
         .map { sets -> sets.values.filter { it.deletedAt == null }.sortedBy { it.createdAt }.map(::visible) }
@@ -35,9 +37,30 @@ class InMemoryRoutineRepository(
         return state.map { it[id]?.takeIf { set -> set.deletedAt == null }?.let(::visible) }.distinctUntilChanged()
     }
 
+    override fun observeRoutineSetForDate(date: LocalDate): Flow<RoutineSet?> = combine(selections, state) { selected, sets ->
+            selected[date]?.let { id -> sets[id]?.takeIf { it.deletedAt == null }?.let(::visible) }
+        }
+        .distinctUntilChanged()
+
+    override fun observeSelectedRoutineSetId(date: LocalDate): Flow<String?> = selections
+        .map { it[date] }
+        .distinctUntilChanged()
+
     override suspend fun getRoutineSet(id: String): RoutineSet? {
         requireUuidV4(id, "RoutineSet.id")
         return state.value[id]?.takeIf { it.deletedAt == null }?.let(::visible)
+    }
+
+    override suspend fun selectRoutineSetForDate(
+        date: LocalDate,
+        routineSetId: String,
+        selectedAt: Instant,
+    ) = mutex.withLock {
+        requireUuidV4(routineSetId, "RoutineSet.id")
+        requireNotNull(state.value[routineSetId]?.takeIf { it.deletedAt == null }) {
+            "RoutineSet not found: $routineSetId"
+        }
+        selections.value = selections.value + (date to routineSetId)
     }
 
     override suspend fun createRoutineSet(routineSet: RoutineSet): RoutineSet = mutex.withLock {
