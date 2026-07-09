@@ -200,6 +200,7 @@ class MainActivity : ComponentActivity() {
                         onOpenRoutineEditor = guardianViewModel::openRoutineEditor,
                         onToggleRoutineSetListEditing = guardianViewModel::toggleRoutineSetListEditing,
                         onSelectRoutineSet = guardianViewModel::selectRoutineSet,
+                        onSetRoutineSetForToday = guardianViewModel::setRoutineSetForToday,
                         onRequestEditRoutineSetName = guardianViewModel::requestEditRoutineSetName,
                         onEditingRoutineSetNameChange = guardianViewModel::updateEditingRoutineSetName,
                         onCancelEditRoutineSetName = guardianViewModel::cancelEditRoutineSetName,

@@ -1,6 +1,7 @@
 package com.example.steppie.data.repository
 
 import androidx.room.withTransaction
+import com.example.steppie.data.local.DailyRoutineSelectionEntity
 import com.example.steppie.data.local.RoutineDao
 import com.example.steppie.data.local.SteppieDatabase
 import com.example.steppie.data.local.toDomain
@@ -16,6 +17,7 @@ import com.example.steppie.domain.repository.RoutineRepository
 import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 class RoomRoutineRepository(
@@ -33,9 +35,37 @@ class RoomRoutineRepository(
         return dao.observeRoutineSet(id).map { it?.toDomain() }
     }
 
+    override fun observeRoutineSetForDate(date: LocalDate): Flow<RoutineSet?> =
+        combine(
+            dao.observeDailyRoutineSelection(date.toString()),
+            dao.observeRoutineSets(),
+        ) { selection, sets ->
+            val routineSetId = selection?.routineSetId
+            sets.firstOrNull { it.routineSet.id == routineSetId }?.toDomain()
+        }
+
+    override fun observeSelectedRoutineSetId(date: LocalDate): Flow<String?> =
+        dao.observeDailyRoutineSelection(date.toString()).map { it?.routineSetId }
+
     override suspend fun getRoutineSet(id: String): RoutineSet? {
         requireUuidV4(id, "RoutineSet.id")
         return dao.getRoutineSet(id)?.toDomain()
+    }
+
+    override suspend fun selectRoutineSetForDate(
+        date: LocalDate,
+        routineSetId: String,
+        selectedAt: Instant,
+    ) = database.withTransaction {
+        requireUuidV4(routineSetId, "RoutineSet.id")
+        requireNotNull(dao.getRoutineSet(routineSetId)) { "RoutineSet not found: $routineSetId" }
+        dao.upsertDailyRoutineSelection(
+            DailyRoutineSelectionEntity(
+                date = date.toString(),
+                routineSetId = routineSetId,
+                selectedAtEpochMillis = selectedAt.toEpochMilli(),
+            ),
+        )
     }
 
     override suspend fun createRoutineSet(routineSet: RoutineSet): RoutineSet = database.withTransaction {

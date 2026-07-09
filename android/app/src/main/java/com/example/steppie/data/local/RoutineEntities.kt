@@ -87,6 +87,24 @@ data class DailyLogEntity(
     val updatedAtEpochMillis: Long,
 )
 
+@Entity(
+    tableName = "daily_routine_selections",
+    foreignKeys = [
+        ForeignKey(
+            entity = RoutineSetEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["routineSetId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+    ],
+    indices = [Index(value = ["routineSetId"])],
+)
+data class DailyRoutineSelectionEntity(
+    @PrimaryKey val date: String,
+    val routineSetId: String,
+    val selectedAtEpochMillis: Long,
+)
+
 data class RoutineSetWithRoutines(
     @Embedded val routineSet: RoutineSetEntity,
     @Relation(

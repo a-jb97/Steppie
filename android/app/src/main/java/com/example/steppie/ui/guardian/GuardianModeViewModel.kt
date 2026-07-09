@@ -113,6 +113,9 @@ data class GuardianModeUiState(
     val appSettings: AppSettings = AppSettings(),
     val routineSets: List<RoutineSet> = emptyList(),
     val activeRoutineSet: RoutineSet? = null,
+    val todayRoutineSetId: String? = null,
+    val selectedRoutineSetId: String? = null,
+    val showDailyRoutineSelectionPrompt: Boolean = false,
     val routines: List<Routine> = emptyList(),
     val draft: RoutineDraft? = null,
     val routineSetDraft: RoutineSetDraft? = null,
@@ -162,6 +165,7 @@ class GuardianModeViewModel(
     private val recordsEndDate = MutableStateFlow(LocalDate.now())
     private val _uiState = MutableStateFlow(GuardianModeUiState())
     val uiState: StateFlow<GuardianModeUiState> = _uiState.asStateFlow()
+    private val today = LocalDate.now()
     private var verifiedPinForChange: String? = null
     private var verifiedRecoveryCodeForReset: String? = null
     private var recordRoutineSetsCache: List<RoutineSet> = emptyList()
@@ -169,21 +173,29 @@ class GuardianModeViewModel(
     private var allDailyLogsCache: List<DailyLog> = emptyList()
 
     init {
+        val routineSetsWithTodaySelection = combine(
+            routineRepository.observeRoutineSets(),
+            routineRepository.observeSelectedRoutineSetId(today),
+        ) { routineSets, todayRoutineSetId ->
+            routineSets to todayRoutineSetId
+        }
         viewModelScope.launch {
             combine(
                 appSettingsRepository.observeAppSettings(),
-                routineRepository.observeRoutineSets(),
+                routineSetsWithTodaySelection,
                 routineRepository.observeRoutineSetsForRecords(),
                 recordsEndDate.flatMapLatest { endDate ->
                     routineRepository.observeDailyLogs(endDate.minusDays(6), endDate)
                         .map { dailyLogs -> endDate to dailyLogs }
                 },
                 routineRepository.observeAllDailyLogs(),
-            ) { settings, routineSets, recordRoutineSets, records, allDailyLogs ->
+            ) { settings, routineSetsAndTodaySelection, recordRoutineSets, records, allDailyLogs ->
+                val (routineSets, todayRoutineSetId) = routineSetsAndTodaySelection
                 val (endDate, dailyLogs) = records
                 GuardianRepositorySnapshot(
                     settings = settings,
                     visibleRoutineSets = routineSets.filter { it.deletedAt == null },
+                    todayRoutineSetId = todayRoutineSetId,
                     recordRoutineSets = recordRoutineSets,
                     dailyLogs = dailyLogs,
                     allDailyLogs = allDailyLogs,
@@ -194,7 +206,13 @@ class GuardianModeViewModel(
                 dailyLogsCache = snapshot.dailyLogs
                 allDailyLogsCache = snapshot.allDailyLogs
                 _uiState.update { state ->
-                    val activeSet = snapshot.visibleRoutineSets.firstOrNull { it.isActive }
+                    val todaySet = snapshot.visibleRoutineSets.firstOrNull { it.id == snapshot.todayRoutineSetId }
+                    val selectedSetId = state.selectedRoutineSetId
+                        ?.takeIf { selectedId -> snapshot.visibleRoutineSets.any { it.id == selectedId } }
+                        ?: todaySet?.id
+                        ?: snapshot.visibleRoutineSets.firstOrNull { it.isActive }?.id
+                        ?: snapshot.visibleRoutineSets.firstOrNull()?.id
+                    val selectedSet = snapshot.visibleRoutineSets.firstOrNull { it.id == selectedSetId }
                     val records = buildGuardianRecords(
                         selectedDate = state.selectedRecordsDate,
                         endDate = snapshot.recordsEndDate,
@@ -217,13 +235,15 @@ class GuardianModeViewModel(
                     } else {
                         state.pinMode
                     }
-                    state.copy(
+                    val nextState = state.copy(
                         hasGuardianPin = snapshot.settings.hasGuardianPin,
                         appSettings = snapshot.settings,
                         pinMode = resolvedPinMode,
                         routineSets = snapshot.visibleRoutineSets,
-                        activeRoutineSet = activeSet,
-                        routines = activeSet?.routines.orEmpty().sortedBy(Routine::order),
+                        activeRoutineSet = selectedSet,
+                        todayRoutineSetId = todaySet?.id,
+                        selectedRoutineSetId = selectedSetId,
+                        routines = selectedSet?.routines.orEmpty().sortedBy(Routine::order),
                         recordDays = records.days,
                         selectedRecordRoutines = records.routines,
                         selectedRecordSummary = records.summary,
@@ -232,6 +252,7 @@ class GuardianModeViewModel(
                         selectedCalendarRecordRoutines = calendarRecords.routines,
                         selectedCalendarRecordSummary = calendarRecords.summary,
                     )
+                    nextState.copy(showDailyRoutineSelectionPrompt = nextState.shouldShowDailyRoutineSelectionPrompt())
                 }
             }
         }
@@ -262,7 +283,17 @@ class GuardianModeViewModel(
     fun closeToChild() {
         verifiedPinForChange = null
         verifiedRecoveryCodeForReset = null
-        _uiState.update { GuardianModeUiState(hasGuardianPin = it.hasGuardianPin, appSettings = it.appSettings) }
+        _uiState.update {
+            GuardianModeUiState(
+                hasGuardianPin = it.hasGuardianPin,
+                appSettings = it.appSettings,
+                routineSets = it.routineSets,
+                activeRoutineSet = it.activeRoutineSet,
+                todayRoutineSetId = it.todayRoutineSetId,
+                selectedRoutineSetId = it.selectedRoutineSetId,
+                routines = it.routines,
+            )
+        }
     }
 
     fun markInteraction() {
@@ -615,7 +646,7 @@ class GuardianModeViewModel(
         verifiedRecoveryCodeForReset = null
         _uiState.update {
             val destination = it.recoveryReturnDestination
-            it.copy(
+            val nextState = it.copy(
                 isAuthenticated = true,
                 destination = destination,
                 recoveryStep = null,
@@ -627,6 +658,7 @@ class GuardianModeViewModel(
                 notice = null,
                 interactionToken = it.interactionToken + 1,
             )
+            nextState.copy(showDailyRoutineSelectionPrompt = nextState.shouldShowDailyRoutineSelectionPrompt())
         }
     }
 
@@ -828,9 +860,30 @@ class GuardianModeViewModel(
 
     fun selectRoutineSet(routineSetId: String) {
         val routineSet = _uiState.value.routineSets.firstOrNull { it.id == routineSetId } ?: return
-        if (routineSet.isActive) return
+        _uiState.update {
+            it.copy(
+                activeRoutineSet = routineSet,
+                selectedRoutineSetId = routineSet.id,
+                routines = routineSet.routines.sortedBy(Routine::order),
+                draftError = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun setRoutineSetForToday(routineSetId: String) {
+        if (_uiState.value.routineSets.none { it.id == routineSetId }) return
         viewModelScope.launch {
-            routineRepository.updateRoutineSet(routineSet.copy(isActive = true, updatedAt = Instant.now()))
+            routineRepository.selectRoutineSetForDate(today, routineSetId)
+            _uiState.update {
+                it.copy(
+                    todayRoutineSetId = routineSetId,
+                    selectedRoutineSetId = routineSetId,
+                    showDailyRoutineSelectionPrompt = false,
+                    notice = "오늘의 루틴으로 설정했습니다.",
+                    interactionToken = it.interactionToken + 1,
+                )
+            }
         }
     }
 
@@ -1413,7 +1466,7 @@ class GuardianModeViewModel(
                 GuardianPinMode.Enter -> {
                     if (appSettingsRepository.verifyGuardianPin(pin)) {
                         _uiState.update {
-                            it.copy(
+                            val nextState = it.copy(
                                 isAuthenticated = true,
                                 destination = GuardianDestination.Home,
                                 destinationBackStack = emptyList(),
@@ -1421,6 +1474,7 @@ class GuardianModeViewModel(
                                 pinError = null,
                                 interactionToken = it.interactionToken + 1,
                             )
+                            nextState.copy(showDailyRoutineSelectionPrompt = nextState.shouldShowDailyRoutineSelectionPrompt())
                         }
                     } else {
                         showPinError()
@@ -1513,7 +1567,7 @@ class GuardianModeViewModel(
                     if (newRecoveryCode != null) {
                         verifiedRecoveryCodeForReset = null
                         _uiState.update {
-                            it.copy(
+                            val nextState = it.copy(
                                 isAuthenticated = true,
                                 destination = GuardianDestination.Home,
                                 destinationBackStack = emptyList(),
@@ -1526,6 +1580,7 @@ class GuardianModeViewModel(
                                 recoveryReturnDestination = GuardianDestination.Home,
                                 interactionToken = it.interactionToken + 1,
                             )
+                            nextState.copy(showDailyRoutineSelectionPrompt = nextState.shouldShowDailyRoutineSelectionPrompt())
                         }
                     } else {
                         verifiedRecoveryCodeForReset = null
@@ -1655,6 +1710,13 @@ private fun GuardianModeUiState.backStackFor(destination: GuardianDestination): 
 private fun List<GuardianDestination>.dropLastMatching(destination: GuardianDestination): List<GuardianDestination> =
     if (lastOrNull() == destination) dropLast(1) else this
 
+private fun GuardianModeUiState.shouldShowDailyRoutineSelectionPrompt(): Boolean =
+    isActive &&
+        isAuthenticated &&
+        recoveryStep == null &&
+        todayRoutineSetId == null &&
+        routineSets.isNotEmpty()
+
 private fun backupErrorMessage(error: Throwable): String = when (error) {
     is BackupValidationException -> error.message ?: "백업 파일을 확인할 수 없습니다."
     else -> error.message ?: "백업/복원 중 오류가 발생했습니다."
@@ -1663,6 +1725,7 @@ private fun backupErrorMessage(error: Throwable): String = when (error) {
 private data class GuardianRepositorySnapshot(
     val settings: AppSettings,
     val visibleRoutineSets: List<RoutineSet>,
+    val todayRoutineSetId: String?,
     val recordRoutineSets: List<RoutineSet>,
     val dailyLogs: List<DailyLog>,
     val allDailyLogs: List<DailyLog>,

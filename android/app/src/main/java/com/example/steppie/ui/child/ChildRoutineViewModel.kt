@@ -114,16 +114,15 @@ class ChildRoutineViewModel(
         viewModelScope.launch {
             combine(
                 appSettingsRepository.observeAppSettings(),
-                repository.observeRoutineSets(),
+                repository.observeRoutineSetForDate(today),
                 repository.observeDailyLogs(today),
-            ) { appSettings, routineSets, logs ->
+            ) { appSettings, todayRoutineSet, logs ->
                 settings.value = appSettings
-                val activeSet = routineSets.firstOrNull { it.isActive && it.deletedAt == null }
                 val completedIds = logs
                     .filter { it.status == LogStatus.Completed }
                     .mapTo(mutableSetOf()) { it.routineId }
                 childRoutineState(
-                    routines = activeSet?.routines.orEmpty(),
+                    routines = todayRoutineSet?.routines.orEmpty(),
                     completedRoutineIds = completedIds,
                     selectedRoutineId = _uiState.value.selectedRoutineId,
                     singlePane = _uiState.value.singlePane,

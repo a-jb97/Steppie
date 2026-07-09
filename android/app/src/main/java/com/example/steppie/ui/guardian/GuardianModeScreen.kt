@@ -137,6 +137,7 @@ fun GuardianModeScreen(
     onOpenRoutineEditor: (String) -> Unit,
     onToggleRoutineSetListEditing: () -> Unit,
     onSelectRoutineSet: (String) -> Unit,
+    onSetRoutineSetForToday: (String) -> Unit = {},
     onRequestEditRoutineSetName: (String) -> Unit,
     onEditingRoutineSetNameChange: (String) -> Unit,
     onCancelEditRoutineSetName: () -> Unit,
@@ -254,6 +255,7 @@ fun GuardianModeScreen(
                         onOpenRoutineEditor = onOpenRoutineEditor,
                         onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
                         onSelectRoutineSet = onSelectRoutineSet,
+                        onSetRoutineSetForToday = onSetRoutineSetForToday,
                         onRequestEditRoutineSetName = onRequestEditRoutineSetName,
                         onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
                         onRequestDelete = onRequestDelete,
@@ -270,6 +272,7 @@ fun GuardianModeScreen(
                         onOpenRoutineEditor = onOpenRoutineEditor,
                         onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
                         onSelectRoutineSet = onSelectRoutineSet,
+                        onSetRoutineSetForToday = onSetRoutineSetForToday,
                         onRequestEditRoutineSetName = onRequestEditRoutineSetName,
                         onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
                         onRequestDelete = onRequestDelete,
@@ -379,6 +382,12 @@ fun GuardianModeScreen(
                 onRecoveryCodeChange = onRecoveryCodeChange,
                 onConfirmRecoveryCode = onConfirmRecoveryCode,
                 onCancelRecoveryPinReset = onCancelRecoveryPinReset,
+            )
+        }
+        if (state.showDailyRoutineSelectionPrompt) {
+            DailyRoutineSelectionDialog(
+                routineSets = state.routineSets,
+                onSelect = onSetRoutineSetForToday,
             )
         }
     }
@@ -1114,6 +1123,7 @@ private fun GuardianRoutineEditScreen(
     onOpenRoutineEditor: (String) -> Unit,
     onToggleRoutineSetListEditing: () -> Unit,
     onSelectRoutineSet: (String) -> Unit,
+    onSetRoutineSetForToday: (String) -> Unit,
     onRequestEditRoutineSetName: (String) -> Unit,
     onRequestDeleteRoutineSet: (String) -> Unit,
     onRequestDelete: (String) -> Unit,
@@ -1157,9 +1167,11 @@ private fun GuardianRoutineEditScreen(
         }
         RoutineSetList(
             routineSets = state.routineSets,
-            activeRoutineSetId = state.activeRoutineSet?.id,
+            selectedRoutineSetId = state.selectedRoutineSetId,
+            todayRoutineSetId = state.todayRoutineSetId,
             editing = state.routineSetListEditing,
             onSelectRoutineSet = onSelectRoutineSet,
+            onSetRoutineSetForToday = onSetRoutineSetForToday,
             onRequestEditRoutineSetName = onRequestEditRoutineSetName,
             onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
         )
@@ -1203,9 +1215,11 @@ private fun GuardianRoutineEditScreen(
 @Composable
 private fun RoutineSetList(
     routineSets: List<RoutineSet>,
-    activeRoutineSetId: String?,
+    selectedRoutineSetId: String?,
+    todayRoutineSetId: String?,
     editing: Boolean,
     onSelectRoutineSet: (String) -> Unit,
+    onSetRoutineSetForToday: (String) -> Unit,
     onRequestEditRoutineSetName: (String) -> Unit,
     onRequestDeleteRoutineSet: (String) -> Unit,
 ) {
@@ -1216,9 +1230,11 @@ private fun RoutineSetList(
         routineSets.forEach { routineSet ->
             RoutineSetRow(
                 routineSet = routineSet,
-                active = routineSet.id == activeRoutineSetId,
+                selected = routineSet.id == selectedRoutineSetId,
+                setForToday = routineSet.id == todayRoutineSetId,
                 editing = editing,
                 onSelect = { onSelectRoutineSet(routineSet.id) },
+                onSetForToday = { onSetRoutineSetForToday(routineSet.id) },
                 onEdit = { onRequestEditRoutineSetName(routineSet.id) },
                 onDelete = { onRequestDeleteRoutineSet(routineSet.id) },
             )
@@ -1229,19 +1245,21 @@ private fun RoutineSetList(
 @Composable
 private fun RoutineSetRow(
     routineSet: RoutineSet,
-    active: Boolean,
+    selected: Boolean,
+    setForToday: Boolean,
     editing: Boolean,
     onSelect: () -> Unit,
+    onSetForToday: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val borderColor = if (active) SteppieTheme.colors.warning else MaterialTheme.colorScheme.outline
+    val borderColor = if (selected) SteppieTheme.colors.warning else MaterialTheme.colorScheme.outline
     val routineSetName = routineSet.name.resolve(null, Locale.getDefault().toLanguageTag())
     val meta = stringResource(
-        if (active) R.string.guardian_routine_set_active_meta else R.string.guardian_routine_set_meta,
+        if (setForToday) R.string.guardian_routine_set_today_meta else R.string.guardian_routine_set_meta,
         routineSet.routines.size,
     )
-    val selectionState = stringResource(if (active) R.string.a11y_selected else R.string.a11y_not_selected)
+    val selectionState = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
     val accessibilityDescription = stringResource(R.string.a11y_routine_set_row, routineSetName, meta)
     Row(
         modifier = Modifier
@@ -1250,7 +1268,7 @@ private fun RoutineSetRow(
             .clip(RoundedCornerShape(SteppieCornerRadius.Card))
             .background(MaterialTheme.colorScheme.surface)
             .border(
-                if (active) 2.dp else SteppieStroke.Divider,
+                if (selected) 2.dp else SteppieStroke.Divider,
                 borderColor,
                 RoundedCornerShape(SteppieCornerRadius.Card),
             )
@@ -1261,7 +1279,7 @@ private fun RoutineSetRow(
                         stateDescription = selectionState
                     }
                 } else {
-                    Modifier.clearAndSetSemantics {
+                    Modifier.semantics {
                         contentDescription = accessibilityDescription
                         stateDescription = selectionState
                         role = Role.Button
@@ -1277,7 +1295,7 @@ private fun RoutineSetRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
     ) {
-        RoutineSetSelectionMark(active = active)
+        RoutineSetSelectionMark(active = selected)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall)) {
             Text(
                 text = routineSetName,
@@ -1304,6 +1322,12 @@ private fun RoutineSetRow(
                 onClick = onDelete,
                 danger = true,
             )
+        } else if (selected) {
+            SteppieButton(
+                label = stringResource(R.string.guardian_routine_set_set_today),
+                onClick = onSetForToday,
+                style = SteppieButtonStyle.Secondary,
+            )
         }
     }
 }
@@ -1326,6 +1350,76 @@ private fun RoutineSetSelectionMark(active: Boolean) {
             )
         }
     }
+}
+
+@Composable
+private fun DailyRoutineSelectionDialog(
+    routineSets: List<RoutineSet>,
+    onSelect: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text(stringResource(R.string.guardian_daily_routine_prompt_title)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+            ) {
+                Text(
+                    text = stringResource(R.string.guardian_daily_routine_prompt_body),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = SteppieTheme.typography.guardianCaption,
+                )
+                routineSets.forEach { routineSet ->
+                    val routineSetName = routineSet.name.resolve(null, Locale.getDefault().toLanguageTag())
+                    val meta = stringResource(R.string.guardian_routine_set_meta, routineSet.routines.size)
+                    val accessibilityDescription = stringResource(R.string.a11y_routine_set_row, routineSetName, meta)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = SteppieLayout.GuardianMinimumTouchTarget)
+                            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(
+                                SteppieStroke.Divider,
+                                MaterialTheme.colorScheme.outline,
+                                RoundedCornerShape(SteppieCornerRadius.Card),
+                            )
+                            .clickable(role = Role.Button) { onSelect(routineSet.id) }
+                            .semantics {
+                                contentDescription = accessibilityDescription
+                            }
+                            .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.Small),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = routineSetName,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = SteppieTheme.typography.button,
+                                maxLines = 2,
+                            )
+                            Text(
+                                text = meta,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = SteppieTheme.typography.guardianCaption,
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.guardian_routine_set_set_today),
+                            color = MaterialTheme.colorScheme.primary,
+                            style = SteppieTheme.typography.button,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+    )
 }
 
 @Composable
@@ -1609,6 +1703,7 @@ private fun GuardianRoutineSplitScreen(
     onOpenRoutineEditor: (String) -> Unit,
     onToggleRoutineSetListEditing: () -> Unit,
     onSelectRoutineSet: (String) -> Unit,
+    onSetRoutineSetForToday: (String) -> Unit,
     onRequestEditRoutineSetName: (String) -> Unit,
     onRequestDeleteRoutineSet: (String) -> Unit,
     onRequestDelete: (String) -> Unit,
@@ -1630,6 +1725,7 @@ private fun GuardianRoutineSplitScreen(
                 onOpenRoutineEditor = onOpenRoutineEditor,
                 onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
                 onSelectRoutineSet = onSelectRoutineSet,
+                onSetRoutineSetForToday = onSetRoutineSetForToday,
                 onRequestEditRoutineSetName = onRequestEditRoutineSetName,
                 onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
                 onRequestDelete = onRequestDelete,

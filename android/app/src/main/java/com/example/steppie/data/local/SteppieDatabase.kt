@@ -8,8 +8,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [RoutineSetEntity::class, RoutineEntity::class, DailyLogEntity::class],
-    version = 2,
+    entities = [
+        RoutineSetEntity::class,
+        RoutineEntity::class,
+        DailyLogEntity::class,
+        DailyRoutineSelectionEntity::class,
+    ],
+    version = 3,
     exportSchema = false,
 )
 abstract class SteppieDatabase : RoomDatabase() {
@@ -25,7 +30,7 @@ abstract class SteppieDatabase : RoomDatabase() {
                 SteppieDatabase::class.java,
                 "steppie.db",
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
                 .also { instance = it }
         }
@@ -54,6 +59,25 @@ abstract class SteppieDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_logs_routineSetId` ON `daily_logs` (`routineSetId`)")
                 db.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS `index_daily_logs_date_routineId` ON `daily_logs` (`date`, `routineId`)",
+                )
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `daily_routine_selections` (
+                        `date` TEXT NOT NULL,
+                        `routineSetId` TEXT NOT NULL,
+                        `selectedAtEpochMillis` INTEGER NOT NULL,
+                        PRIMARY KEY(`date`),
+                        FOREIGN KEY(`routineSetId`) REFERENCES `routine_sets`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_daily_routine_selections_routineSetId` ON `daily_routine_selections` (`routineSetId`)",
                 )
             }
         }
