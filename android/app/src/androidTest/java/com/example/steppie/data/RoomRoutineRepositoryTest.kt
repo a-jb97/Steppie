@@ -164,6 +164,27 @@ class RoomRoutineRepositoryTest {
         assertEquals(listOf(recentDate, olderDate), logs.map { it.date })
     }
 
+    @Test
+    fun dailyRoutineSelection_selectsOneRoutineSetPerDateAndIgnoresDeletedSet() = runBlocking {
+        val first = repository.createRoutineSet(testSet(active = true))
+        val secondId = "30000000-0000-4000-8000-000000000004"
+        val second = repository.createRoutineSet(testSet(id = secondId, active = false))
+        val date = LocalDate.parse("2026-01-12")
+
+        assertNull(repository.observeRoutineSetForDate(date).first())
+
+        repository.selectRoutineSetForDate(date, first.id, Instant.parse("2026-01-12T00:00:00Z"))
+        assertEquals(first.id, repository.observeSelectedRoutineSetId(date).first())
+        assertEquals(first.id, repository.observeRoutineSetForDate(date).first()?.id)
+
+        repository.selectRoutineSetForDate(date, second.id, Instant.parse("2026-01-12T01:00:00Z"))
+        assertEquals(second.id, repository.observeSelectedRoutineSetId(date).first())
+        assertEquals(second.id, repository.observeRoutineSetForDate(date).first()?.id)
+
+        repository.deleteRoutineSet(second.id, Instant.parse("2026-01-12T02:00:00Z"))
+        assertNull(repository.observeRoutineSetForDate(date).first())
+    }
+
 
     @Test
     fun routineSetCrud_enforcesSingleActiveSetAndSoftDeleteRule() = runBlocking {
