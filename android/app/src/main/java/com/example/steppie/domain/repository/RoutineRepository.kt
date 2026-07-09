@@ -28,6 +28,7 @@ interface RoutineRepository {
 
     fun observeDailyLogs(date: LocalDate): Flow<List<DailyLog>>
     fun observeDailyLogs(startDate: LocalDate, endDate: LocalDate): Flow<List<DailyLog>>
+    fun observeAllDailyLogs(): Flow<List<DailyLog>>
     suspend fun completeRoutine(
         routineId: String,
         date: LocalDate = LocalDate.now(),

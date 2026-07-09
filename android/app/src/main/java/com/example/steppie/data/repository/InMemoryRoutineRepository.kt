@@ -162,6 +162,12 @@ class InMemoryRoutineRepository(
         }
         .distinctUntilChanged()
 
+    override fun observeAllDailyLogs(): Flow<List<DailyLog>> = logs
+        .map { source ->
+            source.values.sortedWith(compareByDescending<DailyLog> { it.date }.thenBy { it.updatedAt }.thenBy { it.id })
+        }
+        .distinctUntilChanged()
+
     override suspend fun completeRoutine(
         routineId: String,
         date: LocalDate,

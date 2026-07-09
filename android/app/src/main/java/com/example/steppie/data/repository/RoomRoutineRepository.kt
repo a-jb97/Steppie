@@ -172,6 +172,9 @@ class RoomRoutineRepository(
     override fun observeDailyLogs(startDate: LocalDate, endDate: LocalDate): Flow<List<DailyLog>> =
         dao.observeDailyLogs(startDate.toString(), endDate.toString()).map { logs -> logs.map { it.toDomain() } }
 
+    override fun observeAllDailyLogs(): Flow<List<DailyLog>> =
+        dao.observeAllDailyLogs().map { logs -> logs.map { it.toDomain() } }
+
     override suspend fun completeRoutine(
         routineId: String,
         date: LocalDate,

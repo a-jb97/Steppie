@@ -149,6 +149,21 @@ class RoomRoutineRepositoryTest {
         assertEquals(true, recordSets.single().routines.single { it.id == second.id }.deletedAt != null)
     }
 
+    @Test
+    fun recordsReadsAllDailyLogsWithoutSevenDayLimit() = runBlocking {
+        repository.createRoutineSet(testSet())
+        val routine = repository.createRoutine(testRoutine(1))
+        val olderDate = LocalDate.parse("2025-12-01")
+        val recentDate = LocalDate.parse("2026-01-10")
+
+        repository.completeRoutine(routine.id, olderDate, Instant.parse("2025-12-01T08:00:00Z"))
+        repository.completeRoutine(routine.id, recentDate, Instant.parse("2026-01-10T08:00:00Z"))
+
+        val logs = repository.observeAllDailyLogs().first()
+
+        assertEquals(listOf(recentDate, olderDate), logs.map { it.date })
+    }
+
 
     @Test
     fun routineSetCrud_enforcesSingleActiveSetAndSoftDeleteRule() = runBlocking {
