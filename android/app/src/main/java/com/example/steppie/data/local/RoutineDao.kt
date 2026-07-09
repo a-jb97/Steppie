@@ -83,6 +83,9 @@ interface RoutineDao {
     @Query("SELECT * FROM daily_logs ORDER BY date, updatedAtEpochMillis, id")
     suspend fun getAllDailyLogEntities(): List<DailyLogEntity>
 
+    @Query("SELECT * FROM daily_logs ORDER BY date DESC, updatedAtEpochMillis, id")
+    fun observeAllDailyLogs(): Flow<List<DailyLogEntity>>
+
     @Query("SELECT * FROM daily_logs WHERE date = :date AND routineId = :routineId LIMIT 1")
     suspend fun getDailyLog(date: String, routineId: String): DailyLogEntity?
 

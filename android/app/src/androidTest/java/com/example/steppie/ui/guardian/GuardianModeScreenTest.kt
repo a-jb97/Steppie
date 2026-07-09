@@ -3,8 +3,10 @@ package com.example.steppie.ui.guardian
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -373,6 +375,154 @@ class GuardianModeScreenTest {
         composeRule.onNodeWithText("양치하기").assertIsDisplayed()
         composeRule.onNodeWithText("가방 챙기기").assertIsDisplayed()
         composeRule.onNodeWithText("미완료 · 삭제된 활동").assertIsDisplayed()
+    }
+
+    @Test
+    fun recordsScreenRoutesCalendarButton() {
+        var calendarClicks = 0
+
+        composeRule.setContent {
+            SteppieTheme {
+                GuardianModeScreen(
+                    state = GuardianModeUiState(
+                        isActive = true,
+                        isAuthenticated = true,
+                        destination = GuardianDestination.Records,
+                    ),
+                    onDigit = {},
+                    onDeletePinDigit = {},
+                    onCloseToChild = {},
+                    onInteraction = {},
+                    onOpenHome = {},
+                    onOpenRoutineEdit = {},
+                    onOpenRecordsCalendar = { calendarClicks += 1 },
+                    onOpenSecurity = {},
+                    onOpenPinChange = {},
+                    onOpenRoutineSetCreate = {},
+                    onOpenNewRoutineEditor = {},
+                    onOpenRoutineEditor = {},
+                    onToggleRoutineSetListEditing = {},
+                    onSelectRoutineSet = {},
+                    onRequestEditRoutineSetName = {},
+                    onEditingRoutineSetNameChange = {},
+                    onCancelEditRoutineSetName = {},
+                    onSaveEditingRoutineSetName = {},
+                    onDraftTitleChange = {},
+                    onDraftIconChange = {},
+                    onDraftColorChange = {},
+                    onDraftScheduledTimeChange = {},
+                    onSaveDraft = {},
+                    onRoutineSetNameChange = {},
+                    onRoutineSetStepTitleChange = {},
+                    onRoutineSetStepIconChange = {},
+                    onRoutineSetStepColorChange = {},
+                    onRoutineSetStepScheduledTimeChange = {},
+                    onAddRoutineSetStep = {},
+                    onEditRoutineSetStep = {},
+                    onRemoveRoutineSetStep = {},
+                    onSaveRoutineSetDraft = {},
+                    onRequestDelete = {},
+                    onRequestDeleteRoutineSet = {},
+                    onCancelDelete = {},
+                    onConfirmDelete = {},
+                    onConfirmDeleteRoutineSet = {},
+                    onMoveRoutine = { _, _ -> },
+                    onShowOutOfScopeNotice = {},
+                    onClearNotice = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("전체 기록 캘린더 열기").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(1, calendarClicks)
+        }
+    }
+
+    @Test
+    fun recordsCalendarSelectsOnlyDatesWithRecords() {
+        val dateWithRecords = LocalDate.parse("2026-06-30")
+        val emptyDate = LocalDate.parse("2026-06-29")
+        var selectedDate: LocalDate? = null
+
+        composeRule.setContent {
+            SteppieTheme {
+                GuardianModeScreen(
+                    state = GuardianModeUiState(
+                        isActive = true,
+                        isAuthenticated = true,
+                        destination = GuardianDestination.RecordsCalendar,
+                        recordsCalendarMonth = java.time.YearMonth.of(2026, 6),
+                        calendarRecordDates = setOf(dateWithRecords),
+                        selectedCalendarRecordsDate = dateWithRecords,
+                        selectedCalendarRecordSummary = GuardianRecordDay(dateWithRecords, 1, 1, true),
+                        selectedCalendarRecordRoutines = listOf(
+                            GuardianRecordRoutine(
+                                routineId = "40000000-0000-4000-8000-000000000001",
+                                title = "양치하기",
+                                isCompleted = true,
+                                completedAt = null,
+                                isDeleted = false,
+                                isInactive = false,
+                                isMissing = false,
+                            ),
+                        ),
+                    ),
+                    onDigit = {},
+                    onDeletePinDigit = {},
+                    onCloseToChild = {},
+                    onInteraction = {},
+                    onOpenHome = {},
+                    onOpenRoutineEdit = {},
+                    onOpenSecurity = {},
+                    onOpenPinChange = {},
+                    onOpenRoutineSetCreate = {},
+                    onOpenNewRoutineEditor = {},
+                    onOpenRoutineEditor = {},
+                    onToggleRoutineSetListEditing = {},
+                    onSelectRoutineSet = {},
+                    onRequestEditRoutineSetName = {},
+                    onEditingRoutineSetNameChange = {},
+                    onCancelEditRoutineSetName = {},
+                    onSaveEditingRoutineSetName = {},
+                    onDraftTitleChange = {},
+                    onDraftIconChange = {},
+                    onDraftColorChange = {},
+                    onDraftScheduledTimeChange = {},
+                    onSaveDraft = {},
+                    onRoutineSetNameChange = {},
+                    onRoutineSetStepTitleChange = {},
+                    onRoutineSetStepIconChange = {},
+                    onRoutineSetStepColorChange = {},
+                    onRoutineSetStepScheduledTimeChange = {},
+                    onAddRoutineSetStep = {},
+                    onEditRoutineSetStep = {},
+                    onRemoveRoutineSetStep = {},
+                    onSaveRoutineSetDraft = {},
+                    onRequestDelete = {},
+                    onRequestDeleteRoutineSet = {},
+                    onCancelDelete = {},
+                    onConfirmDelete = {},
+                    onConfirmDeleteRoutineSet = {},
+                    onMoveRoutine = { _, _ -> },
+                    onSelectRecordsCalendarDate = { selectedDate = it },
+                    onShowOutOfScopeNotice = {},
+                    onClearNotice = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("전체 기록").assertIsDisplayed()
+        composeRule.onNodeWithTag("guardian_records_calendar_date_$dateWithRecords").performClick()
+        composeRule.onNodeWithTag("guardian_records_calendar_date_$emptyDate")
+            .assertIsDisplayed()
+            .assertHasNoClickAction()
+        composeRule.onNodeWithText("양치하기").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            assertEquals(dateWithRecords, selectedDate)
+        }
     }
 
     @Test

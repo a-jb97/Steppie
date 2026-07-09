@@ -24,6 +24,7 @@ import com.example.steppie.domain.repository.RoutineRepository
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.YearMonth
 import java.util.Locale
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +45,7 @@ enum class GuardianDestination {
     RoutineSetCreate,
     EnvironmentSettings,
     Records,
+    RecordsCalendar,
     Security,
     RecoveryCode,
     BackupRestore,
@@ -121,6 +123,11 @@ data class GuardianModeUiState(
     val recordDays: List<GuardianRecordDay> = emptyList(),
     val selectedRecordRoutines: List<GuardianRecordRoutine> = emptyList(),
     val selectedRecordSummary: GuardianRecordDay = GuardianRecordDay(LocalDate.now(), 0, 0, false),
+    val recordsCalendarMonth: YearMonth = YearMonth.now(),
+    val selectedCalendarRecordsDate: LocalDate? = null,
+    val calendarRecordDates: Set<LocalDate> = emptySet(),
+    val selectedCalendarRecordRoutines: List<GuardianRecordRoutine> = emptyList(),
+    val selectedCalendarRecordSummary: GuardianRecordDay = GuardianRecordDay(LocalDate.now(), 0, 0, false),
     val editingRoutineSetId: String? = null,
     val editingRoutineSetName: String = "",
     val draftError: String? = null,
@@ -159,6 +166,7 @@ class GuardianModeViewModel(
     private var verifiedRecoveryCodeForReset: String? = null
     private var recordRoutineSetsCache: List<RoutineSet> = emptyList()
     private var dailyLogsCache: List<DailyLog> = emptyList()
+    private var allDailyLogsCache: List<DailyLog> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -170,18 +178,21 @@ class GuardianModeViewModel(
                     routineRepository.observeDailyLogs(endDate.minusDays(6), endDate)
                         .map { dailyLogs -> endDate to dailyLogs }
                 },
-            ) { settings, routineSets, recordRoutineSets, records ->
+                routineRepository.observeAllDailyLogs(),
+            ) { settings, routineSets, recordRoutineSets, records, allDailyLogs ->
                 val (endDate, dailyLogs) = records
                 GuardianRepositorySnapshot(
                     settings = settings,
                     visibleRoutineSets = routineSets.filter { it.deletedAt == null },
                     recordRoutineSets = recordRoutineSets,
                     dailyLogs = dailyLogs,
+                    allDailyLogs = allDailyLogs,
                     recordsEndDate = endDate,
                 )
             }.collect { snapshot ->
                 recordRoutineSetsCache = snapshot.recordRoutineSets
                 dailyLogsCache = snapshot.dailyLogs
+                allDailyLogsCache = snapshot.allDailyLogs
                 _uiState.update { state ->
                     val activeSet = snapshot.visibleRoutineSets.firstOrNull { it.isActive }
                     val records = buildGuardianRecords(
@@ -189,6 +200,13 @@ class GuardianModeViewModel(
                         endDate = snapshot.recordsEndDate,
                         routineSets = snapshot.recordRoutineSets,
                         dailyLogs = snapshot.dailyLogs,
+                    )
+                    val calendarRecordDates = snapshot.allDailyLogs.map(DailyLog::date).toSet()
+                    val selectedCalendarDate = state.selectedCalendarRecordsDate
+                    val calendarRecords = buildGuardianRecordDetail(
+                        selectedDate = selectedCalendarDate,
+                        routineSets = snapshot.recordRoutineSets,
+                        dailyLogs = snapshot.allDailyLogs,
                     )
                     val resolvedPinMode = if (
                         state.isActive &&
@@ -209,6 +227,10 @@ class GuardianModeViewModel(
                         recordDays = records.days,
                         selectedRecordRoutines = records.routines,
                         selectedRecordSummary = records.summary,
+                        selectedCalendarRecordsDate = selectedCalendarDate,
+                        calendarRecordDates = calendarRecordDates,
+                        selectedCalendarRecordRoutines = calendarRecords.routines,
+                        selectedCalendarRecordSummary = calendarRecords.summary,
                     )
                 }
             }
@@ -378,6 +400,32 @@ class GuardianModeViewModel(
         }
     }
 
+    fun openRecordsCalendar() {
+        val today = LocalDate.now()
+        _uiState.update {
+            it.copy(
+                destination = GuardianDestination.RecordsCalendar,
+                destinationBackStack = it.backStackFor(GuardianDestination.RecordsCalendar),
+                recordsCalendarMonth = YearMonth.from(today),
+                selectedCalendarRecordsDate = today,
+                selectedCalendarRecordRoutines = emptyList(),
+                selectedCalendarRecordSummary = GuardianRecordDay(today, 0, 0, false),
+                draft = null,
+                routineSetDraft = null,
+                selectedTemplate = null,
+                templateReturnDestination = GuardianDestination.RoutineEdit,
+                routineSetListEditing = false,
+                editingRoutineSetId = null,
+                editingRoutineSetName = "",
+                draftError = null,
+                pendingDeleteRoutineId = null,
+                pendingDeleteRoutineSetId = null,
+                notice = null,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
     fun selectRecordsDate(date: LocalDate) {
         val current = _uiState.value
         if (current.recordDays.none { it.date == date }) return
@@ -393,6 +441,34 @@ class GuardianModeViewModel(
                 recordDays = records.days,
                 selectedRecordRoutines = records.routines,
                 selectedRecordSummary = records.summary,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun selectRecordsCalendarDate(date: LocalDate) {
+        val current = _uiState.value
+        if (date !in current.calendarRecordDates) return
+        val records = buildGuardianRecordDetail(
+            selectedDate = date,
+            routineSets = recordRoutineSetsCache,
+            dailyLogs = allDailyLogsCache,
+        )
+        _uiState.update {
+            it.copy(
+                recordsCalendarMonth = YearMonth.from(date),
+                selectedCalendarRecordsDate = date,
+                selectedCalendarRecordRoutines = records.routines,
+                selectedCalendarRecordSummary = records.summary,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
+    fun moveRecordsCalendarMonth(monthDelta: Long) {
+        _uiState.update {
+            it.copy(
+                recordsCalendarMonth = it.recordsCalendarMonth.plusMonths(monthDelta),
                 interactionToken = it.interactionToken + 1,
             )
         }
@@ -1589,6 +1665,7 @@ private data class GuardianRepositorySnapshot(
     val visibleRoutineSets: List<RoutineSet>,
     val recordRoutineSets: List<RoutineSet>,
     val dailyLogs: List<DailyLog>,
+    val allDailyLogs: List<DailyLog>,
     val recordsEndDate: LocalDate,
 )
 
@@ -1638,6 +1715,32 @@ private fun buildGuardianRecords(
         routines = detailsByDate[selectedDate].orEmpty(),
         summary = summary,
     )
+}
+
+private fun buildGuardianRecordDetail(
+    selectedDate: LocalDate?,
+    routineSets: List<RoutineSet>,
+    dailyLogs: List<DailyLog>,
+): GuardianRecordsResult {
+    val date = selectedDate ?: LocalDate.now()
+    val logs = if (selectedDate == null) emptyList() else dailyLogs.filter { it.date == selectedDate }
+    val routinesById = routineSets
+        .flatMap(RoutineSet::routines)
+        .associateBy(Routine::id)
+    val routineSetsById = routineSets.associateBy(RoutineSet::id)
+    val routines = buildGuardianRecordRoutines(
+        date = date,
+        logs = logs,
+        routineSetsById = routineSetsById,
+        routinesById = routinesById,
+    )
+    val summary = GuardianRecordDay(
+        date = date,
+        completedCount = routines.count(GuardianRecordRoutine::isCompleted),
+        totalCount = routines.size,
+        hasRecords = logs.isNotEmpty(),
+    )
+    return GuardianRecordsResult(days = emptyList(), routines = routines, summary = summary)
 }
 
 private fun buildGuardianRecordRoutines(

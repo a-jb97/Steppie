@@ -1,6 +1,7 @@
 package com.example.steppie.ui.guardian
 
 import android.app.TimePickerDialog
+import android.widget.NumberPicker
 import androidx.annotation.DrawableRes
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -76,6 +77,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import com.example.steppie.R
 import com.example.steppie.domain.model.AppSettings
@@ -96,10 +98,13 @@ import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
+import java.time.temporal.WeekFields
 import java.util.Locale
 
 private val GuardianSplitMinimumWidth = 905.dp
@@ -111,11 +116,12 @@ fun GuardianModeScreen(
     onDeletePinDigit: () -> Unit,
     onCloseToChild: () -> Unit,
     onInteraction: () -> Unit,
-    onNavigateBack: () -> Unit,
+    onNavigateBack: () -> Unit = {},
     onOpenHome: () -> Unit,
     onOpenRoutineEdit: () -> Unit,
     onOpenEnvironmentSettings: () -> Unit = {},
     onOpenRecords: () -> Unit = {},
+    onOpenRecordsCalendar: () -> Unit = {},
     onOpenSecurity: () -> Unit,
     onOpenBackupRestore: () -> Unit = {},
     onOpenPinChange: () -> Unit,
@@ -162,6 +168,8 @@ fun GuardianModeScreen(
     onConfirmDeleteRoutineSet: () -> Unit,
     onMoveRoutine: (String, Int) -> Unit,
     onSelectRecordsDate: (LocalDate) -> Unit = {},
+    onSelectRecordsCalendarDate: (LocalDate) -> Unit = {},
+    onMoveRecordsCalendarMonth: (Long) -> Unit = {},
     onShowOutOfScopeNotice: () -> Unit,
     onFeedbackIntensityChange: (FeedbackIntensity) -> Unit = {},
     onTtsEnabledChange: (Boolean) -> Unit = {},
@@ -328,6 +336,14 @@ fun GuardianModeScreen(
                 useWideLayout = maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight,
                 onNavigateBack = onNavigateBack,
                 onSelectRecordsDate = onSelectRecordsDate,
+                onOpenRecordsCalendar = onOpenRecordsCalendar,
+            )
+            GuardianDestination.RecordsCalendar -> GuardianRecordsCalendarScreen(
+                state = state,
+                useWideLayout = maxWidth >= GuardianSplitMinimumWidth && maxWidth > maxHeight,
+                onNavigateBack = onNavigateBack,
+                onSelectRecordsCalendarDate = onSelectRecordsCalendarDate,
+                onMoveRecordsCalendarMonth = onMoveRecordsCalendarMonth,
             )
             GuardianDestination.Security -> GuardianSecurityScreen(
                 onNavigateBack = onNavigateBack,
@@ -2091,11 +2107,15 @@ private fun GuardianRecordsScreen(
     useWideLayout: Boolean,
     onNavigateBack: () -> Unit,
     onSelectRecordsDate: (LocalDate) -> Unit,
+    onOpenRecordsCalendar: () -> Unit,
 ) {
     GuardianScaffold(
         title = stringResource(R.string.guardian_records_title),
         subtitle = stringResource(R.string.guardian_records_subtitle),
         onBack = onNavigateBack,
+        topActionIcon = R.drawable.ic_guardian_calendar,
+        topActionContentDescription = stringResource(R.string.a11y_guardian_records_calendar),
+        onTopAction = onOpenRecordsCalendar,
     ) {
         if (useWideLayout) {
             Row(
@@ -2114,12 +2134,18 @@ private fun GuardianRecordsScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
                 ) {
-                    GuardianRecordsDetail(state)
+                    GuardianRecordsDetail(
+                        summary = state.selectedRecordSummary,
+                        routines = state.selectedRecordRoutines,
+                    )
                 }
             }
         } else {
             GuardianRecordsDayList(state, onSelectRecordsDate)
-            GuardianRecordsDetail(state)
+            GuardianRecordsDetail(
+                summary = state.selectedRecordSummary,
+                routines = state.selectedRecordRoutines,
+            )
         }
     }
 }
@@ -2297,10 +2323,350 @@ private fun GuardianRecordContinuousProgressBar(
 }
 
 @Composable
-private fun GuardianRecordsDetail(state: GuardianModeUiState) {
-    val summary = state.selectedRecordSummary
+private fun GuardianRecordsCalendarScreen(
+    state: GuardianModeUiState,
+    useWideLayout: Boolean,
+    onNavigateBack: () -> Unit,
+    onSelectRecordsCalendarDate: (LocalDate) -> Unit,
+    onMoveRecordsCalendarMonth: (Long) -> Unit,
+) {
     Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(SteppieLayout.GuardianScreenPadding),
+    ) {
+        GuardianTopBar(
+            title = stringResource(R.string.guardian_records_calendar_title),
+            subtitle = stringResource(R.string.guardian_records_calendar_subtitle),
+            onBack = onNavigateBack,
+        )
+        if (useWideLayout) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Large),
+            ) {
+                GuardianRecordsCalendarPanel(
+                    state = state,
+                    onSelectDate = onSelectRecordsCalendarDate,
+                    onMoveMonth = onMoveRecordsCalendarMonth,
+                    modifier = Modifier.weight(1f),
+                )
+                GuardianRecordsDetail(
+                    summary = state.selectedCalendarRecordSummary,
+                    routines = state.selectedCalendarRecordRoutines,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        } else {
+            GuardianRecordsCalendarPanel(
+                state = state,
+                onSelectDate = onSelectRecordsCalendarDate,
+                onMoveMonth = onMoveRecordsCalendarMonth,
+            )
+            Spacer(Modifier.height(SteppieSpacing.ExtraLarge + SteppieSpacing.Medium))
+            GuardianRecordsDetail(
+                summary = state.selectedCalendarRecordSummary,
+                routines = state.selectedCalendarRecordRoutines,
+            )
+        }
+        Spacer(Modifier.height(SteppieSpacing.Large))
+    }
+}
+
+@Composable
+private fun GuardianRecordsCalendarPanel(
+    state: GuardianModeUiState,
+    onSelectDate: (LocalDate) -> Unit,
+    onMoveMonth: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var monthPickerOpen by remember { mutableStateOf(false) }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(SteppieStroke.Divider, MaterialTheme.colorScheme.outline, RoundedCornerShape(SteppieCornerRadius.Card))
+            .padding(SteppieSpacing.Medium),
+        verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
+    ) {
+        GuardianRecordsCalendarHeader(
+            month = state.recordsCalendarMonth,
+            onPreviousMonth = { onMoveMonth(-1L) },
+            onNextMonth = { onMoveMonth(1L) },
+            onOpenMonthPicker = { monthPickerOpen = true },
+        )
+        GuardianRecordsCalendarGrid(
+            month = state.recordsCalendarMonth,
+            recordDates = state.calendarRecordDates,
+            selectedDate = state.selectedCalendarRecordsDate,
+            onSelectDate = onSelectDate,
+        )
+    }
+    if (monthPickerOpen) {
+        GuardianRecordsMonthPickerDialog(
+            currentMonth = state.recordsCalendarMonth,
+            recordDates = state.calendarRecordDates,
+            onDismiss = { monthPickerOpen = false },
+            onConfirm = { selectedMonth ->
+                val delta = ChronoUnit.MONTHS.between(state.recordsCalendarMonth, selectedMonth)
+                if (delta != 0L) onMoveMonth(delta)
+                monthPickerOpen = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun GuardianRecordsCalendarHeader(
+    month: YearMonth,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onOpenMonthPicker: () -> Unit,
+) {
+    Row(
         modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CalendarMonthIconButton(
+            icon = R.drawable.ic_chevron_left,
+            description = stringResource(R.string.guardian_records_previous_month),
+            onClick = onPreviousMonth,
+        )
+        Box(
+            modifier = Modifier
+                .height(SteppieLayout.GuardianMinimumTouchTarget)
+                .clip(RoundedCornerShape(SteppieCornerRadius.Control))
+                .clickable(role = Role.Button, onClick = onOpenMonthPicker)
+                .padding(horizontal = SteppieSpacing.ExtraSmall, vertical = SteppieSpacing.TwoExtraSmall),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = calendarMonthText(month),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.guardianSection,
+                textAlign = TextAlign.Center,
+            )
+        }
+        CalendarMonthIconButton(
+            icon = R.drawable.ic_chevron_right,
+            description = stringResource(R.string.guardian_records_next_month),
+            onClick = onNextMonth,
+        )
+    }
+}
+
+@Composable
+private fun CalendarMonthIconButton(
+    @DrawableRes icon: Int,
+    description: String,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(SteppieLayout.GuardianMinimumTouchTarget),
+    ) {
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = description,
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(17.dp),
+        )
+    }
+}
+
+@Composable
+private fun GuardianRecordsMonthPickerDialog(
+    currentMonth: YearMonth,
+    recordDates: Set<LocalDate>,
+    onDismiss: () -> Unit,
+    onConfirm: (YearMonth) -> Unit,
+) {
+    val recordYears = recordDates.map(LocalDate::getYear)
+    val minYear = ((recordYears.minOrNull() ?: currentMonth.year) - 5).coerceAtLeast(1970)
+    val maxYear = (recordYears.maxOrNull() ?: currentMonth.year) + 5
+    var selectedYear by remember(currentMonth) { mutableStateOf(currentMonth.year.coerceIn(minYear, maxYear)) }
+    var selectedMonth by remember(currentMonth) { mutableStateOf(currentMonth.monthValue) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.guardian_records_month_picker_title)) },
+        text = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AndroidView(
+                    modifier = Modifier.weight(1f),
+                    factory = { context ->
+                        NumberPicker(context).apply {
+                            minValue = minYear
+                            maxValue = maxYear
+                            value = selectedYear
+                            wrapSelectorWheel = false
+                            setOnValueChangedListener { _, _, newValue -> selectedYear = newValue }
+                        }
+                    },
+                    update = { picker ->
+                        picker.minValue = minYear
+                        picker.maxValue = maxYear
+                        if (picker.value != selectedYear) picker.value = selectedYear
+                    },
+                )
+                AndroidView(
+                    modifier = Modifier.weight(1f),
+                    factory = { context ->
+                        NumberPicker(context).apply {
+                            minValue = 1
+                            maxValue = 12
+                            value = selectedMonth
+                            displayedValues = (1..12).map { it.toString() }.toTypedArray()
+                            wrapSelectorWheel = true
+                            setOnValueChangedListener { _, _, newValue -> selectedMonth = newValue }
+                        }
+                    },
+                    update = { picker ->
+                        if (picker.value != selectedMonth) picker.value = selectedMonth
+                    },
+                )
+            }
+        },
+        confirmButton = {
+            SteppieButton(
+                label = stringResource(R.string.action_ok),
+                onClick = { onConfirm(YearMonth.of(selectedYear, selectedMonth)) },
+            )
+        },
+        dismissButton = {
+            SteppieButton(
+                label = stringResource(R.string.action_cancel),
+                onClick = onDismiss,
+                style = SteppieButtonStyle.Secondary,
+            )
+        },
+    )
+}
+
+@Composable
+private fun GuardianRecordsCalendarGrid(
+    month: YearMonth,
+    recordDates: Set<LocalDate>,
+    selectedDate: LocalDate?,
+    onSelectDate: (LocalDate) -> Unit,
+) {
+    val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
+    val weekdays = generateSequence(firstDayOfWeek) { previous -> previous.plus(1) }
+        .take(7)
+        .toList()
+    val firstOfMonth = month.atDay(1)
+    val leadingBlankCount = weekdays.indexOf(firstOfMonth.dayOfWeek).coerceAtLeast(0)
+    val dates = List(leadingBlankCount) { null } + (1..month.lengthOfMonth()).map(month::atDay)
+    val rows = dates.chunked(7)
+    Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
+            weekdays.forEach { weekday ->
+                Text(
+                    text = weekday.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = SteppieTheme.typography.guardianCaption,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        rows.forEach { week ->
+            Row(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
+                (week + List(7 - week.size) { null }).forEach { date ->
+                    GuardianRecordsCalendarDateCell(
+                        date = date,
+                        hasRecords = date != null && date in recordDates,
+                        selected = date == selectedDate,
+                        onClick = if (date != null && date in recordDates) {
+                            { onSelectDate(date) }
+                        } else {
+                            null
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GuardianRecordsCalendarDateCell(
+    date: LocalDate?,
+    hasRecords: Boolean,
+    selected: Boolean,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    if (date == null) {
+        Spacer(modifier.height(58.dp))
+        return
+    }
+    val dateText = date.dayOfMonth.toString()
+    val recordState = stringResource(
+        if (hasRecords) R.string.guardian_records_calendar_date_has_records else R.string.guardian_records_calendar_date_no_records,
+    )
+    val selectionState = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
+    val cellModifier = modifier
+        .testTag("guardian_records_calendar_date_${date}")
+        .heightIn(min = 58.dp)
+        .clip(RoundedCornerShape(SteppieCornerRadius.Control))
+        .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent)
+        .then(
+            if (selected) {
+                Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(SteppieCornerRadius.Control))
+            } else {
+                Modifier
+            },
+        )
+        .clearAndSetSemantics {
+            contentDescription = "$dateText, $recordState"
+            stateDescription = selectionState
+            if (onClick != null) {
+                role = Role.Button
+                semanticOnClick {
+                    onClick()
+                    true
+                }
+            }
+        }
+        .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+        .padding(vertical = SteppieSpacing.ExtraSmall)
+    Column(
+        modifier = cellModifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = dateText,
+            color = if (hasRecords) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = SteppieTheme.typography.guardianBody,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(SteppieSpacing.TwoExtraSmall))
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(if (hasRecords) SteppieTheme.colors.progressComplete else Color.Transparent),
+        )
+    }
+}
+
+@Composable
+private fun GuardianRecordsDetail(
+    summary: GuardianRecordDay,
+    routines: List<GuardianRecordRoutine>,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
     ) {
         Text(
@@ -2364,7 +2730,7 @@ private fun GuardianRecordsDetail(state: GuardianModeUiState) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = SteppieTheme.typography.guardianTitle,
             )
-            state.selectedRecordRoutines.forEach { routine ->
+            routines.forEach { routine ->
                 GuardianRecordRoutineRow(routine)
             }
         }
@@ -2490,6 +2856,12 @@ private fun recordDateText(date: LocalDate): String = "${date.monthValue}/${date
 
 private fun fullRecordDateText(date: LocalDate): String =
     date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.getDefault()))
+
+private fun calendarMonthText(month: YearMonth): String {
+    val locale = Locale.getDefault()
+    val pattern = if (locale.language == "ko") "yyyy년 M월" else "MMMM yyyy"
+    return month.format(DateTimeFormatter.ofPattern(pattern, locale))
+}
 
 private fun recordCompletedTimeText(completedAt: java.time.Instant): String =
     completedAt.atZone(ZoneId.systemDefault()).format(
@@ -2777,6 +3149,8 @@ private fun GuardianScaffold(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
     topActionLabel: String? = null,
+    @DrawableRes topActionIcon: Int? = null,
+    topActionContentDescription: String? = null,
     onTopAction: (() -> Unit)? = null,
     bottom: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
@@ -2793,6 +3167,8 @@ private fun GuardianScaffold(
             subtitle = subtitle,
             onBack = onBack,
             topActionLabel = topActionLabel,
+            topActionIcon = topActionIcon,
+            topActionContentDescription = topActionContentDescription,
             onTopAction = onTopAction,
         )
         Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small), content = content)
@@ -2807,6 +3183,8 @@ private fun GuardianTopBar(
     subtitle: String,
     onBack: (() -> Unit)? = null,
     topActionLabel: String? = null,
+    @DrawableRes topActionIcon: Int? = null,
+    topActionContentDescription: String? = null,
     onTopAction: (() -> Unit)? = null,
 ) {
     Column(
@@ -2850,6 +3228,18 @@ private fun GuardianTopBar(
                     color = MaterialTheme.colorScheme.primary,
                     style = SteppieTheme.typography.button,
                 )
+            } else if (topActionIcon != null && topActionContentDescription != null && onTopAction != null) {
+                IconButton(
+                    onClick = onTopAction,
+                    modifier = Modifier.size(SteppieLayout.GuardianMinimumTouchTarget),
+                ) {
+                    Icon(
+                        painter = painterResource(topActionIcon),
+                        contentDescription = topActionContentDescription,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
             }
         }
         Text(subtitle, color = MaterialTheme.colorScheme.onSurface, style = SteppieTheme.typography.guardianCaption)
