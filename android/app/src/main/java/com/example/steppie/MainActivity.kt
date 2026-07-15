@@ -1,6 +1,7 @@
 package com.example.steppie
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.media.AudioManager
@@ -11,9 +12,9 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.provider.MediaStore
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -24,6 +25,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -90,19 +92,20 @@ class MainActivity : ComponentActivity() {
                     .collectAsStateWithLifecycle(initialValue = AppSettings())
                 val targetRoutineId by notificationRoutineId.collectAsStateWithLifecycle()
                 var notificationPermissionRefresh by remember { mutableIntStateOf(0) }
-                var photoTarget by remember { mutableStateOf<PhotoTarget?>(null) }
-                var cameraPhotoTarget by remember { mutableStateOf<PhotoTarget?>(null) }
-                var cameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
+                var photoTargetName by rememberSaveable { mutableStateOf<String?>(null) }
+                var cameraPhotoTargetName by rememberSaveable { mutableStateOf<String?>(null) }
+                var cameraPhotoUriString by rememberSaveable { mutableStateOf<String?>(null) }
                 val notificationPermissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission(),
                 ) {
                     notificationPermissionRefresh += 1
                 }
                 val photoPickerLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.PickVisualMedia(),
-                ) { uri ->
-                    val target = photoTarget
-                    photoTarget = null
+                    ActivityResultContracts.StartActivityForResult(),
+                ) { result ->
+                    val target = photoTargetName.toPhotoTarget()
+                    photoTargetName = null
+                    val uri = result.data?.data
                     if (uri != null) {
                         when (target) {
                             PhotoTarget.RoutineDraft -> guardianViewModel.importDraftPhoto(uri)
@@ -114,10 +117,10 @@ class MainActivity : ComponentActivity() {
                 val cameraLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.TakePicture(),
                 ) { success ->
-                    val target = cameraPhotoTarget
-                    val uri = cameraPhotoUri
-                    cameraPhotoTarget = null
-                    cameraPhotoUri = null
+                    val target = cameraPhotoTargetName.toPhotoTarget()
+                    val uri = cameraPhotoUriString?.let(Uri::parse)
+                    cameraPhotoTargetName = null
+                    cameraPhotoUriString = null
                     if (success && uri != null) {
                         when (target) {
                             PhotoTarget.RoutineDraft -> guardianViewModel.importDraftPhoto(uri)
@@ -209,13 +212,13 @@ class MainActivity : ComponentActivity() {
                         onDraftTitleChange = guardianViewModel::updateDraftTitle,
                         onDraftIconChange = guardianViewModel::updateDraftIcon,
                         onDraftPhotoPick = {
-                            photoTarget = PhotoTarget.RoutineDraft
-                            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            photoTargetName = PhotoTarget.RoutineDraft.name
+                            photoPickerLauncher.launch(imageGalleryIntent())
                         },
                         onDraftCameraCapture = {
                             val uri = createCameraImageUri()
-                            cameraPhotoTarget = PhotoTarget.RoutineDraft
-                            cameraPhotoUri = uri
+                            cameraPhotoTargetName = PhotoTarget.RoutineDraft.name
+                            cameraPhotoUriString = uri.toString()
                             cameraLauncher.launch(uri)
                         },
                         onDraftPhotoRemove = guardianViewModel::removeDraftPhoto,
@@ -226,13 +229,13 @@ class MainActivity : ComponentActivity() {
                         onRoutineSetStepTitleChange = guardianViewModel::updateRoutineSetStepTitle,
                         onRoutineSetStepIconChange = guardianViewModel::updateRoutineSetStepIcon,
                         onRoutineSetStepPhotoPick = {
-                            photoTarget = PhotoTarget.RoutineSetStep
-                            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            photoTargetName = PhotoTarget.RoutineSetStep.name
+                            photoPickerLauncher.launch(imageGalleryIntent())
                         },
                         onRoutineSetStepCameraCapture = {
                             val uri = createCameraImageUri()
-                            cameraPhotoTarget = PhotoTarget.RoutineSetStep
-                            cameraPhotoUri = uri
+                            cameraPhotoTargetName = PhotoTarget.RoutineSetStep.name
+                            cameraPhotoUriString = uri.toString()
                             cameraLauncher.launch(uri)
                         },
                         onRoutineSetStepPhotoRemove = guardianViewModel::removeRoutineSetStepPhoto,
@@ -324,6 +327,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun imageGalleryIntent(): Intent = Intent(Intent.ACTION_PICK).apply {
+        setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*")
+    }
+
     private fun createCameraImageUri(): Uri {
         val directory = File(cacheDir, "camera_photos").apply { mkdirs() }
         val file = File.createTempFile("routine-photo-", ".jpg", directory)
@@ -335,6 +342,9 @@ private fun android.content.Intent?.notificationRoutineId(): String? =
     this?.takeIf { it.action == ACTION_OPEN_ROUTINE }?.getStringExtra(EXTRA_ROUTINE_ID)
 
 private enum class PhotoTarget { RoutineDraft, RoutineSetStep }
+
+private fun String?.toPhotoTarget(): PhotoTarget? =
+    this?.let { name -> PhotoTarget.entries.firstOrNull { it.name == name } }
 
 private class AndroidFeedbackController(
     private val activity: ComponentActivity,
