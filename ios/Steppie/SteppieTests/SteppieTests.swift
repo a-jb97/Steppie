@@ -93,6 +93,33 @@ struct SteppieTests {
         #expect(viewModel.cardState(for: current) == .current)
     }
 
+    @Test("루틴 음성은 지금 할 일 화면에서만 재생한다")
+    func childRoutineSpeechOnlyPlaysOnFocusScreen() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let speechGuide = FakeRoutineSpeechGuide()
+        try assignActiveRoutineSet(in: repository, on: Date())
+        let viewModel = ChildRoutineViewModel(
+            repository: repository,
+            speechGuide: speechGuide
+        )
+
+        viewModel.load()
+        #expect(speechGuide.spokenTexts.count == 1)
+
+        viewModel.showList()
+        viewModel.load()
+        #expect(speechGuide.spokenTexts.count == 1)
+        #expect(speechGuide.stopCallCount == 1)
+
+        viewModel.showFocus()
+        #expect(speechGuide.spokenTexts.count == 2)
+
+        viewModel.setRoutineSpeechActive(false)
+        viewModel.load()
+        #expect(speechGuide.spokenTexts.count == 2)
+        #expect(speechGuide.stopCallCount == 2)
+    }
+
     @Test("포커스 카드 완료는 피드백 화면을 유지하고 다음 카드 선택 후 current를 이동한다")
     func childRoutineCompletionWaitsForManualAdvance() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
@@ -1908,13 +1935,16 @@ private final class FakeBackupAssetStore: BackupAssetStore {
 @MainActor
 private final class FakeRoutineSpeechGuide: RoutineSpeechGuiding {
     var spokenTexts: [String] = []
+    var stopCallCount = 0
 
     func speak(_ text: String, settings: AppSettings) {
         guard settings.ttsEnabled else { return }
         spokenTexts.append(text)
     }
 
-    func stop() {}
+    func stop() {
+        stopCallCount += 1
+    }
 }
 
 @MainActor

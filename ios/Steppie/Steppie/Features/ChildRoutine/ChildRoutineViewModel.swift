@@ -37,6 +37,7 @@ final class ChildRoutineViewModel {
     private let isNotificationSchedulingEnabled: Bool
     @ObservationIgnored private var didRequestNotificationAuthorization = false
     @ObservationIgnored private var pendingNotificationRoute: RoutineNotificationRoute?
+    @ObservationIgnored private var isRoutineSpeechActive = true
 
     private(set) var loadState: ChildRoutineLoadState = .idle
     private(set) var activeRoutineSet: RoutineSet?
@@ -170,6 +171,7 @@ final class ChildRoutineViewModel {
 
     func showList() {
         page = .list
+        speechGuide.stop()
     }
 
     func showFocus() {
@@ -178,6 +180,13 @@ final class ChildRoutineViewModel {
         }
         page = .focus
         speakSelectedRoutineIfNeeded()
+    }
+
+    func setRoutineSpeechActive(_ isActive: Bool) {
+        isRoutineSpeechActive = isActive
+        if !isActive {
+            speechGuide.stop()
+        }
     }
 
     func cardState(for routine: Routine) -> RoutineCardState {
@@ -295,7 +304,9 @@ final class ChildRoutineViewModel {
     }
 
     private func speakSelectedRoutineIfNeeded() {
-        guard !isAllCompleted,
+        guard isRoutineSpeechActive,
+              page == .focus,
+              !isAllCompleted,
               completionFeedbackRoutineID == nil,
               let selectedRoutine,
               cardState(for: selectedRoutine) == .current,
