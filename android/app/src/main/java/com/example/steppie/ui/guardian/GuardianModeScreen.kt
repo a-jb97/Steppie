@@ -138,6 +138,7 @@ fun GuardianModeScreen(
     onToggleRoutineSetListEditing: () -> Unit,
     onSelectRoutineSet: (String) -> Unit,
     onSetRoutineSetForToday: (String) -> Unit = {},
+    onDismissDailyRoutineSelectionPrompt: () -> Unit = {},
     onRequestEditRoutineSetName: (String) -> Unit,
     onEditingRoutineSetNameChange: (String) -> Unit,
     onCancelEditRoutineSetName: () -> Unit,
@@ -388,6 +389,7 @@ fun GuardianModeScreen(
             DailyRoutineSelectionDialog(
                 routineSets = state.routineSets,
                 onSelect = onSetRoutineSetForToday,
+                onDismiss = onDismissDailyRoutineSelectionPrompt,
             )
         }
     }
@@ -1356,9 +1358,10 @@ private fun RoutineSetSelectionMark(active: Boolean) {
 private fun DailyRoutineSelectionDialog(
     routineSets: List<RoutineSet>,
     onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
-        onDismissRequest = {},
+        onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.guardian_daily_routine_prompt_title)) },
         text = {
             Column(

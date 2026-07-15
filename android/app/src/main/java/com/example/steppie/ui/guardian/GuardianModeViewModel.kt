@@ -908,6 +908,15 @@ class GuardianModeViewModel(
         }
     }
 
+    fun dismissDailyRoutineSelectionPrompt() {
+        _uiState.update {
+            it.copy(
+                showDailyRoutineSelectionPrompt = false,
+                interactionToken = it.interactionToken + 1,
+            )
+        }
+    }
+
     private fun refreshCurrentDate(): LocalDate {
         val today = LocalDate.now()
         if (currentDate.value != today) {
