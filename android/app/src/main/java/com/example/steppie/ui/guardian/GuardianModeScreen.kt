@@ -1324,7 +1324,7 @@ private fun RoutineSetRow(
                 onClick = onDelete,
                 danger = true,
             )
-        } else if (selected) {
+        } else if (selected && !setForToday) {
             SteppieButton(
                 label = stringResource(R.string.guardian_routine_set_set_today),
                 onClick = onSetForToday,
