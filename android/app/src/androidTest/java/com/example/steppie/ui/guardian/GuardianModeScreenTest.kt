@@ -708,7 +708,7 @@ class GuardianModeScreenTest {
     }
 
     @Test
-    fun routineEditShowsAllRoutineSetsAndSelectsOne() {
+    fun routineEditShowsAllRoutineSetsHidesSetActionForTodaySetAndSelectsOne() {
         var selectedRoutineSetId: String? = null
 
         composeRule.setContent {
@@ -721,6 +721,8 @@ class GuardianModeScreenTest {
                         routineSets = RoutineSampleData.routineSets,
                         activeRoutineSet = RoutineSampleData.morning,
                         routines = RoutineSampleData.morning.routines,
+                        selectedRoutineSetId = RoutineSampleData.morning.id,
+                        todayRoutineSetId = RoutineSampleData.morning.id,
                     ),
                     onDigit = {},
                     onDeletePinDigit = {},
@@ -768,6 +770,7 @@ class GuardianModeScreenTest {
         composeRule.onNodeWithText("아침 루틴").assertIsDisplayed()
         composeRule.onNodeWithText("학교 루틴").assertIsDisplayed()
         composeRule.onNodeWithText("취침 루틴").assertIsDisplayed()
+        composeRule.onAllNodesWithText("설정").assertCountEquals(0)
         composeRule.onNodeWithText("학교 루틴").performClick()
 
         composeRule.runOnIdle {

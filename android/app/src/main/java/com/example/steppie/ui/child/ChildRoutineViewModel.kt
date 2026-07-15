@@ -4,13 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.steppie.domain.model.AppSettings
+import com.example.steppie.domain.model.DailyLog
 import com.example.steppie.domain.model.FeedbackIntensity
 import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.model.Routine
+import com.example.steppie.domain.model.RoutineSet
 import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.domain.repository.RoutineRepository
 import java.time.LocalDate
 import java.util.Locale
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -19,6 +22,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 
 enum class ChildSinglePane { Focus, List }
@@ -97,12 +101,12 @@ internal fun childRoutineState(
     )
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ChildRoutineViewModel(
     private val repository: RoutineRepository,
     private val appSettingsRepository: AppSettingsRepository,
 ) : ViewModel() {
-    private val today = LocalDate.now()
-
+    private val currentDate = MutableStateFlow(LocalDate.now())
     private val _uiState = MutableStateFlow(ChildRoutineUiState())
     val uiState: StateFlow<ChildRoutineUiState> = _uiState.asStateFlow()
     private val _feedbackEvents = MutableSharedFlow<ChildRoutineFeedbackEvent>()
@@ -111,18 +115,25 @@ class ChildRoutineViewModel(
     private var lastGuidedRoutineId: String? = null
 
     init {
+        val routineDataForDate = currentDate.flatMapLatest { date ->
+            combine(
+                repository.observeRoutineSetForDate(date),
+                repository.observeDailyLogs(date),
+            ) { routineSet, logs ->
+                ChildRoutineDateData(routineSet = routineSet, logs = logs)
+            }
+        }
         viewModelScope.launch {
             combine(
                 appSettingsRepository.observeAppSettings(),
-                repository.observeRoutineSetForDate(today),
-                repository.observeDailyLogs(today),
-            ) { appSettings, todayRoutineSet, logs ->
+                routineDataForDate,
+            ) { appSettings, routineData ->
                 settings.value = appSettings
-                val completedIds = logs
+                val completedIds = routineData.logs
                     .filter { it.status == LogStatus.Completed }
                     .mapTo(mutableSetOf()) { it.routineId }
                 childRoutineState(
-                    routines = todayRoutineSet?.routines.orEmpty(),
+                    routines = routineData.routineSet?.routines.orEmpty(),
                     completedRoutineIds = completedIds,
                     selectedRoutineId = _uiState.value.selectedRoutineId,
                     singlePane = _uiState.value.singlePane,
@@ -164,6 +175,9 @@ class ChildRoutineViewModel(
     }
 
     fun completeSelectedRoutine() {
+        val previousDate = currentDate.value
+        val actionDate = refreshCurrentDate()
+        if (actionDate != previousDate) return
         val state = _uiState.value
         val routine = state.selectedRoutine ?: return
         if (!state.isSelectedRoutineCompletable || routine.id in state.completedRoutineIds) return
@@ -175,7 +189,7 @@ class ChildRoutineViewModel(
         )
 
         viewModelScope.launch {
-            repository.completeRoutine(routine.id, today)
+            repository.completeRoutine(routine.id, actionDate)
             val appSettings = settings.value
             _feedbackEvents.emit(
                 ChildRoutineFeedbackEvent(
@@ -206,6 +220,9 @@ class ChildRoutineViewModel(
     }
 
     fun undoLastCompletion() {
+        val previousDate = currentDate.value
+        val actionDate = refreshCurrentDate()
+        if (actionDate != previousDate) return
         val routineId = _uiState.value.undoRoutineId ?: return
         _uiState.value = _uiState.value.copy(
             selectedRoutineId = routineId,
@@ -214,11 +231,12 @@ class ChildRoutineViewModel(
             singlePane = ChildSinglePane.Focus,
         )
         viewModelScope.launch {
-            repository.undoRoutine(routineId, today)
+            repository.undoRoutine(routineId, actionDate)
         }
     }
 
     fun onDataChanged() {
+        refreshCurrentDate()
         lastGuidedRoutineId = null
         _uiState.value = _uiState.value.copy(
             feedbackRoutineId = null,
@@ -250,6 +268,15 @@ class ChildRoutineViewModel(
     private fun Routine.localizedTitleForDevice(settings: AppSettings): String =
         title.resolve(appLocale = settings.locale, systemLocale = Locale.getDefault().toLanguageTag())
 
+    private fun refreshCurrentDate(): LocalDate {
+        val today = LocalDate.now()
+        if (currentDate.value != today) {
+            currentDate.value = today
+            lastGuidedRoutineId = null
+        }
+        return today
+    }
+
     companion object {
         fun factory(repository: RoutineRepository, appSettingsRepository: AppSettingsRepository): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
@@ -261,6 +288,11 @@ class ChildRoutineViewModel(
             }
     }
 }
+
+private data class ChildRoutineDateData(
+    val routineSet: RoutineSet?,
+    val logs: List<DailyLog>,
+)
 
 private fun FeedbackIntensity.allowsHaptic(): Boolean = this == FeedbackIntensity.Strong || this == FeedbackIntensity.Normal
 

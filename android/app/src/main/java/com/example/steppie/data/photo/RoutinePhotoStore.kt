@@ -3,6 +3,8 @@ package com.example.steppie.data.photo
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import com.example.steppie.data.backup.BackupMaxAssetBytes
 import com.example.steppie.domain.model.IconRef
@@ -22,10 +24,18 @@ class RoutinePhotoStore(context: Context) {
         val outputFile = fileForAssetId(assetId)
         photoDirectory.mkdirs()
 
+        val exifOrientation = appContext.contentResolver.openInputStream(uri)?.use { input ->
+            runCatching {
+                ExifInterface(input).getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL,
+                )
+            }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+        } ?: ExifInterface.ORIENTATION_NORMAL
         val bytes = appContext.contentResolver.openInputStream(uri)?.use { input ->
             val original = BitmapFactory.decodeStream(input)
                 ?: throw IllegalArgumentException("사진 파일을 읽을 수 없습니다.")
-            original.toRoutinePhotoJpegBytes()
+            original.applyExifOrientation(exifOrientation).toRoutinePhotoJpegBytes()
         } ?: throw IllegalArgumentException("사진 파일을 열 수 없습니다.")
 
         outputFile.writeBytes(bytes)
@@ -71,6 +81,28 @@ class RoutinePhotoStore(context: Context) {
     }
 
     private fun fileForAssetId(assetId: String): File = File(photoDirectory, "$assetId.jpg")
+
+    private fun Bitmap.applyExifOrientation(orientation: Int): Bitmap {
+        val matrix = Matrix().apply {
+            when (orientation) {
+                ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> setScale(-1f, 1f)
+                ExifInterface.ORIENTATION_ROTATE_180 -> setRotate(180f)
+                ExifInterface.ORIENTATION_FLIP_VERTICAL -> setScale(1f, -1f)
+                ExifInterface.ORIENTATION_TRANSPOSE -> {
+                    setRotate(90f)
+                    postScale(-1f, 1f)
+                }
+                ExifInterface.ORIENTATION_ROTATE_90 -> setRotate(90f)
+                ExifInterface.ORIENTATION_TRANSVERSE -> {
+                    setRotate(-90f)
+                    postScale(-1f, 1f)
+                }
+                ExifInterface.ORIENTATION_ROTATE_270 -> setRotate(-90f)
+                else -> return this@applyExifOrientation
+            }
+        }
+        return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
+    }
 
     private fun Bitmap.toRoutinePhotoJpegBytes(): ByteArray {
         val maxSide = 1200

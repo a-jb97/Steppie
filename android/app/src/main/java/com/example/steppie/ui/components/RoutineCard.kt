@@ -183,17 +183,19 @@ private fun FocusRoutineCard(
             style = SteppieTheme.typography.childCardTitle,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.size(SteppieSpacing.Large))
-        Text(
-            text = meta,
-            color = if (state == RoutineCardState.Completed) {
-                SteppieTheme.colors.success
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            style = SteppieTheme.typography.guardianSection,
-            textAlign = TextAlign.Center,
-        )
+        if (meta.isNotBlank()) {
+            Spacer(Modifier.size(SteppieSpacing.Large))
+            Text(
+                text = meta,
+                color = if (state == RoutineCardState.Completed) {
+                    SteppieTheme.colors.success
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                style = SteppieTheme.typography.guardianSection,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

@@ -138,6 +138,7 @@ fun GuardianModeScreen(
     onToggleRoutineSetListEditing: () -> Unit,
     onSelectRoutineSet: (String) -> Unit,
     onSetRoutineSetForToday: (String) -> Unit = {},
+    onDismissDailyRoutineSelectionPrompt: () -> Unit = {},
     onRequestEditRoutineSetName: (String) -> Unit,
     onEditingRoutineSetNameChange: (String) -> Unit,
     onCancelEditRoutineSetName: () -> Unit,
@@ -250,7 +251,6 @@ fun GuardianModeScreen(
                         state = state,
                         onNavigateBack = onNavigateBack,
                         onOpenRoutineSetCreate = onOpenRoutineSetCreate,
-                        onOpenTemplateSelect = onOpenTemplateSelect,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                         onOpenRoutineEditor = onOpenRoutineEditor,
                         onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
@@ -267,7 +267,6 @@ fun GuardianModeScreen(
                         state = state,
                         onNavigateBack = onNavigateBack,
                         onOpenRoutineSetCreate = onOpenRoutineSetCreate,
-                        onOpenTemplateSelect = onOpenTemplateSelect,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                         onOpenRoutineEditor = onOpenRoutineEditor,
                         onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
@@ -388,6 +387,7 @@ fun GuardianModeScreen(
             DailyRoutineSelectionDialog(
                 routineSets = state.routineSets,
                 onSelect = onSetRoutineSetForToday,
+                onDismiss = onDismissDailyRoutineSelectionPrompt,
             )
         }
     }
@@ -1118,7 +1118,6 @@ private fun GuardianRoutineEditScreen(
     state: GuardianModeUiState,
     onNavigateBack: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
-    onOpenTemplateSelect: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
     onOpenRoutineEditor: (String) -> Unit,
     onToggleRoutineSetListEditing: () -> Unit,
@@ -1139,23 +1138,11 @@ private fun GuardianRoutineEditScreen(
         ),
         onTopAction = onToggleRoutineSetListEditing,
         bottom = {
-            Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small)) {
-                if (state.activeRoutineSet == null) {
+            if (state.activeRoutineSet == null) {
+                Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small)) {
                     SteppieButton(
                         label = stringResource(R.string.guardian_menu_create_routine_set),
                         onClick = onOpenRoutineSetCreate,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    SteppieButton(
-                        label = stringResource(R.string.guardian_template_action),
-                        onClick = onOpenTemplateSelect,
-                        modifier = Modifier.fillMaxWidth(),
-                        style = SteppieButtonStyle.Secondary,
-                    )
-                    SteppieButton(
-                        label = stringResource(R.string.guardian_add_routine),
-                        onClick = onOpenNewRoutineEditor,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -1208,6 +1195,13 @@ private fun GuardianRoutineEditScreen(
                     onMove = { direction -> onMoveRoutine(routine.id, direction) },
                 )
             }
+        }
+        if (state.activeRoutineSet != null) {
+            SteppieButton(
+                label = stringResource(R.string.guardian_add_routine),
+                onClick = onOpenNewRoutineEditor,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -1322,7 +1316,7 @@ private fun RoutineSetRow(
                 onClick = onDelete,
                 danger = true,
             )
-        } else if (selected) {
+        } else if (selected && !setForToday) {
             SteppieButton(
                 label = stringResource(R.string.guardian_routine_set_set_today),
                 onClick = onSetForToday,
@@ -1356,9 +1350,10 @@ private fun RoutineSetSelectionMark(active: Boolean) {
 private fun DailyRoutineSelectionDialog(
     routineSets: List<RoutineSet>,
     onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
-        onDismissRequest = {},
+        onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.guardian_daily_routine_prompt_title)) },
         text = {
             Column(
@@ -1698,7 +1693,6 @@ private fun GuardianRoutineSplitScreen(
     state: GuardianModeUiState,
     onNavigateBack: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
-    onOpenTemplateSelect: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
     onOpenRoutineEditor: (String) -> Unit,
     onToggleRoutineSetListEditing: () -> Unit,
@@ -1720,7 +1714,6 @@ private fun GuardianRoutineSplitScreen(
                 state = state,
                 onNavigateBack = onNavigateBack,
                 onOpenRoutineSetCreate = onOpenRoutineSetCreate,
-                onOpenTemplateSelect = onOpenTemplateSelect,
                 onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                 onOpenRoutineEditor = onOpenRoutineEditor,
                 onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
@@ -1858,7 +1851,10 @@ private fun TemplateSelectionRow(
             Text(
                 text = templateName,
                 color = MaterialTheme.colorScheme.onSurface,
-                style = SteppieTheme.typography.guardianTitle,
+                style = SteppieTheme.typography.guardianTitle.copy(
+                    fontSize = SteppieTheme.typography.guardianTitle.fontSize * 0.7f,
+                    lineHeight = SteppieTheme.typography.guardianTitle.lineHeight * 0.7f,
+                ),
             )
             Text(
                 text = stepCount,
@@ -2741,7 +2737,7 @@ private fun GuardianRecordsCalendarDateCell(
     ) {
         Text(
             text = dateText,
-            color = if (hasRecords) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (hasRecords) MaterialTheme.colorScheme.onSurface else Color.Gray,
             style = SteppieTheme.typography.guardianBody,
             textAlign = TextAlign.Center,
         )
@@ -2770,7 +2766,7 @@ private fun GuardianRecordsDetail(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = SteppieTheme.typography.guardianTitle,
         )
-        if (!summary.hasRecords) {
+        if (summary.totalCount == 0) {
             Text(
                 text = stringResource(R.string.guardian_records_empty_date),
                 color = MaterialTheme.colorScheme.onSurface,
