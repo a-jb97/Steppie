@@ -1861,7 +1861,10 @@ private fun TemplateSelectionRow(
             Text(
                 text = templateName,
                 color = MaterialTheme.colorScheme.onSurface,
-                style = SteppieTheme.typography.guardianTitle,
+                style = SteppieTheme.typography.guardianTitle.copy(
+                    fontSize = SteppieTheme.typography.guardianTitle.fontSize * 0.7f,
+                    lineHeight = SteppieTheme.typography.guardianTitle.lineHeight * 0.7f,
+                ),
             )
             Text(
                 text = stepCount,
