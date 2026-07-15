@@ -918,7 +918,7 @@ struct GuardianModeView: View {
 
             if viewModel.isEditingRoutineSets {
                 routineSetEditActions(for: routineSet)
-            } else if isSelected {
+            } else if isSelected || viewModel.isRoutineSetAssignedToday(routineSet) {
                 todayRoutineSetAction(for: routineSet)
             }
         }
