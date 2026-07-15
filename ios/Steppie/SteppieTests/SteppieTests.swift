@@ -826,6 +826,31 @@ struct SteppieTests {
         #expect(childReloadCount == 2)
     }
 
+    @Test("루틴 관리 진입 시 오늘 배정된 루틴 세트를 선택한다")
+    func guardianSelectsTodayAssignedRoutineSetForRoutineManagement() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let now = Date(timeIntervalSince1970: 1_767_312_000)
+        let viewModel = GuardianModeViewModel(repository: repository, now: { now }) {}
+        viewModel.load()
+        let originalSet = try #require(viewModel.selectedRoutineSet)
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "저녁 루틴"
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "저녁 먹기"
+        viewModel.saveRoutineSetStepDraft()
+        viewModel.saveRoutineSetDraft(localeIdentifier: "ko")
+        let assignedSet = try #require(viewModel.selectedRoutineSet)
+        viewModel.assignRoutineSetForToday(assignedSet)
+
+        viewModel.selectRoutineSet(originalSet)
+        #expect(viewModel.selectedRoutineSet?.id == originalSet.id)
+
+        viewModel.selectTodayAssignedRoutineSet()
+
+        #expect(viewModel.selectedRoutineSet?.id == assignedSet.id)
+    }
+
     @Test("루틴 세트 편집 모드는 세트 이름 변경과 세트 삭제를 Repository에 반영한다")
     func guardianRoutineSetEditModeRenamesAndDeletesRoutineSets() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()

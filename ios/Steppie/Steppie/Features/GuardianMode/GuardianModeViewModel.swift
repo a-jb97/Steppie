@@ -858,6 +858,12 @@ final class GuardianModeViewModel {
         load()
     }
 
+    func selectTodayAssignedRoutineSet() {
+        guard let todayAssignedRoutineSetID,
+              let routineSet = routineSets.first(where: { $0.id == todayAssignedRoutineSetID }) else { return }
+        selectRoutineSet(routineSet)
+    }
+
     func isRoutineSetAssignedToday(_ routineSet: RoutineSet) -> Bool {
         todayAssignedRoutineSetID == routineSet.id
     }
@@ -920,7 +926,7 @@ final class GuardianModeViewModel {
         guard let routineSet = pendingDeleteRoutineSet else { return }
         do {
             if todayAssignedRoutineSetID == routineSet.id {
-                errorMessage = "오늘 사용 중인 루틴 세트는 삭제할 수 없어요. 먼저 다른 루틴 세트를 오늘 루틴으로 설정해 주세요."
+                errorMessage = "현재 사용 중인 루틴 세트는 삭제할 수 없어요. 먼저 다른 루틴 세트를 오늘 루틴으로 설정해 주세요."
                 pendingDeleteRoutineSet = nil
                 return
             }
