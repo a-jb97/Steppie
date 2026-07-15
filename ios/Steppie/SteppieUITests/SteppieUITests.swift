@@ -23,14 +23,18 @@ final class SteppieUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testFirstLaunchTutorialAppearsAndAdvances() throws {
         let app = XCUIApplication()
+        app.launchArguments.append("-resetTutorialProgress")
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
+        let tutorialTitle = app.staticTexts["tutorial.title"]
+        XCTAssertTrue(tutorialTitle.waitForExistence(timeout: 10))
+
+        let nextButton = app.buttons["tutorial.primaryAction"]
+        XCTAssertTrue(nextButton.exists)
+        nextButton.tap()
+        XCTAssertTrue(tutorialTitle.exists)
     }
 
     @MainActor
