@@ -151,12 +151,12 @@ final class ChildRoutineViewModel {
     }
 
     private func routineSetForToday() throws -> RoutineSet? {
-        if let assignment = try repository.dailyRoutineAssignment(on: today),
-           let assignedSet = try repository.routineSet(id: assignment.routineSetID),
-           assignedSet.deletedAt == nil {
-            return assignedSet
+        guard let assignment = try repository.dailyRoutineAssignment(on: today),
+              let assignedSet = try repository.routineSet(id: assignment.routineSetID),
+              assignedSet.deletedAt == nil else {
+            return nil
         }
-        return try repository.routineSets().first(where: \.isActive)
+        return assignedSet
     }
 
     func selectRoutine(_ routine: Routine, showFocus: Bool) {

@@ -281,7 +281,17 @@ struct BackupService {
                 try assetStore.saveAssetData(data, backupAssetName: name)
                 savedAssetNames.append(name)
             }
-            try repository.replaceAll(with: payload.snapshot)
+            let restoreDate = DailyLog.localDateString(for: now())
+            let snapshot = RoutineRepositorySnapshot(
+                routineSets: payload.snapshot.routineSets,
+                routines: payload.snapshot.routines,
+                dailyLogs: payload.snapshot.dailyLogs,
+                dailyRoutineAssignments: payload.snapshot.dailyRoutineAssignments.filter {
+                    $0.date != restoreDate
+                },
+                appSettings: payload.snapshot.appSettings
+            )
+            try repository.replaceAll(with: snapshot)
         } catch {
             for name in savedAssetNames {
                 try? assetStore.removeAssetData(backupAssetName: name)
