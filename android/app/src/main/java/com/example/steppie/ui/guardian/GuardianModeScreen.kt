@@ -251,7 +251,6 @@ fun GuardianModeScreen(
                         state = state,
                         onNavigateBack = onNavigateBack,
                         onOpenRoutineSetCreate = onOpenRoutineSetCreate,
-                        onOpenTemplateSelect = onOpenTemplateSelect,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                         onOpenRoutineEditor = onOpenRoutineEditor,
                         onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
@@ -268,7 +267,6 @@ fun GuardianModeScreen(
                         state = state,
                         onNavigateBack = onNavigateBack,
                         onOpenRoutineSetCreate = onOpenRoutineSetCreate,
-                        onOpenTemplateSelect = onOpenTemplateSelect,
                         onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                         onOpenRoutineEditor = onOpenRoutineEditor,
                         onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
@@ -1120,7 +1118,6 @@ private fun GuardianRoutineEditScreen(
     state: GuardianModeUiState,
     onNavigateBack: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
-    onOpenTemplateSelect: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
     onOpenRoutineEditor: (String) -> Unit,
     onToggleRoutineSetListEditing: () -> Unit,
@@ -1141,23 +1138,11 @@ private fun GuardianRoutineEditScreen(
         ),
         onTopAction = onToggleRoutineSetListEditing,
         bottom = {
-            Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small)) {
-                if (state.activeRoutineSet == null) {
+            if (state.activeRoutineSet == null) {
+                Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small)) {
                     SteppieButton(
                         label = stringResource(R.string.guardian_menu_create_routine_set),
                         onClick = onOpenRoutineSetCreate,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    SteppieButton(
-                        label = stringResource(R.string.guardian_template_action),
-                        onClick = onOpenTemplateSelect,
-                        modifier = Modifier.fillMaxWidth(),
-                        style = SteppieButtonStyle.Secondary,
-                    )
-                    SteppieButton(
-                        label = stringResource(R.string.guardian_add_routine),
-                        onClick = onOpenNewRoutineEditor,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -1210,6 +1195,13 @@ private fun GuardianRoutineEditScreen(
                     onMove = { direction -> onMoveRoutine(routine.id, direction) },
                 )
             }
+        }
+        if (state.activeRoutineSet != null) {
+            SteppieButton(
+                label = stringResource(R.string.guardian_add_routine),
+                onClick = onOpenNewRoutineEditor,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -1701,7 +1693,6 @@ private fun GuardianRoutineSplitScreen(
     state: GuardianModeUiState,
     onNavigateBack: () -> Unit,
     onOpenRoutineSetCreate: () -> Unit,
-    onOpenTemplateSelect: () -> Unit,
     onOpenNewRoutineEditor: () -> Unit,
     onOpenRoutineEditor: (String) -> Unit,
     onToggleRoutineSetListEditing: () -> Unit,
@@ -1723,7 +1714,6 @@ private fun GuardianRoutineSplitScreen(
                 state = state,
                 onNavigateBack = onNavigateBack,
                 onOpenRoutineSetCreate = onOpenRoutineSetCreate,
-                onOpenTemplateSelect = onOpenTemplateSelect,
                 onOpenNewRoutineEditor = onOpenNewRoutineEditor,
                 onOpenRoutineEditor = onOpenRoutineEditor,
                 onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
@@ -2747,7 +2737,7 @@ private fun GuardianRecordsCalendarDateCell(
     ) {
         Text(
             text = dateText,
-            color = if (hasRecords) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (hasRecords) MaterialTheme.colorScheme.onSurface else Color.Gray,
             style = SteppieTheme.typography.guardianBody,
             textAlign = TextAlign.Center,
         )
