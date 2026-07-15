@@ -16,7 +16,9 @@ struct BackupRestoreView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
                 header(title: "백업/복원", subtitle: "로컬 파일로 데이터를 내보내고 Replace 복원을 실행합니다")
+                    .tutorialTarget(.primary)
                 backupSection
+                    .tutorialTarget(.secondary)
                 restoreSection
                 if let message = viewModel.backupStatusMessage {
                     statusNote(message)

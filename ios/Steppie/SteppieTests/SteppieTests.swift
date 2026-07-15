@@ -2015,3 +2015,57 @@ private let backupTestJSONEncoder: JSONEncoder = {
     encoder.dateEncodingStrategy = .iso8601
     return encoder
 }()
+
+@MainActor
+struct TutorialCoordinatorTests {
+    @Test("튜토리얼은 화면별 최초 진입에만 표시된다")
+    func presentsOnlyOncePerScreen() {
+        let store = InMemoryTutorialProgressStore()
+        let coordinator = TutorialCoordinator(store: store)
+
+        coordinator.presentIfNeeded(.childFocus)
+        #expect(coordinator.activeScreen == .childFocus)
+        while !coordinator.isLastStep { coordinator.next() }
+        coordinator.next()
+        #expect(coordinator.activeScreen == nil)
+
+        coordinator.presentIfNeeded(.childFocus)
+        #expect(coordinator.activeScreen == nil)
+        coordinator.presentIfNeeded(.childList)
+        #expect(coordinator.activeScreen == .childList)
+    }
+
+    @Test("이전과 다음은 화면의 단계 경계를 지킨다")
+    func navigatesWithinStepBounds() {
+        let coordinator = TutorialCoordinator(store: InMemoryTutorialProgressStore())
+        coordinator.presentIfNeeded(.childFocus)
+
+        coordinator.previous()
+        #expect(coordinator.stepIndex == 0)
+        coordinator.next()
+        #expect(coordinator.stepIndex == 1)
+        coordinator.previous()
+        #expect(coordinator.stepIndex == 0)
+    }
+
+    @Test("건너뛰기와 전체 초기화가 완료 상태를 갱신한다")
+    func skipsAndResetsProgress() {
+        let coordinator = TutorialCoordinator(store: InMemoryTutorialProgressStore())
+        coordinator.presentIfNeeded(.security)
+        coordinator.skip()
+        coordinator.presentIfNeeded(.security)
+        #expect(coordinator.activeScreen == nil)
+
+        coordinator.resetAndPresent(.security)
+        #expect(coordinator.activeScreen == .security)
+        #expect(coordinator.stepIndex == 0)
+    }
+}
+
+@MainActor
+private final class InMemoryTutorialProgressStore: TutorialProgressStoring {
+    private var tokens: Set<String> = []
+    func contains(_ token: String) -> Bool { tokens.contains(token) }
+    func insert(_ token: String) { tokens.insert(token) }
+    func removeAll() { tokens.removeAll() }
+}

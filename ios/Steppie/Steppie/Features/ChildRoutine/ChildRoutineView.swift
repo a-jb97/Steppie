@@ -6,13 +6,16 @@ struct ChildRoutineView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let viewModel: ChildRoutineViewModel
+    let tutorialCoordinator: TutorialCoordinator
     let onGuardianEntryRequested: () -> Void
 
     init(
         viewModel: ChildRoutineViewModel,
+        tutorialCoordinator: TutorialCoordinator,
         onGuardianEntryRequested: @escaping () -> Void = {}
     ) {
         self.viewModel = viewModel
+        self.tutorialCoordinator = tutorialCoordinator
         self.onGuardianEntryRequested = onGuardianEntryRequested
     }
 
@@ -34,6 +37,14 @@ struct ChildRoutineView: View {
         .task {
             viewModel.loadIfNeeded()
         }
+        .tutorialOverlay(
+            coordinator: tutorialCoordinator,
+            screen: viewModel.page == .focus ? .childFocus : .childList,
+            childMode: true,
+            onPresentationChanged: { isPresented in
+                viewModel.setRoutineSpeechActive(!isPresented)
+            }
+        )
     }
 
     private var guardianEntryHotspot: some View {
@@ -45,6 +56,7 @@ struct ChildRoutineView: View {
                     .onEnded { _ in onGuardianEntryRequested() }
             )
             .accessibilityHidden(true)
+            .tutorialTarget(.guardianEntry)
     }
 
     @ViewBuilder
@@ -124,9 +136,11 @@ struct ChildRoutineView: View {
 
                 progressDots
                     .padding(.top, 18)
+                    .tutorialTarget(.secondary)
 
                 focusContent(minimumHeight: 448)
                     .padding(.top, 40)
+                    .tutorialTarget(.primary)
 
                 if viewModel.isShowingCompletionFeedback {
                     feedbackUndoButton
@@ -140,6 +154,7 @@ struct ChildRoutineView: View {
                         action: viewModel.showList
                     )
                     .padding(.top, SteppieSpacing.small)
+                    .tutorialTarget(.tertiary)
                 }
             }
             .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
@@ -164,12 +179,14 @@ struct ChildRoutineView: View {
                     subtitle: "screen.list.subtitle",
                     titleStyle: .childScreenTitle
                 )
+                .tutorialTarget(.primary)
 
                 progressDots
                     .padding(.top, 18)
 
                 routineCards(compactMetadata: false)
                     .padding(.top, SteppieSpacing.extraLarge)
+                    .tutorialTarget(.secondary)
             }
             .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
             .frame(maxWidth: .infinity)
@@ -907,16 +924,16 @@ private struct FireworkBurstSpec: Identifiable {
 
 #Preview("Child Routine · iPhone", traits: .fixedLayout(width: 393, height: 852)) {
     let repository = try! RoutinePreviewStore.makeLightweightSampleRepository()
-    ChildRoutineView(viewModel: ChildRoutineViewModel.preview(repository: repository))
+    ChildRoutineView(viewModel: ChildRoutineViewModel.preview(repository: repository), tutorialCoordinator: TutorialCoordinator())
 }
 
 #Preview("Child Routine · iPad Landscape", traits: .fixedLayout(width: 1194, height: 834)) {
     let repository = try! RoutinePreviewStore.makeLightweightSampleRepository()
-    ChildRoutineView(viewModel: ChildRoutineViewModel.preview(repository: repository))
+    ChildRoutineView(viewModel: ChildRoutineViewModel.preview(repository: repository), tutorialCoordinator: TutorialCoordinator())
 }
 
 #Preview("Child Routine · Accessibility Text", traits: .fixedLayout(width: 393, height: 852)) {
     let repository = try! RoutinePreviewStore.makeLightweightSampleRepository()
-    ChildRoutineView(viewModel: ChildRoutineViewModel.preview(repository: repository))
+    ChildRoutineView(viewModel: ChildRoutineViewModel.preview(repository: repository), tutorialCoordinator: TutorialCoordinator())
         .environment(\.dynamicTypeSize, .accessibility3)
 }

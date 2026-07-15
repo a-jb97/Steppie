@@ -18,6 +18,7 @@ struct GuardianModeView: View {
     @State private var isRecordCalendarDatePickerPresented = false
     @State private var isTodayRoutineSelectionDismissed = false
     let viewModel: GuardianModeViewModel
+    let tutorialCoordinator: TutorialCoordinator
     let onDone: () -> Void
     let onInteraction: () -> Void
 
@@ -78,6 +79,7 @@ struct GuardianModeView: View {
             }
             .presentationDetents([.medium, .large])
         }
+        .tutorialOverlay(coordinator: tutorialCoordinator, screen: tutorialScreen)
     }
 
     @ViewBuilder
@@ -134,6 +136,7 @@ struct GuardianModeView: View {
                     isWide: isWide,
                     isEnabled: true
                 )
+                .tutorialTarget(.primary)
                 menuCard(
                     title: "템플릿에서 시작하기",
                     subtitle: "아침, 학교, 취침 루틴으로 빠르게 만들기",
@@ -142,6 +145,7 @@ struct GuardianModeView: View {
                     isWide: isWide,
                     isEnabled: true
                 )
+                .tutorialTarget(.secondary)
                 menuCard(
                     title: "루틴 관리",
                     subtitle: viewModel.hasRoutineSets ? "루틴 세트 목록, 활동 추가, 순서 변경" : "먼저 루틴 세트를 만들어 주세요",
@@ -150,6 +154,7 @@ struct GuardianModeView: View {
                     isWide: isWide,
                     isEnabled: viewModel.hasRoutineSets
                 )
+                .tutorialTarget(.tertiary)
                 menuCard(
                     title: "환경 설정",
                     subtitle: "음성, 효과음, 햅틱, 알림",
@@ -176,11 +181,26 @@ struct GuardianModeView: View {
                 )
                 SteppieButton("완료", action: onDone)
                     .padding(.top, SteppieSpacing.medium)
+                    .tutorialTarget(.done)
             }
             .padding(SteppieLayout.guardianScreenPadding)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.steppieBackgroundSecondary)
+    }
+
+    private var tutorialScreen: TutorialScreen {
+        switch viewModel.selectedDestination {
+        case nil: .guardianHome
+        case .routineSetCreator: .routineSetCreator
+        case .routineTemplates: .routineTemplates
+        case .routineEditor: .routineEditor
+        case .feedbackSettings: .feedbackSettings
+        case .records: .records
+        case .recordCalendar: .recordCalendar
+        case .security: .security
+        case .backupRestore: .backupRestore
+        }
     }
 
     @ViewBuilder
@@ -2029,6 +2049,11 @@ struct GuardianModeView: View {
                     openDestination(.backupRestore, isWide: isWide)
                     onInteraction()
                 }
+                SteppieButton("tutorial.replay", role: .secondary) {
+                    tutorialCoordinator.resetAndPresent(.security)
+                    onInteraction()
+                }
+                .tutorialTarget(.secondary)
                 privacyPolicyNote
                 SteppieButton("완료", action: onDone)
                     .padding(.top, SteppieSpacing.large)
@@ -2206,6 +2231,7 @@ struct GuardianModeView: View {
                 }
             }
         }
+        .tutorialTarget(.primary)
     }
 
     private func settingsSliderBlock(
