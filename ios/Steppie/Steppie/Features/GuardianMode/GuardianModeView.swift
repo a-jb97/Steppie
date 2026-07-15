@@ -4,7 +4,6 @@ import UIKit
 
 struct GuardianModeView: View {
     @Environment(\.locale) private var locale
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedRoutinePhotoItem: PhotosPickerItem?
     @State private var selectedRoutineSetStepPhotoItem: PhotosPickerItem?
@@ -17,6 +16,7 @@ struct GuardianModeView: View {
     @State private var recordCalendarPickerMonth = Calendar.current.component(.month, from: Date())
     @State private var isRecordCalendarDatePickerPresented = false
     @State private var isTodayRoutineSelectionDismissed = false
+    @State private var isWideLayout = false
     let viewModel: GuardianModeViewModel
     let tutorialCoordinator: TutorialCoordinator
     let onDone: () -> Void
@@ -24,10 +24,29 @@ struct GuardianModeView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            content(isWide: proxy.size.width >= SteppieLayout.splitMinimumWidth)
+            let isWide = proxy.size.width >= SteppieLayout.splitMinimumWidth
+            content(isWide: isWide)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.steppieBackgroundSecondary)
                 .onTapGesture(perform: onInteraction)
+                .sheet(item: routineSetStepDraftBinding(isWide: isWide)) { _ in
+                    NavigationStack {
+                        AnyView(routineSetStepEditorPane)
+                    }
+                    .presentationDetents([.large])
+                }
+                .sheet(item: draftBinding(isWide: isWide)) { _ in
+                    NavigationStack {
+                        AnyView(cardEditorPane)
+                    }
+                    .presentationDetents([.large])
+                }
+                .onAppear {
+                    isWideLayout = isWide
+                }
+                .onChange(of: isWide) { _, newValue in
+                    isWideLayout = newValue
+                }
         }
         .overlay {
             if todayRoutineSelectionBinding.wrappedValue {
@@ -203,29 +222,28 @@ struct GuardianModeView: View {
         }
     }
 
-    @ViewBuilder
-    private func destinationDetail(_ destination: GuardianDestination, isWide: Bool) -> some View {
+    private func destinationDetail(_ destination: GuardianDestination, isWide: Bool) -> AnyView {
         switch destination {
         case .routineSetCreator:
-            routineSetCreator(isWide: isWide)
+            AnyView(routineSetCreator(isWide: isWide))
         case .routineTemplates:
-            routineTemplateSelector(isWide: isWide)
+            AnyView(routineTemplateSelector(isWide: isWide))
         case .routineEditor:
-            routineEditor(isWide: isWide)
+            AnyView(routineEditor(isWide: isWide))
         case .feedbackSettings:
-            feedbackSettingsScreen(isWide: isWide)
+            AnyView(feedbackSettingsScreen(isWide: isWide))
         case .records:
-            recordsScreen(isWide: isWide)
+            AnyView(recordsScreen(isWide: isWide))
         case .recordCalendar:
-            recordCalendarScreen(isWide: isWide)
+            AnyView(recordCalendarScreen(isWide: isWide))
         case .security:
-            securityScreen(isWide: isWide)
+            AnyView(securityScreen(isWide: isWide))
         case .backupRestore:
-            BackupRestoreView(
+            AnyView(BackupRestoreView(
                 viewModel: viewModel,
                 onDone: onDone,
                 onInteraction: onInteraction
-            )
+            ))
         }
     }
 
@@ -321,12 +339,12 @@ struct GuardianModeView: View {
 
     private func routineEditor(isWide: Bool) -> some View {
         HStack(spacing: 0) {
-            routineListPane(isWide: isWide)
+            AnyView(routineListPane(isWide: isWide))
             if isWide {
                 Rectangle()
                     .fill(Color.steppieBorderSubtle)
                     .frame(width: SteppieStroke.divider)
-                cardEditorPane
+                AnyView(cardEditorPane)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -334,12 +352,12 @@ struct GuardianModeView: View {
 
     private func routineSetCreator(isWide: Bool) -> some View {
         HStack(spacing: 0) {
-            routineSetStepListPane(isWide: isWide)
+            AnyView(routineSetStepListPane(isWide: isWide))
             if isWide {
                 Rectangle()
                     .fill(Color.steppieBorderSubtle)
                     .frame(width: SteppieStroke.divider)
-                routineSetStepEditorPane
+                AnyView(routineSetStepEditorPane)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -445,14 +463,12 @@ struct GuardianModeView: View {
         }
         .onDisappear {
             if !isWide {
-                viewModel.cancelRoutineSetDraft()
+                Task { @MainActor in
+                    if viewModel.selectedDestination != .routineSetCreator {
+                        viewModel.cancelRoutineSetDraft()
+                    }
+                }
             }
-        }
-        .sheet(item: routineSetStepDraftBinding) { _ in
-            NavigationStack {
-                routineSetStepEditorPane
-            }
-            .presentationDetents([.large])
         }
     }
 
@@ -695,12 +711,6 @@ struct GuardianModeView: View {
                     Button("완료", action: onDone)
                 }
             }
-        }
-        .sheet(item: draftBinding) { _ in
-            NavigationStack {
-                cardEditorPane
-            }
-            .presentationDetents([.large])
         }
     }
 
@@ -2907,17 +2917,37 @@ struct GuardianModeView: View {
         )
     }
 
-    private var draftBinding: Binding<RoutineDraft?> {
+    private func draftBinding(isWide: Bool) -> Binding<RoutineDraft?> {
         Binding(
-            get: { horizontalSizeClass == .compact ? viewModel.draft : nil },
-            set: { if $0 == nil { viewModel.draft = nil } }
+            get: {
+                !isWide && viewModel.selectedDestination == .routineEditor
+                    ? viewModel.draft
+                    : nil
+            },
+            set: {
+                if $0 == nil,
+                   !isWideLayout,
+                   viewModel.selectedDestination == .routineEditor {
+                    viewModel.cancelDraft()
+                }
+            }
         )
     }
 
-    private var routineSetStepDraftBinding: Binding<RoutineSetStepDraft?> {
+    private func routineSetStepDraftBinding(isWide: Bool) -> Binding<RoutineSetStepDraft?> {
         Binding(
-            get: { horizontalSizeClass == .compact ? viewModel.routineSetStepDraft : nil },
-            set: { if $0 == nil { viewModel.routineSetStepDraft = nil } }
+            get: {
+                !isWide && viewModel.selectedDestination == .routineSetCreator
+                    ? viewModel.routineSetStepDraft
+                    : nil
+            },
+            set: {
+                if $0 == nil,
+                   !isWideLayout,
+                   viewModel.selectedDestination == .routineSetCreator {
+                    viewModel.cancelRoutineSetStepDraft()
+                }
+            }
         )
     }
 
