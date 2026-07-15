@@ -25,6 +25,12 @@ struct ChildRoutineView: View {
                 }
         }
         .background(Color.steppieBackgroundSecondary)
+        .onAppear {
+            viewModel.setRoutineSpeechActive(true)
+        }
+        .onDisappear {
+            viewModel.setRoutineSpeechActive(false)
+        }
         .task {
             viewModel.loadIfNeeded()
         }

@@ -8,6 +8,7 @@ struct SteppieTests {
     @Test("아이 모드가 활성 루틴을 순서대로 불러오고 첫 항목을 current로 선택한다")
     func childRoutineViewModelLoadsActiveRoutines() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
+        try assignActiveRoutineSet(in: repository, on: Date())
         let viewModel = ChildRoutineViewModel(repository: repository)
 
         viewModel.load()
@@ -54,6 +55,7 @@ struct SteppieTests {
     @Test("목록의 upcoming 항목 선택은 포커스만 바꾸고 저장 데이터를 변경하지 않는다")
     func childRoutineSelectionIsReadOnly() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
+        try assignActiveRoutineSet(in: repository, on: Date())
         let viewModel = ChildRoutineViewModel(repository: repository)
         viewModel.load()
         let activeSetID = try #require(viewModel.activeRoutineSet?.id)
@@ -72,6 +74,7 @@ struct SteppieTests {
     @Test("오늘의 순서에서 지금 할 일을 누르면 현재 루틴으로 돌아간다")
     func childRoutineShowFocusReturnsToCurrentRoutine() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
+        try assignActiveRoutineSet(in: repository, on: Date())
         let viewModel = ChildRoutineViewModel(repository: repository)
         viewModel.load()
         let current = try #require(viewModel.currentRoutine)
@@ -90,12 +93,40 @@ struct SteppieTests {
         #expect(viewModel.cardState(for: current) == .current)
     }
 
+    @Test("루틴 음성은 지금 할 일 화면에서만 재생한다")
+    func childRoutineSpeechOnlyPlaysOnFocusScreen() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let speechGuide = FakeRoutineSpeechGuide()
+        try assignActiveRoutineSet(in: repository, on: Date())
+        let viewModel = ChildRoutineViewModel(
+            repository: repository,
+            speechGuide: speechGuide
+        )
+
+        viewModel.load()
+        #expect(speechGuide.spokenTexts.count == 1)
+
+        viewModel.showList()
+        viewModel.load()
+        #expect(speechGuide.spokenTexts.count == 1)
+        #expect(speechGuide.stopCallCount == 1)
+
+        viewModel.showFocus()
+        #expect(speechGuide.spokenTexts.count == 2)
+
+        viewModel.setRoutineSpeechActive(false)
+        viewModel.load()
+        #expect(speechGuide.spokenTexts.count == 2)
+        #expect(speechGuide.stopCallCount == 2)
+    }
+
     @Test("포커스 카드 완료는 피드백 화면을 유지하고 다음 카드 선택 후 current를 이동한다")
     func childRoutineCompletionWaitsForManualAdvance() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let speechGuide = FakeRoutineSpeechGuide()
         let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
         let completedDate = DailyLog.localDateString(for: completedAt)
+        try assignActiveRoutineSet(in: repository, on: completedAt)
         let viewModel = ChildRoutineViewModel(
             repository: repository,
             speechGuide: speechGuide,
@@ -125,6 +156,7 @@ struct SteppieTests {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
         let completedDate = DailyLog.localDateString(for: completedAt)
+        try assignActiveRoutineSet(in: repository, on: completedAt)
         let viewModel = ChildRoutineViewModel(
             repository: repository,
             now: { completedAt }
@@ -145,6 +177,7 @@ struct SteppieTests {
     func childRoutineAllDoneState() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
+        try assignActiveRoutineSet(in: repository, on: completedAt)
         let viewModel = ChildRoutineViewModel(
             repository: repository,
             now: { completedAt }
@@ -167,6 +200,7 @@ struct SteppieTests {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let scheduler = FakeRoutineNotificationScheduler()
         let now = Date(timeIntervalSince1970: 1_767_225_600)
+        try assignActiveRoutineSet(in: repository, on: now)
         let viewModel = ChildRoutineViewModel(
             repository: repository,
             notificationScheduler: scheduler,
@@ -190,6 +224,7 @@ struct SteppieTests {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let scheduler = FakeRoutineNotificationScheduler()
         let now = Date(timeIntervalSince1970: 1_767_225_600)
+        try assignActiveRoutineSet(in: repository, on: now)
         let viewModel = ChildRoutineViewModel(
             repository: repository,
             notificationScheduler: scheduler,
@@ -826,6 +861,31 @@ struct SteppieTests {
         #expect(childReloadCount == 2)
     }
 
+    @Test("루틴 관리 진입 시 오늘 배정된 루틴 세트를 선택한다")
+    func guardianSelectsTodayAssignedRoutineSetForRoutineManagement() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let now = Date(timeIntervalSince1970: 1_767_312_000)
+        let viewModel = GuardianModeViewModel(repository: repository, now: { now }) {}
+        viewModel.load()
+        let originalSet = try #require(viewModel.selectedRoutineSet)
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "저녁 루틴"
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "저녁 먹기"
+        viewModel.saveRoutineSetStepDraft()
+        viewModel.saveRoutineSetDraft(localeIdentifier: "ko")
+        let assignedSet = try #require(viewModel.selectedRoutineSet)
+        viewModel.assignRoutineSetForToday(assignedSet)
+
+        viewModel.selectRoutineSet(originalSet)
+        #expect(viewModel.selectedRoutineSet?.id == originalSet.id)
+
+        viewModel.selectTodayAssignedRoutineSet()
+
+        #expect(viewModel.selectedRoutineSet?.id == assignedSet.id)
+    }
+
     @Test("루틴 세트 편집 모드는 세트 이름 변경과 세트 삭제를 Repository에 반영한다")
     func guardianRoutineSetEditModeRenamesAndDeletesRoutineSets() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
@@ -1121,6 +1181,7 @@ struct SteppieTests {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let now = Date(timeIntervalSince1970: 1_767_225_600)
         let date = DailyLog.localDateString(for: now)
+        try assignActiveRoutineSet(in: repository, on: now)
         let routineSets = try repository.routineSets()
         let routines = try repository.routines(in: routineSets[0].id)
         let target = routines[2]
@@ -1147,6 +1208,7 @@ struct SteppieTests {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let now = Date(timeIntervalSince1970: 1_767_225_600)
         let date = DailyLog.localDateString(for: now)
+        try assignActiveRoutineSet(in: repository, on: now)
         let viewModel = ChildRoutineViewModel(
             repository: repository,
             now: { now }
@@ -1170,6 +1232,7 @@ struct SteppieTests {
     func invalidNotificationRouteIsIgnored() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let now = Date(timeIntervalSince1970: 1_767_225_600)
+        try assignActiveRoutineSet(in: repository, on: now)
         let viewModel = ChildRoutineViewModel(
             repository: repository,
             now: { now }
@@ -1205,6 +1268,24 @@ struct SteppieTests {
 
         #expect(viewModel.loadState == .empty)
         #expect(viewModel.routines.isEmpty)
+        #expect(viewModel.selectedRoutine == nil)
+    }
+
+    @Test("로컬 날짜가 바뀌면 루틴 세트를 자동 선택하지 않고 빈 상태를 표시한다")
+    func childRoutineDateChangeRequiresNewAssignment() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        var now = Date(timeIntervalSince1970: 1_767_225_600)
+        try assignActiveRoutineSet(in: repository, on: now)
+        let viewModel = ChildRoutineViewModel(repository: repository, now: { now })
+
+        viewModel.load()
+        #expect(viewModel.loadState == .loaded)
+
+        now = try #require(Calendar.current.date(byAdding: .day, value: 1, to: now))
+        viewModel.appDidBecomeActive()
+
+        #expect(viewModel.loadState == .empty)
+        #expect(viewModel.activeRoutineSet == nil)
         #expect(viewModel.selectedRoutine == nil)
     }
 
@@ -1506,6 +1587,24 @@ struct SteppieTests {
         #expect(try target.dailyLogs(on: DailyLog.localDateString(for: completedAt), routineSetID: activeSet.id).count == 1)
     }
 
+    @Test("복원 당일의 루틴 세트 배정은 복원하지 않고 아이 모드는 빈 상태를 표시한다")
+    func restoreClearsRoutineAssignmentForRestoreDate() throws {
+        let now = Date(timeIntervalSince1970: 1_767_225_600)
+        let today = DailyLog.localDateString(for: now)
+        let source = try RoutinePreviewStore.makeSampleRepository()
+        try assignActiveRoutineSet(in: source, on: now)
+        let package = try BackupService(repository: source, now: { now }).exportPackage()
+        let target = try RoutinePreviewStore.makeRepository()
+
+        try BackupService(repository: target, now: { now }).restorePackage(package.archiveData)
+
+        #expect(try target.dailyRoutineAssignment(on: today) == nil)
+        let childViewModel = ChildRoutineViewModel(repository: target, now: { now })
+        childViewModel.load()
+        #expect(childViewModel.loadState == .empty)
+        #expect(childViewModel.selectedRoutine == nil)
+    }
+
     @Test("복원 중 DB replace가 실패하면 새로 저장한 사진 에셋을 정리한다")
     func restoreCleansSavedAssetsWhenReplaceFails() throws {
         let assetName = "routine-photo-77777777-7777-4777-8777-777777777777.jpg"
@@ -1727,6 +1826,18 @@ struct SteppieTests {
         #expect(try target.routineSets().isEmpty == false)
     }
 
+    private func assignActiveRoutineSet(
+        in repository: SwiftDataRoutineRepository,
+        on date: Date
+    ) throws {
+        let routineSet = try #require(try repository.routineSets().first(where: \.isActive))
+        _ = try repository.assignRoutineSet(
+            routineSet.id,
+            on: DailyLog.localDateString(for: date),
+            at: date
+        )
+    }
+
     private func makeFixture(
         routineCount: Int
     ) throws -> (
@@ -1824,13 +1935,16 @@ private final class FakeBackupAssetStore: BackupAssetStore {
 @MainActor
 private final class FakeRoutineSpeechGuide: RoutineSpeechGuiding {
     var spokenTexts: [String] = []
+    var stopCallCount = 0
 
     func speak(_ text: String, settings: AppSettings) {
         guard settings.ttsEnabled else { return }
         spokenTexts.append(text)
     }
 
-    func stop() {}
+    func stop() {
+        stopCallCount += 1
+    }
 }
 
 @MainActor

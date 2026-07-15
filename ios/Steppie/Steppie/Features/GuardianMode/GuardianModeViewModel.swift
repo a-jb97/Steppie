@@ -858,6 +858,12 @@ final class GuardianModeViewModel {
         load()
     }
 
+    func selectTodayAssignedRoutineSet() {
+        guard let todayAssignedRoutineSetID,
+              let routineSet = routineSets.first(where: { $0.id == todayAssignedRoutineSetID }) else { return }
+        selectRoutineSet(routineSet)
+    }
+
     func isRoutineSetAssignedToday(_ routineSet: RoutineSet) -> Bool {
         todayAssignedRoutineSetID == routineSet.id
     }
@@ -920,7 +926,7 @@ final class GuardianModeViewModel {
         guard let routineSet = pendingDeleteRoutineSet else { return }
         do {
             if todayAssignedRoutineSetID == routineSet.id {
-                errorMessage = "오늘 사용 중인 루틴 세트는 삭제할 수 없어요. 먼저 다른 루틴 세트를 오늘 루틴으로 설정해 주세요."
+                errorMessage = "현재 사용 중인 루틴 세트는 삭제할 수 없어요. 먼저 다른 루틴 세트를 오늘 루틴으로 설정해 주세요."
                 pendingDeleteRoutineSet = nil
                 return
             }
@@ -1184,7 +1190,12 @@ final class GuardianModeViewModel {
     }
 
     private func refreshRecordCalendarDates() {
-        recordCalendarDates = Set((try? repository.dailyLogDates()) ?? [])
+        var dates = Set((try? repository.dailyLogDates()) ?? [])
+        let today = DailyLog.localDateString(for: now(), calendar: calendar)
+        if (try? routineSetRepresented(on: today)) != nil {
+            dates.insert(today)
+        }
+        recordCalendarDates = dates
     }
 
     private func refreshSelectedCalendarRecordDetail() {
@@ -1245,6 +1256,13 @@ final class GuardianModeViewModel {
     }
 
     private func routinesRepresented(on date: String, logs: [DailyLog]) throws -> [Routine] {
+        if logs.isEmpty {
+            guard let routineSet = try routineSetRepresented(on: date) else { return [] }
+            return try repository.routines(in: routineSet.id)
+                .filter { routineExisted($0, on: date) }
+                .sorted(by: routineRecordSort)
+        }
+
         let routineSetIDs = Set(logs.map(\.routineSetID))
         let representedRoutines = try routineSetIDs.flatMap { routineSetID in
             try repository.routines(
@@ -1264,18 +1282,34 @@ final class GuardianModeViewModel {
         let logRoutineIDs = Set(logs.map(\.routineID))
         return routinesByID.values
             .filter { routine in
-                guard !logs.isEmpty else { return false }
                 if logRoutineIDs.contains(routine.id) { return true }
                 guard routineExisted(routine, on: date) else { return false }
                 return routine.isActive || routine.deletedAt != nil
             }
-            .sorted {
-                if $0.routineSetID == $1.routineSetID {
-                    if $0.order == $1.order { return $0.createdAt < $1.createdAt }
-                    return $0.order < $1.order
-                }
-                return $0.createdAt < $1.createdAt
-            }
+            .sorted(by: routineRecordSort)
+    }
+
+    private func routineSetRepresented(on date: String) throws -> RoutineSet? {
+        if let assignment = try repository.dailyRoutineAssignment(on: date),
+           let assignedSet = try repository.routineSet(id: assignment.routineSetID),
+           assignedSet.deletedAt == nil {
+            return assignedSet
+        }
+
+        let today = DailyLog.localDateString(for: now(), calendar: calendar)
+        guard date == today else { return nil }
+        if let activeRoutineSet {
+            return activeRoutineSet
+        }
+        return try repository.routineSets().first(where: \.isActive)
+    }
+
+    private func routineRecordSort(_ lhs: Routine, _ rhs: Routine) -> Bool {
+        if lhs.routineSetID == rhs.routineSetID {
+            if lhs.order == rhs.order { return lhs.createdAt < rhs.createdAt }
+            return lhs.order < rhs.order
+        }
+        return lhs.createdAt < rhs.createdAt
     }
 
     private func routineExisted(_ routine: Routine, on localDate: String) -> Bool {

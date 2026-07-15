@@ -111,6 +111,7 @@ struct ContentView: View {
     }
 
     private func beginGuardianEntry() {
+        childViewModel.setRoutineSpeechActive(false)
         guardianViewModel.load()
         pinFlow = .guardianEntry
         pinPurpose = guardianViewModel.hasGuardianPIN() ? .enter : .setup
@@ -256,6 +257,9 @@ struct ContentView: View {
             pinFlow = nil
             guardianViewModel.clearRecoveryCodeError()
             guardianViewModel.clearOneTimeRecoveryCode()
+            if appMode == .child {
+                childViewModel.setRoutineSpeechActive(true)
+            }
         }
     }
 }

@@ -16,6 +16,7 @@ struct GuardianModeView: View {
     @State private var recordCalendarPickerYear = Calendar.current.component(.year, from: Date())
     @State private var recordCalendarPickerMonth = Calendar.current.component(.month, from: Date())
     @State private var isRecordCalendarDatePickerPresented = false
+    @State private var isTodayRoutineSelectionDismissed = false
     let viewModel: GuardianModeViewModel
     let onDone: () -> Void
     let onInteraction: () -> Void
@@ -26,6 +27,14 @@ struct GuardianModeView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.steppieBackgroundSecondary)
                 .onTapGesture(perform: onInteraction)
+        }
+        .overlay {
+            if todayRoutineSelectionBinding.wrappedValue {
+                Color.black
+                    .opacity(0.32)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
         }
         .task { viewModel.loadIfNeeded() }
         .alert("삭제할까요?", isPresented: deleteBinding) {
@@ -67,7 +76,6 @@ struct GuardianModeView: View {
             NavigationStack {
                 todayRoutineSelectionSheet
             }
-            .interactiveDismissDisabled(true)
             .presentationDetents([.medium, .large])
         }
     }
@@ -263,6 +271,9 @@ struct GuardianModeView: View {
     }
 
     private func openDestination(_ destination: GuardianDestination, isWide: Bool) {
+        if destination == .routineEditor {
+            viewModel.selectTodayAssignedRoutineSet()
+        }
         if isWide {
             viewModel.selectedDestination = destination
         } else if phoneNavigationPath.last != destination {
@@ -612,6 +623,7 @@ struct GuardianModeView: View {
                     title: routineEditorTitle,
                     subtitle: "각 루틴을 선택하면 해당 루틴을 수정할 수 있습니다."
                 )
+                .padding(.top, SteppieSpacing.large)
                 .padding(.horizontal, SteppieLayout.guardianScreenPadding)
                 .listRowInsets(headerListRowInsets)
                 .listRowSeparator(.hidden)
@@ -643,14 +655,6 @@ struct GuardianModeView: View {
                 }
             }
             Section {
-                SteppieButton("템플릿에서 시작하기", role: .secondary) {
-                    viewModel.beginTemplateSelection(returnDestination: .routineEditor)
-                    onInteraction()
-                }
-                    .padding(.top, SteppieSpacing.medium)
-                    .listRowInsets(routineListRowInsets)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
                 SteppieButton("+ 활동 추가") {
                     viewModel.beginAddRoutine()
                     onInteraction()
@@ -891,14 +895,9 @@ struct GuardianModeView: View {
                             height: SteppieLayout.guardianMinimumTouchTarget
                         )
                         .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
-                        Text(routineSetTitle(routineSet))
-                            .steppieTextStyle(.button)
-                            .foregroundStyle(Color.steppieTextPrimary)
-                        Text(routineSet.isActive ? "아이 모드에서 사용 중" : "보관된 루틴 세트")
-                            .steppieTextStyle(.guardianCaption)
-                            .foregroundStyle(Color.steppieTextSecondary)
-                    }
+                    Text(routineSetTitle(routineSet))
+                        .steppieTextStyle(.button)
+                        .foregroundStyle(Color.steppieTextPrimary)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -906,12 +905,12 @@ struct GuardianModeView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(routineSetTitle(routineSet)))
-            .accessibilityValue(Text(routineSet.isActive ? "아이 모드에서 사용 중" : "보관된 루틴 세트"))
+            .accessibilityValue(Text(isSelected ? "선택됨" : "선택 안 됨"))
             .accessibilityHint(Text("이 루틴 세트를 편집합니다"))
 
             if viewModel.isEditingRoutineSets {
                 routineSetEditActions(for: routineSet)
-            } else if isSelected {
+            } else if isSelected || viewModel.isRoutineSetAssignedToday(routineSet) {
                 todayRoutineSetAction(for: routineSet)
             }
         }
@@ -931,12 +930,12 @@ struct GuardianModeView: View {
     @ViewBuilder
     private func todayRoutineSetAction(for routineSet: RoutineSet) -> some View {
         if viewModel.isRoutineSetAssignedToday(routineSet) {
-            Text("오늘 사용 중")
+            Text("현재 사용 중")
                 .steppieTextStyle(.guardianCaption)
                 .foregroundStyle(Color.steppieFocusRing)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(minWidth: SteppieLayout.guardianMinimumTouchTarget, minHeight: SteppieLayout.guardianMinimumTouchTarget)
-                .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 오늘 사용 중"))
+                .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 현재 사용 중"))
         } else {
             Button {
                 viewModel.assignRoutineSetForToday(routineSet)
@@ -1163,7 +1162,7 @@ struct GuardianModeView: View {
                                     .steppieTextStyle(.button)
                                     .foregroundStyle(Color.steppieTextPrimary)
                                     .fixedSize(horizontal: false, vertical: true)
-                                Text(viewModel.isRoutineSetAssignedToday(routineSet) ? "오늘 사용 중" : "오늘 루틴으로 설정")
+                                Text(viewModel.isRoutineSetAssignedToday(routineSet) ? "현재 사용 중" : "오늘 루틴으로 설정")
                                     .steppieTextStyle(.guardianCaption)
                                     .foregroundStyle(Color.steppieTextSecondary)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -1183,7 +1182,7 @@ struct GuardianModeView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text(routineSetTitle(routineSet)))
-                    .accessibilityValue(Text(viewModel.isRoutineSetAssignedToday(routineSet) ? "오늘 사용 중" : "오늘 루틴으로 설정 가능"))
+                    .accessibilityValue(Text(viewModel.isRoutineSetAssignedToday(routineSet) ? "현재 사용 중" : "오늘 루틴으로 설정 가능"))
                     .listRowInsets(routineListRowInsets)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
@@ -2846,8 +2845,15 @@ struct GuardianModeView: View {
 
     private var todayRoutineSelectionBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.requiresTodayRoutineSelection },
-            set: { _ in }
+            get: {
+                viewModel.requiresTodayRoutineSelection
+                    && !isTodayRoutineSelectionDismissed
+            },
+            set: { isPresented in
+                if !isPresented {
+                    isTodayRoutineSelectionDismissed = true
+                }
+            }
         )
     }
 
