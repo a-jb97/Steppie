@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -453,7 +454,7 @@ private fun FocusRoutineContent(
         presentation = RoutineCardPresentation.Focus,
         cardColor = routine.cardColor(),
         meta = if (isCompleted) {
-            stringResource(R.string.routine_state_completed)
+            null
         } else if (isCurrent) {
             stringResource(R.string.child_focus_tap_hint)
         } else {
@@ -552,13 +553,10 @@ private fun UndoFeedbackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    Box(
         modifier = modifier
-            .widthIn(min = 198.dp)
-            .heightIn(min = SteppieLayout.ChildMinimumTouchTarget)
-            .clip(RoundedCornerShape(18.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(2.dp, Color(0xFF5D4037), RoundedCornerShape(18.dp))
+            .width(280.dp)
+            .height(SteppieLayout.ChildMinimumTouchTarget)
             .clearAndSetSemantics {
                 contentDescription = label
                 role = Role.Button
@@ -567,23 +565,33 @@ private fun UndoFeedbackButton(
                     true
                 }
             }
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = SteppieSpacing.Medium, vertical = SteppieSpacing.TwoExtraSmall),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_undo_arrow),
-            contentDescription = null,
-            tint = Color.Unspecified,
-            modifier = Modifier.size(24.dp),
-        )
-        Spacer(Modifier.size(SteppieSpacing.ExtraSmall))
-        Text(
-            text = label,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = SteppieTheme.typography.button,
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(2.dp, Color(0xFF5D4037), RoundedCornerShape(50))
+                .padding(horizontal = SteppieSpacing.Medium),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_undo_arrow),
+                contentDescription = null,
+                tint = Color.Unspecified,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.size(SteppieSpacing.ExtraSmall))
+            Text(
+                text = label,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.button,
+            )
+        }
     }
 }
 
