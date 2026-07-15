@@ -77,6 +77,8 @@ import com.example.steppie.ui.theme.SteppieLayout
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
+import com.example.steppie.ui.tutorial.TutorialTarget
+import com.example.steppie.ui.tutorial.tutorialAnchor
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
@@ -127,6 +129,7 @@ fun ChildRoutineScreen(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .size(SteppieLayout.ChildMinimumTouchTarget)
+                .tutorialAnchor(TutorialTarget.GuardianEntry)
                 .testTag("guardian_hidden_entry")
                 .pointerInput(onRequestGuardianMode) {
                     awaitEachGesture {
@@ -289,6 +292,7 @@ private fun SplitRoutineLayout(
                 .width(SteppieLayout.SplitListWidth)
                 .fillMaxHeight()
                 .testTag("split_list_pane")
+                .tutorialAnchor(TutorialTarget.ChildListNavigation)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(
                     horizontal = SteppieLayout.GuardianScreenPadding,
@@ -398,9 +402,9 @@ private fun ChildHeader(
 private fun ProgressIndicator(completed: Int, total: Int) {
     val description = stringResource(R.string.a11y_progress, completed, total)
     Row(
-        modifier = Modifier.semantics(mergeDescendants = true) {
-            contentDescription = description
-        },
+        modifier = Modifier
+            .tutorialAnchor(TutorialTarget.ChildProgress)
+            .semantics(mergeDescendants = true) { contentDescription = description },
         horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -450,6 +454,7 @@ private fun FocusRoutineContent(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("focus_routine_card")
+            .tutorialAnchor(TutorialTarget.ChildCard)
             .then(if (tablet) Modifier.heightIn(min = 520.dp) else Modifier),
         presentation = RoutineCardPresentation.Focus,
         cardColor = routine.cardColor(),
@@ -501,7 +506,7 @@ private fun RoutineList(
         return
     }
     LazyColumn(
-        modifier = modifier,
+        modifier = modifier.tutorialAnchor(TutorialTarget.ChildList),
         verticalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = PaddingValues(bottom = contentBottomPadding),
     ) {
@@ -903,6 +908,7 @@ private fun FocusListNavigation(
         modifier = modifier
             .fillMaxWidth()
             .testTag(if (directionUp) "show_focus" else "show_list")
+            .tutorialAnchor(TutorialTarget.ChildListNavigation)
             .heightIn(min = SteppieLayout.ChildMinimumTouchTarget)
             .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceVariant)

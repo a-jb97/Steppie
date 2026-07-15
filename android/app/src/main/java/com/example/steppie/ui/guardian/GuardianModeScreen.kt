@@ -96,6 +96,8 @@ import com.example.steppie.ui.theme.SteppieLayout
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
+import com.example.steppie.ui.tutorial.TutorialTarget
+import com.example.steppie.ui.tutorial.tutorialAnchor
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
@@ -183,6 +185,7 @@ fun GuardianModeScreen(
     onQuietHoursEnabledChange: (Boolean) -> Unit = {},
     onQuietHoursStartChange: (String) -> Unit = {},
     onQuietHoursEndChange: (String) -> Unit = {},
+    onReplayTutorials: () -> Unit = {},
     onCreateBackupFile: () -> Unit = {},
     onOpenRestoreFile: () -> Unit = {},
     onRestorePinDigit: (Int) -> Unit = {},
@@ -200,6 +203,7 @@ fun GuardianModeScreen(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
+            .tutorialAnchor(TutorialTarget.GuardianContent)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .pointerInput(state.isActive, state.isAuthenticated) {
@@ -332,6 +336,7 @@ fun GuardianModeScreen(
                 onQuietHoursEnabledChange = onQuietHoursEnabledChange,
                 onQuietHoursStartChange = onQuietHoursStartChange,
                 onQuietHoursEndChange = onQuietHoursEndChange,
+                onReplayTutorials = onReplayTutorials,
             )
             GuardianDestination.Records -> GuardianRecordsScreen(
                 state = state,
@@ -562,6 +567,7 @@ private fun GuardianPinScreen(
             title = when (state.pinMode) {
                 GuardianPinMode.Enter -> stringResource(R.string.guardian_pin_title)
                 GuardianPinMode.Setup -> stringResource(R.string.guardian_pin_setup_title)
+                GuardianPinMode.SetupConfirm -> stringResource(R.string.guardian_pin_setup_confirm_title)
                 GuardianPinMode.ChangeCurrent -> stringResource(R.string.guardian_pin_change_current_title)
                 GuardianPinMode.ChangeNew -> stringResource(R.string.guardian_pin_change_new_title)
                 GuardianPinMode.RecoveryRegenerateConfirm -> stringResource(R.string.guardian_recovery_confirm_pin_title)
@@ -570,6 +576,7 @@ private fun GuardianPinScreen(
             subtitle = when (state.pinMode) {
                 GuardianPinMode.Enter -> stringResource(R.string.guardian_pin_subtitle)
                 GuardianPinMode.Setup -> stringResource(R.string.guardian_pin_setup_subtitle)
+                GuardianPinMode.SetupConfirm -> stringResource(R.string.guardian_pin_setup_confirm_subtitle)
                 GuardianPinMode.ChangeCurrent -> stringResource(R.string.guardian_pin_change_current_subtitle)
                 GuardianPinMode.ChangeNew -> stringResource(R.string.guardian_pin_change_new_subtitle)
                 GuardianPinMode.RecoveryRegenerateConfirm -> stringResource(R.string.guardian_recovery_confirm_pin_subtitle)
@@ -599,7 +606,9 @@ private fun GuardianPinScreen(
             }
         }
         Spacer(Modifier.height(SteppieSpacing.Large))
-        PinKeypad(onDigit = onDigit, onDelete = onDeletePinDigit)
+        Box(Modifier.tutorialAnchor(TutorialTarget.GuardianMain)) {
+            PinKeypad(onDigit = onDigit, onDelete = onDeletePinDigit)
+        }
         if (state.pinError != null) {
             Spacer(Modifier.height(28.dp))
             ErrorMessage(state.pinError)
@@ -756,6 +765,7 @@ private fun GuardianEnvironmentSettingsScreen(
     onQuietHoursEnabledChange: (Boolean) -> Unit,
     onQuietHoursStartChange: (String) -> Unit,
     onQuietHoursEndChange: (String) -> Unit,
+    onReplayTutorials: () -> Unit,
 ) {
     GuardianScaffold(
         title = stringResource(R.string.guardian_environment_title),
@@ -827,6 +837,18 @@ private fun GuardianEnvironmentSettingsScreen(
                     label = stringResource(R.string.guardian_notification_5_minutes),
                     enabled = 5 in settings.notificationLeadTimes,
                     onEnabledChange = { onNotificationLeadTimeChange(5, it) },
+                )
+            }
+            SettingBlock(title = stringResource(R.string.tutorial_replay_title)) {
+                Text(
+                    text = stringResource(R.string.tutorial_replay_body),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = SteppieTheme.typography.guardianBody,
+                )
+                SteppieButton(
+                    label = stringResource(R.string.tutorial_replay_title),
+                    onClick = onReplayTutorials,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
             SettingBlock(title = stringResource(R.string.guardian_setting_quiet_hours)) {
@@ -3263,9 +3285,21 @@ private fun GuardianScaffold(
             topActionContentDescription = topActionContentDescription,
             onTopAction = onTopAction,
         )
-        Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small), content = content)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .tutorialAnchor(TutorialTarget.GuardianMain),
+            verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+            content = content,
+        )
         Spacer(Modifier.height(SteppieSpacing.Large))
-        bottom?.invoke()
+        if (bottom != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .tutorialAnchor(TutorialTarget.GuardianBottom),
+            ) { bottom() }
+        }
     }
 }
 

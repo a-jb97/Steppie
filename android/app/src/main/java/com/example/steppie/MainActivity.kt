@@ -20,12 +20,16 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,17 +49,27 @@ import com.example.steppie.ui.child.ChildRoutineScreen
 import com.example.steppie.ui.child.ChildRoutineViewModel
 import com.example.steppie.ui.guardian.GuardianModeScreen
 import com.example.steppie.ui.guardian.GuardianModeViewModel
+import com.example.steppie.ui.guardian.GuardianDestination
+import com.example.steppie.ui.guardian.GuardianPinMode
 import com.example.steppie.ui.theme.SteppieTheme
+import com.example.steppie.ui.tutorial.TutorialCoordinatorViewModel
+import com.example.steppie.ui.tutorial.TutorialOverlay
+import com.example.steppie.ui.tutorial.TutorialProgressRepository
+import com.example.steppie.ui.tutorial.TutorialScreen
+import com.example.steppie.ui.tutorial.LocalTutorialAnchorRegistry
+import com.example.steppie.ui.tutorial.rememberTutorialAnchorRegistry
 import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 
 class MainActivity : ComponentActivity() {
     private val routineRepository by lazy {
         RoomRoutineRepository(SteppieDatabase.getInstance(this))
     }
     private val appSettingsRepository by lazy { DataStoreAppSettingsRepository(this) }
+    private val tutorialProgressRepository by lazy { TutorialProgressRepository(this) }
     private val routinePhotoStore by lazy { RoutinePhotoStore(this) }
     private val backupRepository by lazy {
         AndroidBackupRepository(
@@ -86,8 +100,13 @@ class MainActivity : ComponentActivity() {
                         routinePhotoStore,
                     ),
                 )
+                val tutorialViewModel: TutorialCoordinatorViewModel = viewModel(
+                    factory = TutorialCoordinatorViewModel.factory(tutorialProgressRepository),
+                )
                 val childState by childViewModel.uiState.collectAsStateWithLifecycle()
                 val guardianState by guardianViewModel.uiState.collectAsStateWithLifecycle()
+                val tutorialState by tutorialViewModel.uiState.collectAsStateWithLifecycle()
+                val tutorialAnchorRegistry = rememberTutorialAnchorRegistry()
                 val settings by appSettingsRepository.observeAppSettings()
                     .collectAsStateWithLifecycle(initialValue = AppSettings())
                 val targetRoutineId by notificationRoutineId.collectAsStateWithLifecycle()
@@ -95,6 +114,7 @@ class MainActivity : ComponentActivity() {
                 var photoTargetName by rememberSaveable { mutableStateOf<String?>(null) }
                 var cameraPhotoTargetName by rememberSaveable { mutableStateOf<String?>(null) }
                 var cameraPhotoUriString by rememberSaveable { mutableStateOf<String?>(null) }
+                var appBootstrapComplete by rememberSaveable { mutableStateOf(false) }
                 val notificationPermissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission(),
                 ) {
@@ -143,6 +163,11 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(childViewModel) {
                     childViewModel.feedbackEvents.collect(feedbackController::play)
                 }
+                LaunchedEffect(Unit) {
+                    val persistedSettings = appSettingsRepository.observeAppSettings().first()
+                    if (!persistedSettings.hasGuardianPin) guardianViewModel.openInitialSetup()
+                    appBootstrapComplete = true
+                }
                 LaunchedEffect(guardianState.restoreCompletedToken) {
                     if (guardianState.restoreCompletedToken > 0L) {
                         childViewModel.onDataChanged()
@@ -173,6 +198,37 @@ class MainActivity : ComponentActivity() {
                         guardianViewModel.closeToChild()
                     }
                 }
+                val tutorialScreen = if (guardianState.isActive) {
+                    if (guardianState.recoveryStep != null || guardianState.showDailyRoutineSelectionPrompt) {
+                        null
+                    } else when (guardianState.destination) {
+                        GuardianDestination.Pin -> if (guardianState.pinMode == GuardianPinMode.Enter) TutorialScreen.GuardianPin else null
+                        GuardianDestination.Home -> TutorialScreen.GuardianHome
+                        GuardianDestination.RoutineEdit -> TutorialScreen.RoutineManagement
+                        GuardianDestination.TemplateSelect -> TutorialScreen.TemplateSelect
+                        GuardianDestination.CardEdit -> TutorialScreen.CardEdit
+                        GuardianDestination.RoutineSetCreate -> TutorialScreen.RoutineSetCreate
+                        GuardianDestination.EnvironmentSettings -> TutorialScreen.EnvironmentSettings
+                        GuardianDestination.Records -> TutorialScreen.Records
+                        GuardianDestination.RecordsCalendar -> TutorialScreen.RecordsCalendar
+                        GuardianDestination.Security -> TutorialScreen.Security
+                        GuardianDestination.RecoveryCode -> TutorialScreen.RecoveryCode
+                        GuardianDestination.BackupRestore -> TutorialScreen.BackupRestore
+                    }
+                } else if (!childState.isLoading) {
+                    if (childState.singlePane == com.example.steppie.ui.child.ChildSinglePane.List) {
+                        TutorialScreen.ChildList
+                    } else {
+                        TutorialScreen.ChildFocus
+                    }
+                } else null
+                LaunchedEffect(tutorialScreen) {
+                    tutorialAnchorRegistry.clear()
+                    tutorialViewModel.showFor(tutorialScreen)
+                }
+
+                CompositionLocalProvider(LocalTutorialAnchorRegistry provides tutorialAnchorRegistry) {
+                if (appBootstrapComplete) Box(Modifier.fillMaxSize()) {
                 if (guardianState.isActive) {
                     GuardianModeScreen(
                         state = guardianState,
@@ -275,6 +331,7 @@ class MainActivity : ComponentActivity() {
                         onQuietHoursEnabledChange = guardianViewModel::updateQuietHoursEnabled,
                         onQuietHoursStartChange = guardianViewModel::updateQuietHoursStart,
                         onQuietHoursEndChange = guardianViewModel::updateQuietHoursEnd,
+                        onReplayTutorials = tutorialViewModel::resetAll,
                         onCreateBackupFile = {
                             createBackupLauncher.launch(AndroidBackupRepository.defaultFileName())
                         },
@@ -303,6 +360,17 @@ class MainActivity : ComponentActivity() {
                         onUndoRoutine = childViewModel::undoLastCompletion,
                         onRequestGuardianMode = guardianViewModel::openFromChild,
                     )
+                }
+                    if (tutorialState.visible) {
+                        TutorialOverlay(
+                            state = tutorialState,
+                            anchorRegistry = tutorialAnchorRegistry,
+                            onPrevious = tutorialViewModel::previous,
+                            onNext = tutorialViewModel::next,
+                            onSkip = tutorialViewModel::finishCurrent,
+                        )
+                    }
+                }
                 }
             }
         }
