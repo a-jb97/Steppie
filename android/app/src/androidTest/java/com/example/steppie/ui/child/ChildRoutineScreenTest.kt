@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -234,6 +235,7 @@ class ChildRoutineScreenTest {
         composeRule.onNodeWithTag("focus_routine_card").performClick()
         composeRule.onNodeWithTag("phone_focus").assertIsDisplayed()
         composeRule.onNodeWithText("일어나기 완료!").assertIsDisplayed()
+        composeRule.onNodeWithText("완료했어요").assertDoesNotExist()
         composeRule.onNodeWithText("다음 : 세수하기").assertIsDisplayed()
         composeRule.onNodeWithText("카드를 잘못 눌렀어요").performClick()
         composeRule.runOnIdle {

@@ -453,7 +453,9 @@ private fun FocusRoutineContent(
             .then(if (tablet) Modifier.heightIn(min = 520.dp) else Modifier),
         presentation = RoutineCardPresentation.Focus,
         cardColor = routine.cardColor(),
-        meta = if (isCompleted) {
+        meta = if (isFeedback) {
+            ""
+        } else if (isCompleted) {
             null
         } else if (isCurrent) {
             stringResource(R.string.child_focus_tap_hint)
