@@ -16,6 +16,7 @@ struct GuardianModeView: View {
     @State private var recordCalendarPickerYear = Calendar.current.component(.year, from: Date())
     @State private var recordCalendarPickerMonth = Calendar.current.component(.month, from: Date())
     @State private var isRecordCalendarDatePickerPresented = false
+    @State private var isTodayRoutineSelectionDismissed = false
     let viewModel: GuardianModeViewModel
     let onDone: () -> Void
     let onInteraction: () -> Void
@@ -26,6 +27,14 @@ struct GuardianModeView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.steppieBackgroundSecondary)
                 .onTapGesture(perform: onInteraction)
+        }
+        .overlay {
+            if todayRoutineSelectionBinding.wrappedValue {
+                Color.black
+                    .opacity(0.32)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
         }
         .task { viewModel.loadIfNeeded() }
         .alert("삭제할까요?", isPresented: deleteBinding) {
@@ -67,7 +76,6 @@ struct GuardianModeView: View {
             NavigationStack {
                 todayRoutineSelectionSheet
             }
-            .interactiveDismissDisabled(true)
             .presentationDetents([.medium, .large])
         }
     }
@@ -2846,8 +2854,15 @@ struct GuardianModeView: View {
 
     private var todayRoutineSelectionBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.requiresTodayRoutineSelection },
-            set: { _ in }
+            get: {
+                viewModel.requiresTodayRoutineSelection
+                    && !isTodayRoutineSelectionDismissed
+            },
+            set: { isPresented in
+                if !isPresented {
+                    isTodayRoutineSelectionDismissed = true
+                }
+            }
         )
     }
 
