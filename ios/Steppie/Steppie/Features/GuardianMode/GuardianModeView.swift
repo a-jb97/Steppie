@@ -655,14 +655,6 @@ struct GuardianModeView: View {
                 }
             }
             Section {
-                SteppieButton("템플릿에서 시작하기", role: .secondary) {
-                    viewModel.beginTemplateSelection(returnDestination: .routineEditor)
-                    onInteraction()
-                }
-                    .padding(.top, SteppieSpacing.medium)
-                    .listRowInsets(routineListRowInsets)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
                 SteppieButton("+ 활동 추가") {
                     viewModel.beginAddRoutine()
                     onInteraction()
