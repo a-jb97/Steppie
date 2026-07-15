@@ -163,9 +163,9 @@ class GuardianModeViewModel(
     private val routinePhotoStore: RoutinePhotoStore? = null,
 ) : ViewModel() {
     private val recordsEndDate = MutableStateFlow(LocalDate.now())
+    private val currentDate = MutableStateFlow(LocalDate.now())
     private val _uiState = MutableStateFlow(GuardianModeUiState())
     val uiState: StateFlow<GuardianModeUiState> = _uiState.asStateFlow()
-    private val today = LocalDate.now()
     private var verifiedPinForChange: String? = null
     private var verifiedRecoveryCodeForReset: String? = null
     private var recordRoutineSetsCache: List<RoutineSet> = emptyList()
@@ -173,11 +173,17 @@ class GuardianModeViewModel(
     private var allDailyLogsCache: List<DailyLog> = emptyList()
 
     init {
-        val routineSetsWithTodaySelection = combine(
-            routineRepository.observeRoutineSets(),
-            routineRepository.observeSelectedRoutineSetId(today),
-        ) { routineSets, todayRoutineSetId ->
-            routineSets to todayRoutineSetId
+        val routineSetsWithTodaySelection = currentDate.flatMapLatest { date ->
+            combine(
+                routineRepository.observeRoutineSets(),
+                routineRepository.observeSelectedRoutineSetId(date),
+            ) { routineSets, todayRoutineSetId ->
+                TodayRoutineSelectionSnapshot(
+                    date = date,
+                    routineSets = routineSets,
+                    todayRoutineSetId = todayRoutineSetId,
+                )
+            }
         }
         viewModelScope.launch {
             combine(
@@ -190,12 +196,12 @@ class GuardianModeViewModel(
                 },
                 routineRepository.observeAllDailyLogs(),
             ) { settings, routineSetsAndTodaySelection, recordRoutineSets, records, allDailyLogs ->
-                val (routineSets, todayRoutineSetId) = routineSetsAndTodaySelection
                 val (endDate, dailyLogs) = records
                 GuardianRepositorySnapshot(
                     settings = settings,
-                    visibleRoutineSets = routineSets.filter { it.deletedAt == null },
-                    todayRoutineSetId = todayRoutineSetId,
+                    today = routineSetsAndTodaySelection.date,
+                    visibleRoutineSets = routineSetsAndTodaySelection.routineSets.filter { it.deletedAt == null },
+                    todayRoutineSetId = routineSetsAndTodaySelection.todayRoutineSetId,
                     recordRoutineSets = recordRoutineSets,
                     dailyLogs = dailyLogs,
                     allDailyLogs = allDailyLogs,
@@ -225,6 +231,7 @@ class GuardianModeViewModel(
                         selectedDate = selectedCalendarDate,
                         routineSets = snapshot.recordRoutineSets,
                         dailyLogs = snapshot.allDailyLogs,
+                        routineSetForSelectedDate = todaySet.takeIf { selectedCalendarDate == snapshot.today },
                     )
                     val resolvedPinMode = if (
                         state.isActive &&
@@ -259,6 +266,7 @@ class GuardianModeViewModel(
     }
 
     fun openFromChild() {
+        refreshCurrentDate()
         verifiedPinForChange = null
         verifiedRecoveryCodeForReset = null
         _uiState.update { state ->
@@ -408,7 +416,7 @@ class GuardianModeViewModel(
     }
 
     fun openRecords() {
-        val today = LocalDate.now()
+        val today = refreshCurrentDate()
         recordsEndDate.value = today
         _uiState.update {
             it.copy(
@@ -432,15 +440,22 @@ class GuardianModeViewModel(
     }
 
     fun openRecordsCalendar() {
-        val today = LocalDate.now()
+        val today = refreshCurrentDate()
+        val current = _uiState.value
+        val records = buildGuardianRecordDetail(
+            selectedDate = today,
+            routineSets = recordRoutineSetsCache,
+            dailyLogs = allDailyLogsCache,
+            routineSetForSelectedDate = current.activeRoutineSet.takeIf { current.todayRoutineSetId == it?.id },
+        )
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.RecordsCalendar,
                 destinationBackStack = it.backStackFor(GuardianDestination.RecordsCalendar),
                 recordsCalendarMonth = YearMonth.from(today),
                 selectedCalendarRecordsDate = today,
-                selectedCalendarRecordRoutines = emptyList(),
-                selectedCalendarRecordSummary = GuardianRecordDay(today, 0, 0, false),
+                selectedCalendarRecordRoutines = records.routines,
+                selectedCalendarRecordSummary = records.summary,
                 draft = null,
                 routineSetDraft = null,
                 selectedTemplate = null,
@@ -479,11 +494,16 @@ class GuardianModeViewModel(
 
     fun selectRecordsCalendarDate(date: LocalDate) {
         val current = _uiState.value
-        if (date !in current.calendarRecordDates) return
+        val today = currentDate.value
+        val canSelectTodayRoutine = date == today && current.todayRoutineSetId != null
+        if (date !in current.calendarRecordDates && !canSelectTodayRoutine) return
         val records = buildGuardianRecordDetail(
             selectedDate = date,
             routineSets = recordRoutineSetsCache,
             dailyLogs = allDailyLogsCache,
+            routineSetForSelectedDate = current.activeRoutineSet.takeIf {
+                date == today && current.todayRoutineSetId == it?.id
+            },
         )
         _uiState.update {
             it.copy(
@@ -874,6 +894,7 @@ class GuardianModeViewModel(
     fun setRoutineSetForToday(routineSetId: String) {
         if (_uiState.value.routineSets.none { it.id == routineSetId }) return
         viewModelScope.launch {
+            val today = refreshCurrentDate()
             routineRepository.selectRoutineSetForDate(today, routineSetId)
             _uiState.update {
                 it.copy(
@@ -885,6 +906,14 @@ class GuardianModeViewModel(
                 )
             }
         }
+    }
+
+    private fun refreshCurrentDate(): LocalDate {
+        val today = LocalDate.now()
+        if (currentDate.value != today) {
+            currentDate.value = today
+        }
+        return today
     }
 
     fun requestEditRoutineSetName(routineSetId: String) {
@@ -1465,6 +1494,7 @@ class GuardianModeViewModel(
             when (_uiState.value.pinMode) {
                 GuardianPinMode.Enter -> {
                     if (appSettingsRepository.verifyGuardianPin(pin)) {
+                        refreshCurrentDate()
                         _uiState.update {
                             val nextState = it.copy(
                                 isAuthenticated = true,
@@ -1482,6 +1512,7 @@ class GuardianModeViewModel(
                 }
                 GuardianPinMode.Setup -> {
                     val recoveryCode = appSettingsRepository.setGuardianPin(pin)
+                    refreshCurrentDate()
                     _uiState.update {
                         it.copy(
                             isAuthenticated = true,
@@ -1724,12 +1755,19 @@ private fun backupErrorMessage(error: Throwable): String = when (error) {
 
 private data class GuardianRepositorySnapshot(
     val settings: AppSettings,
+    val today: LocalDate,
     val visibleRoutineSets: List<RoutineSet>,
     val todayRoutineSetId: String?,
     val recordRoutineSets: List<RoutineSet>,
     val dailyLogs: List<DailyLog>,
     val allDailyLogs: List<DailyLog>,
     val recordsEndDate: LocalDate,
+)
+
+private data class TodayRoutineSelectionSnapshot(
+    val date: LocalDate,
+    val routineSets: List<RoutineSet>,
+    val todayRoutineSetId: String?,
 )
 
 private data class GuardianRecordsResult(
@@ -1784,6 +1822,7 @@ private fun buildGuardianRecordDetail(
     selectedDate: LocalDate?,
     routineSets: List<RoutineSet>,
     dailyLogs: List<DailyLog>,
+    routineSetForSelectedDate: RoutineSet? = null,
 ): GuardianRecordsResult {
     val date = selectedDate ?: LocalDate.now()
     val logs = if (selectedDate == null) emptyList() else dailyLogs.filter { it.date == selectedDate }
@@ -1796,6 +1835,7 @@ private fun buildGuardianRecordDetail(
         logs = logs,
         routineSetsById = routineSetsById,
         routinesById = routinesById,
+        fallbackRoutineSet = routineSetForSelectedDate,
     )
     val summary = GuardianRecordDay(
         date = date,
@@ -1811,8 +1851,26 @@ private fun buildGuardianRecordRoutines(
     logs: List<DailyLog>,
     routineSetsById: Map<String, RoutineSet>,
     routinesById: Map<String, Routine>,
+    fallbackRoutineSet: RoutineSet? = null,
 ): List<GuardianRecordRoutine> {
-    if (logs.isEmpty()) return emptyList()
+    if (logs.isEmpty()) {
+        return fallbackRoutineSet
+            ?.routines
+            .orEmpty()
+            .filter { it.existedOn(date) && it.deletedAt == null && it.isActive }
+            .sortedWith(compareBy<Routine> { it.order }.thenBy { it.createdAt }.thenBy { it.id })
+            .map { routine ->
+                GuardianRecordRoutine(
+                    routineId = routine.id,
+                    title = routine.title.resolve(null, Locale.getDefault().toLanguageTag()),
+                    isCompleted = false,
+                    completedAt = null,
+                    isDeleted = false,
+                    isInactive = false,
+                    isMissing = false,
+                )
+            }
+    }
     val logsByRoutineId = logs.associateBy(DailyLog::routineId)
     val loggedRoutineSetRoutines = logs
         .mapNotNull { routineSetsById[it.routineSetId] }

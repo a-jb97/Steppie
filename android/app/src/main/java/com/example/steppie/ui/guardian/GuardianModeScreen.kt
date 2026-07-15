@@ -2770,7 +2770,7 @@ private fun GuardianRecordsDetail(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = SteppieTheme.typography.guardianTitle,
         )
-        if (!summary.hasRecords) {
+        if (summary.totalCount == 0) {
             Text(
                 text = stringResource(R.string.guardian_records_empty_date),
                 color = MaterialTheme.colorScheme.onSurface,
