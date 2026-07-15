@@ -22,6 +22,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var childViewModel: ChildRoutineViewModel
     @State private var guardianViewModel: GuardianModeViewModel
+    @State private var tutorialCoordinator = TutorialCoordinator()
     @State private var appMode: SteppieAppMode = .child
     @State private var pinPurpose: GuardianPINPurpose?
     @State private var pinFlow: GuardianPINFlow?
@@ -64,11 +65,13 @@ struct ContentView: View {
             case .child:
                 ChildRoutineView(
                     viewModel: childViewModel,
+                    tutorialCoordinator: tutorialCoordinator,
                     onGuardianEntryRequested: beginGuardianEntry
                 )
             case .guardian:
                 GuardianModeView(
                     viewModel: guardianViewModel,
+                    tutorialCoordinator: tutorialCoordinator,
                     onDone: exitGuardianMode,
                     onInteraction: resetGuardianInactivityTimer
                 )
@@ -216,6 +219,8 @@ struct ContentView: View {
                             guardianSheet = .recoveryCodeReset
                         }
                     )
+                    .tutorialTarget(.primary)
+                    .tutorialOverlay(coordinator: tutorialCoordinator, screen: .guardianPIN)
                 }
                 .presentationDetents([.large])
             }
@@ -246,6 +251,8 @@ struct ContentView: View {
                         guardianSheet = nil
                     }
                 )
+                .tutorialTarget(.primary)
+                .tutorialOverlay(coordinator: tutorialCoordinator, screen: .recoveryCode)
                 .presentationDetents([.medium, .large])
             }
         }
