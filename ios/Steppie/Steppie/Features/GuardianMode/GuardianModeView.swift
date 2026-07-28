@@ -88,6 +88,12 @@ struct GuardianModeView: View {
             }
             .presentationDetents([.medium])
         }
+        .sheet(item: routineSetScheduleDraftBinding) { _ in
+            NavigationStack {
+                routineSetScheduleEditor
+            }
+            .presentationDetents([.medium])
+        }
         .sheet(isPresented: $isRecordCalendarDatePickerPresented) {
             recordCalendarDatePickerSheet
                 .presentationDetents([.medium])
@@ -940,8 +946,8 @@ struct GuardianModeView: View {
 
             if viewModel.isEditingRoutineSets {
                 routineSetEditActions(for: routineSet)
-            } else if isSelected || viewModel.isRoutineSetAssignedToday(routineSet) {
-                todayRoutineSetAction(for: routineSet)
+            } else {
+                dailyRoutineSetAction(for: routineSet)
             }
         }
         .padding(SteppieSpacing.small)
@@ -958,20 +964,45 @@ struct GuardianModeView: View {
     }
 
     @ViewBuilder
-    private func todayRoutineSetAction(for routineSet: RoutineSet) -> some View {
-        if viewModel.isRoutineSetAssignedToday(routineSet) {
-            Text("현재 사용 중")
-                .steppieTextStyle(.guardianCaption)
-                .foregroundStyle(Color.steppieFocusRing)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(minWidth: SteppieLayout.guardianMinimumTouchTarget, minHeight: SteppieLayout.guardianMinimumTouchTarget)
-                .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 현재 사용 중"))
+    private func dailyRoutineSetAction(for routineSet: RoutineSet) -> some View {
+        if let startTime = routineSet.dailyStartTime {
+            VStack(spacing: SteppieSpacing.twoExtraSmall) {
+                Button {
+                    viewModel.beginScheduleRoutineSet(routineSet)
+                    onInteraction()
+                } label: {
+                    Text(startTime.description)
+                        .steppieTextStyle(.button)
+                        .foregroundStyle(Color.steppieFocusRing)
+                        .frame(
+                            minWidth: SteppieLayout.guardianMinimumTouchTarget,
+                            minHeight: SteppieLayout.guardianMinimumTouchTarget
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 매일 \(startTime.description) 시작, 시간 변경"))
+
+                Button {
+                    viewModel.removeRoutineSetFromDailySchedule(routineSet)
+                    onInteraction()
+                } label: {
+                    Text("제외")
+                        .steppieTextStyle(.guardianCaption)
+                        .foregroundStyle(Color.steppieDanger)
+                        .frame(
+                            minWidth: SteppieLayout.guardianMinimumTouchTarget,
+                            minHeight: SteppieLayout.guardianMinimumTouchTarget
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 매일 루틴에서 제외"))
+            }
         } else {
             Button {
-                viewModel.assignRoutineSetForToday(routineSet)
+                viewModel.beginScheduleRoutineSet(routineSet)
                 onInteraction()
             } label: {
-                Text("설정")
+                Text("매일 사용")
                     .steppieTextStyle(.button)
                     .foregroundStyle(Color.steppieBackgroundPrimary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -981,7 +1012,7 @@ struct GuardianModeView: View {
                     .clipShape(.rect(cornerRadius: SteppieCornerRadius.control))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 오늘 루틴으로 설정"))
+            .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 매일 루틴에 추가"))
         }
     }
 
@@ -989,7 +1020,7 @@ struct GuardianModeView: View {
         HStack(alignment: .top, spacing: SteppieSpacing.medium) {
             header(
                 title: "루틴 관리",
-                subtitle: "편집할 루틴 세트를 선택합니다"
+                subtitle: "여러 세트를 매일 사용할 시간과 함께 선택합니다"
             )
             Button(viewModel.isEditingRoutineSets ? "완료" : "편집") {
                 viewModel.toggleRoutineSetEditing()
@@ -1063,6 +1094,40 @@ struct GuardianModeView: View {
                         state: viewModel.routineSetNameDraft?.isValid == true ? .enabled : .disabled
                     ) {
                         viewModel.saveRoutineSetName(localeIdentifier: localeIdentifier)
+                        onInteraction()
+                    }
+                }
+            }
+            .padding(SteppieLayout.guardianScreenPadding)
+        }
+        .background(Color.steppieBackgroundSecondary)
+    }
+
+    private var routineSetScheduleEditor: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
+                header(
+                    title: "매일 루틴 시간",
+                    subtitle: "현재 세트를 마친 뒤 이 시간이 되면 자동으로 시작합니다"
+                )
+                labeledCard("시작 시각") {
+                    DatePicker(
+                        "시작 시각",
+                        selection: routineSetScheduleDateBinding,
+                        displayedComponents: .hourAndMinute
+                    )
+                    .datePickerStyle(.wheel)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel(Text("루틴 세트 시작 시각"))
+                }
+                HStack(spacing: SteppieSpacing.medium) {
+                    SteppieButton("취소", role: .secondary) {
+                        viewModel.cancelRoutineSetSchedule()
+                        onInteraction()
+                    }
+                    SteppieButton("저장") {
+                        viewModel.saveRoutineSetSchedule()
                         onInteraction()
                     }
                 }
@@ -2904,6 +2969,37 @@ struct GuardianModeView: View {
         Binding(
             get: { viewModel.routineSetNameDraft },
             set: { if $0 == nil { viewModel.routineSetNameDraft = nil } }
+        )
+    }
+
+    private var routineSetScheduleDraftBinding: Binding<RoutineSetScheduleDraft?> {
+        Binding(
+            get: { viewModel.routineSetScheduleDraft },
+            set: { if $0 == nil { viewModel.cancelRoutineSetSchedule() } }
+        )
+    }
+
+    private var routineSetScheduleDateBinding: Binding<Date> {
+        Binding(
+            get: {
+                guard let time = viewModel.routineSetScheduleDraft?.startTime else {
+                    return Date()
+                }
+                return Calendar.current.date(
+                    bySettingHour: time.hour,
+                    minute: time.minute,
+                    second: 0,
+                    of: Date()
+                ) ?? Date()
+            },
+            set: { date in
+                let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+                guard let hour = components.hour,
+                      let minute = components.minute,
+                      let time = try? LocalTime(hour: hour, minute: minute) else { return }
+                viewModel.routineSetScheduleDraft?.startTime = time
+                onInteraction()
+            }
         )
     }
 
