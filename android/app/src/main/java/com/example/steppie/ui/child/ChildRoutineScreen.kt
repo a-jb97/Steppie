@@ -190,6 +190,8 @@ private fun PhoneFocusView(
             },
             subtitle = if (state.feedbackRoutine != null) {
                 stringResource(R.string.child_feedback_subtitle)
+            } else if (state.isRoutineSetLocked) {
+                stringResource(R.string.child_locked_set_subtitle, state.waitingUntil?.toString().orEmpty())
             } else {
                 stringResource(R.string.child_focus_subtitle)
             },
@@ -206,6 +208,10 @@ private fun PhoneFocusView(
                 feedbackIntensity = state.feedbackIntensity,
                 modifier = Modifier.weightlessFill(),
             )
+            state.isWaiting -> WaitingRoutineContent(
+                state = state,
+                modifier = Modifier.weightlessFill(),
+            )
             else -> EmptyRoutineContent(modifier = Modifier.weightlessFill())
         }
         if (state.undoRoutine != null) {
@@ -219,6 +225,8 @@ private fun PhoneFocusView(
             val nextRoutine = state.nextIncompleteRoutine
             if (nextRoutine != null) {
                 NextRoutinePreview(routine = nextRoutine, onClick = onAdvanceFromFeedback)
+            } else if (state.hasRemainingSchedule) {
+                ContinueSchedulePreview(onClick = onAdvanceFromFeedback)
             } else {
                 AllCompletePreview(onClick = onAdvanceFromFeedback)
             }
@@ -362,6 +370,9 @@ private fun SplitRoutineLayout(
                         if (nextRoutine != null) {
                             Spacer(Modifier.size(SteppieSpacing.Medium))
                             NextRoutinePreview(routine = nextRoutine, onClick = onAdvanceFromFeedback)
+                        } else if (state.hasRemainingSchedule) {
+                            Spacer(Modifier.size(SteppieSpacing.Medium))
+                            ContinueSchedulePreview(onClick = onAdvanceFromFeedback)
                         } else {
                             Spacer(Modifier.size(SteppieSpacing.Medium))
                             AllCompletePreview(onClick = onAdvanceFromFeedback)
@@ -369,6 +380,7 @@ private fun SplitRoutineLayout(
                     }
                 }
                 state.isAllComplete -> AllCompleteContent(feedbackIntensity = state.feedbackIntensity)
+                state.isWaiting -> WaitingRoutineContent(state)
                 else -> EmptyRoutineContent()
             }
         }
@@ -462,6 +474,8 @@ private fun FocusRoutineContent(
             ""
         } else if (isCompleted) {
             null
+        } else if (state.isRoutineSetLocked) {
+            stringResource(R.string.child_locked_set_hint, state.waitingUntil?.toString().orEmpty())
         } else if (isCurrent) {
             stringResource(R.string.child_focus_tap_hint)
         } else {
@@ -523,7 +537,11 @@ private fun RoutineList(
                 onClick = { onSelectRoutine(routine.id) },
                 modifier = Modifier.testTag("routine_${routine.id}"),
                 cardColor = routine.cardColor(),
-                meta = routine.listMeta(isCurrent, isCompleted),
+                meta = routine.listMeta(
+                    isCurrent = isCurrent,
+                    isCompleted = isCompleted,
+                    lockedUntil = state.waitingUntil.takeIf { state.isRoutineSetLocked },
+                ),
             ) {
                 RoutineIcon(icon = routine.icon, focus = false, modifier = Modifier.fillMaxSize())
             }
@@ -540,10 +558,15 @@ private fun Routine.localizedTitle(): String {
 }
 
 @Composable
-private fun Routine.listMeta(isCurrent: Boolean, isCompleted: Boolean): String {
+private fun Routine.listMeta(
+    isCurrent: Boolean,
+    isCompleted: Boolean,
+    lockedUntil: java.time.LocalTime? = null,
+): String {
     val orderLabel = order + 1
     return when {
         isCompleted -> stringResource(R.string.routine_state_completed)
+        lockedUntil != null -> stringResource(R.string.child_locked_set_hint, lockedUntil.toString())
         isCurrent -> stringResource(R.string.routine_meta_current, orderLabel)
         scheduledTime != null -> stringResource(
             R.string.routine_meta_scheduled,
@@ -684,6 +707,32 @@ private fun AllCompletePreview(onClick: () -> Unit) {
                 maxLines = 2,
             )
         }
+    }
+}
+
+@Composable
+private fun ContinueSchedulePreview(onClick: () -> Unit) {
+    val description = stringResource(R.string.child_continue_schedule)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = SteppieLayout.ChildMinimumTouchTarget)
+            .clip(RoundedCornerShape(SteppieCornerRadius.Card))
+            .background(SteppieTheme.colors.cardSky)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics {
+                contentDescription = description
+                role = Role.Button
+            }
+            .padding(SteppieSpacing.Medium),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = description,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = SteppieTheme.typography.button,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -951,6 +1000,45 @@ private fun EmptyRoutineContent(modifier: Modifier = Modifier) {
             style = SteppieTheme.typography.childListTitle,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+private fun WaitingRoutineContent(
+    state: ChildRoutineUiState,
+    modifier: Modifier = Modifier,
+) {
+    val setName = state.waitingRoutineSet
+        ?.name
+        ?.resolve(null, Locale.getDefault().toLanguageTag())
+        .orEmpty()
+    val startTime = state.waitingUntil?.toString().orEmpty()
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 240.dp)
+            .semantics {
+                contentDescription = "$setName, $startTime"
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+        ) {
+            Text(
+                text = stringResource(R.string.child_waiting_title),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = SteppieTheme.typography.childListTitle,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = stringResource(R.string.child_waiting_message, startTime, setName),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = SteppieTheme.typography.childProgress,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

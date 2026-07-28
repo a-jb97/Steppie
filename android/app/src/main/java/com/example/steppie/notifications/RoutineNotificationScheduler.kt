@@ -36,6 +36,7 @@ class AndroidRoutineNotificationScheduler(
 ) : RoutineNotificationScheduler {
     private val appContext = context.applicationContext
     private val alarmManager = appContext.getSystemService(AlarmManager::class.java)
+    private val knownRoutineIds = mutableSetOf<String>()
 
     override fun reconcileToday(
         routines: List<Routine>,
@@ -44,7 +45,10 @@ class AndroidRoutineNotificationScheduler(
         now: Instant,
         date: LocalDate,
     ) {
-        cancelKnownRequests(routines)
+        val currentRoutineIds = routines.mapTo(mutableSetOf(), Routine::id)
+        cancelKnownRequests(knownRoutineIds + currentRoutineIds)
+        knownRoutineIds.clear()
+        knownRoutineIds += currentRoutineIds
         if (!appContext.canPostNotifications()) return
 
         planner.requestsForToday(
@@ -64,12 +68,12 @@ class AndroidRoutineNotificationScheduler(
         )
     }
 
-    private fun cancelKnownRequests(routines: List<Routine>) {
-        routines.forEach { routine ->
+    private fun cancelKnownRequests(routineIds: Collection<String>) {
+        routineIds.forEach { routineId ->
             KnownLeadMinutes.forEach { leadMinutes ->
                 alarmManager.cancel(
                     pendingIntentFor(
-                        routineId = routine.id,
+                        routineId = routineId,
                         leadMinutes = leadMinutes,
                         flags = PendingIntent.FLAG_NO_CREATE,
                     ) ?: return@forEach,

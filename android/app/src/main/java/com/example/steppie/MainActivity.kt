@@ -174,9 +174,14 @@ class MainActivity : ComponentActivity() {
                         notificationPermissionRefresh += 1
                     }
                 }
-                LaunchedEffect(childState.routines, childState.completedRoutineIds, settings, notificationPermissionRefresh) {
+                LaunchedEffect(
+                    childState.scheduledRoutines,
+                    childState.completedRoutineIds,
+                    settings,
+                    notificationPermissionRefresh,
+                ) {
                     notificationScheduler.reconcileToday(
-                        routines = childState.routines,
+                        routines = childState.scheduledRoutines,
                         completedRoutineIds = childState.completedRoutineIds,
                         settings = settings,
                     )
@@ -260,6 +265,7 @@ class MainActivity : ComponentActivity() {
                         onToggleRoutineSetListEditing = guardianViewModel::toggleRoutineSetListEditing,
                         onSelectRoutineSet = guardianViewModel::selectRoutineSet,
                         onSetRoutineSetForToday = guardianViewModel::setRoutineSetForToday,
+                        onRoutineSetStartTimeChange = guardianViewModel::updateRoutineSetStartTime,
                         onDismissDailyRoutineSelectionPrompt = guardianViewModel::dismissDailyRoutineSelectionPrompt,
                         onRequestEditRoutineSetName = guardianViewModel::requestEditRoutineSetName,
                         onEditingRoutineSetNameChange = guardianViewModel::updateEditingRoutineSetName,
