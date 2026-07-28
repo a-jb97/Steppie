@@ -140,6 +140,7 @@ fun GuardianModeScreen(
     onToggleRoutineSetListEditing: () -> Unit,
     onSelectRoutineSet: (String) -> Unit,
     onSetRoutineSetForToday: (String) -> Unit = {},
+    onRoutineSetStartTimeChange: (String, String) -> Unit = { _, _ -> },
     onDismissDailyRoutineSelectionPrompt: () -> Unit = {},
     onRequestEditRoutineSetName: (String) -> Unit,
     onEditingRoutineSetNameChange: (String) -> Unit,
@@ -260,6 +261,7 @@ fun GuardianModeScreen(
                         onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
                         onSelectRoutineSet = onSelectRoutineSet,
                         onSetRoutineSetForToday = onSetRoutineSetForToday,
+                        onRoutineSetStartTimeChange = onRoutineSetStartTimeChange,
                         onRequestEditRoutineSetName = onRequestEditRoutineSetName,
                         onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
                         onRequestDelete = onRequestDelete,
@@ -276,6 +278,7 @@ fun GuardianModeScreen(
                         onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
                         onSelectRoutineSet = onSelectRoutineSet,
                         onSetRoutineSetForToday = onSetRoutineSetForToday,
+                        onRoutineSetStartTimeChange = onRoutineSetStartTimeChange,
                         onRequestEditRoutineSetName = onRequestEditRoutineSetName,
                         onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
                         onRequestDelete = onRequestDelete,
@@ -1145,6 +1148,7 @@ private fun GuardianRoutineEditScreen(
     onToggleRoutineSetListEditing: () -> Unit,
     onSelectRoutineSet: (String) -> Unit,
     onSetRoutineSetForToday: (String) -> Unit,
+    onRoutineSetStartTimeChange: (String, String) -> Unit,
     onRequestEditRoutineSetName: (String) -> Unit,
     onRequestDeleteRoutineSet: (String) -> Unit,
     onRequestDelete: (String) -> Unit,
@@ -1184,6 +1188,24 @@ private fun GuardianRoutineEditScreen(
             onRequestEditRoutineSetName = onRequestEditRoutineSetName,
             onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
         )
+        state.activeRoutineSet?.let { selectedSet ->
+            Column(
+                modifier = Modifier.padding(top = SteppieSpacing.Small),
+                verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+            ) {
+                Text(
+                    text = stringResource(R.string.guardian_routine_set_start_time_title),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = SteppieTheme.typography.guardianTitle,
+                )
+                ScheduledTimePicker(
+                    scheduledTime = selectedSet.startTime?.toStorageString().orEmpty(),
+                    onScheduledTimeChange = { value ->
+                        onRoutineSetStartTimeChange(selectedSet.id, value)
+                    },
+                )
+            }
+        }
         if (state.activeRoutineSet != null) {
             Column(
                 modifier = Modifier.padding(top = SteppieSpacing.Medium + SteppieSpacing.TwoExtraSmall),
@@ -1247,7 +1269,7 @@ private fun RoutineSetList(
             RoutineSetRow(
                 routineSet = routineSet,
                 selected = routineSet.id == selectedRoutineSetId,
-                setForToday = routineSet.id == todayRoutineSetId,
+                setForToday = routineSet.isActive,
                 editing = editing,
                 onSelect = { onSelectRoutineSet(routineSet.id) },
                 onSetForToday = { onSetRoutineSetForToday(routineSet.id) },
@@ -1271,10 +1293,15 @@ private fun RoutineSetRow(
 ) {
     val borderColor = if (selected) SteppieTheme.colors.warning else MaterialTheme.colorScheme.outline
     val routineSetName = routineSet.name.resolve(null, Locale.getDefault().toLanguageTag())
-    val meta = stringResource(
-        if (setForToday) R.string.guardian_routine_set_today_meta else R.string.guardian_routine_set_meta,
-        routineSet.routines.size,
-    )
+    val meta = if (routineSet.isActive) {
+        stringResource(
+            R.string.guardian_routine_set_schedule_meta,
+            routineSet.startTime?.formatLocalizedTime() ?: stringResource(R.string.guardian_time_none),
+            routineSet.routines.size,
+        )
+    } else {
+        stringResource(R.string.guardian_routine_set_meta, routineSet.routines.size)
+    }
     val selectionState = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
     val accessibilityDescription = stringResource(R.string.a11y_routine_set_row, routineSetName, meta)
     Row(
@@ -1338,9 +1365,15 @@ private fun RoutineSetRow(
                 onClick = onDelete,
                 danger = true,
             )
-        } else if (selected && !setForToday) {
+        } else {
             SteppieButton(
-                label = stringResource(R.string.guardian_routine_set_set_today),
+                label = stringResource(
+                    if (setForToday) {
+                        R.string.guardian_routine_set_disable_daily
+                    } else {
+                        R.string.guardian_routine_set_enable_daily
+                    },
+                ),
                 onClick = onSetForToday,
                 style = SteppieButtonStyle.Secondary,
             )
@@ -1720,6 +1753,7 @@ private fun GuardianRoutineSplitScreen(
     onToggleRoutineSetListEditing: () -> Unit,
     onSelectRoutineSet: (String) -> Unit,
     onSetRoutineSetForToday: (String) -> Unit,
+    onRoutineSetStartTimeChange: (String, String) -> Unit,
     onRequestEditRoutineSetName: (String) -> Unit,
     onRequestDeleteRoutineSet: (String) -> Unit,
     onRequestDelete: (String) -> Unit,
@@ -1741,6 +1775,7 @@ private fun GuardianRoutineSplitScreen(
                 onToggleRoutineSetListEditing = onToggleRoutineSetListEditing,
                 onSelectRoutineSet = onSelectRoutineSet,
                 onSetRoutineSetForToday = onSetRoutineSetForToday,
+                onRoutineSetStartTimeChange = onRoutineSetStartTimeChange,
                 onRequestEditRoutineSetName = onRequestEditRoutineSetName,
                 onRequestDeleteRoutineSet = onRequestDeleteRoutineSet,
                 onRequestDelete = onRequestDelete,
@@ -2487,7 +2522,6 @@ private fun GuardianRecordsCalendarScreen(
         Spacer(Modifier.height(SteppieSpacing.Large))
     }
 }
-
 @Composable
 private fun GuardianRecordsCalendarPanel(
     state: GuardianModeUiState,

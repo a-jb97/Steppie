@@ -20,6 +20,11 @@
     <string name="child_list_title">오늘의 순서</string>
     <string name="child_list_subtitle">위아래로만 움직여요</string>
     <string name="child_empty_title">오늘 할 일이 없어요</string>
+    <string name="child_waiting_title">다음 루틴을 기다려요</string>
+    <string name="child_waiting_message">%1$s에 %2$s을 시작해요</string>
+    <string name="child_continue_schedule">다음 루틴 확인하기</string>
+    <string name="child_locked_set_subtitle">%1$s부터 완료할 수 있어요</string>
+    <string name="child_locked_set_hint">%1$s 시작 전에는 완료할 수 없어요</string>
     <string name="child_progress_label">%1$d/%2$d</string>
     <string name="routine_meta_current">%1$d · 지금</string>
     <string name="routine_meta_scheduled">%1$d · %2$s</string>
@@ -211,6 +216,10 @@
     <string name="guardian_routine_set_active_meta">사용 중 · 단계 %1$d개</string>
     <string name="guardian_routine_set_today_meta">오늘 설정됨 · 단계 %1$d개</string>
     <string name="guardian_routine_set_set_today">설정</string>
+    <string name="guardian_routine_set_enable_daily">매일 진행</string>
+    <string name="guardian_routine_set_disable_daily">진행 제외</string>
+    <string name="guardian_routine_set_start_time_title">선택한 루틴 세트 시작 시간</string>
+    <string name="guardian_routine_set_schedule_meta">%1$s · 단계 %2$d개</string>
     <string name="guardian_daily_routine_prompt_title">오늘의 루틴을 선택해 주세요</string>
     <string name="guardian_daily_routine_prompt_body">저장된 루틴 세트 중 하나를 선택하면 오늘의 루틴으로 설정됩니다.</string>
     <string name="guardian_active_routine_steps_title">%1$s</string>

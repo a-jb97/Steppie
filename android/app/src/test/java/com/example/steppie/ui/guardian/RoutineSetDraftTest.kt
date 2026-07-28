@@ -34,7 +34,7 @@ class RoutineSetDraftTest {
         )
 
         assertEquals("주말 루틴", routineSet.name.values["ko"])
-        assertEquals(true, routineSet.isActive)
+        assertEquals(false, routineSet.isActive)
         assertEquals(listOf(0, 1), routineSet.routines.map { it.order })
         assertEquals(listOf(routineSet.id, routineSet.id), routineSet.routines.map { it.routineSetId })
         assertEquals(LocalTime.of(8, 30), routineSet.routines.first().scheduledTime)
