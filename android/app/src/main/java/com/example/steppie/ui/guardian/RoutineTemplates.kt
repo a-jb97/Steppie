@@ -28,7 +28,7 @@ data class RoutineTemplate(
         return RoutineSet(
             id = routineSetId,
             name = name,
-            isActive = true,
+            isActive = false,
             createdAt = now,
             updatedAt = now,
             routines = steps.mapIndexed { index, step ->

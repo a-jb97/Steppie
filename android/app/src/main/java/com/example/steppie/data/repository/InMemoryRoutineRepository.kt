@@ -37,6 +37,20 @@ class InMemoryRoutineRepository(
         return state.map { it[id]?.takeIf { set -> set.deletedAt == null }?.let(::visible) }.distinctUntilChanged()
     }
 
+    override fun observeRoutineSetsForDate(date: LocalDate): Flow<List<RoutineSet>> = state
+        .map { sets ->
+            sets.values
+                .filter { it.deletedAt == null && it.isActive }
+                .map(::visible)
+                .sortedWith(
+                    compareBy<RoutineSet> { it.startTime != null }
+                        .thenBy { it.startTime }
+                        .thenBy { it.createdAt }
+                        .thenBy { it.id },
+                )
+        }
+        .distinctUntilChanged()
+
     override fun observeRoutineSetForDate(date: LocalDate): Flow<RoutineSet?> = combine(selections, state) { selected, sets ->
             selected[date]?.let { id -> sets[id]?.takeIf { it.deletedAt == null }?.let(::visible) }
         }
@@ -65,8 +79,7 @@ class InMemoryRoutineRepository(
 
     override suspend fun createRoutineSet(routineSet: RoutineSet): RoutineSet = mutex.withLock {
         check(routineSet.id !in state.value) { "RoutineSet already exists: ${routineSet.id}" }
-        val updated = if (routineSet.isActive) deactivateOthers(state.value, routineSet.id, routineSet.updatedAt) else state.value
-        state.value = updated + (routineSet.id to routineSet)
+        state.value = state.value + (routineSet.id to routineSet)
         visible(routineSet)
     }
 
@@ -75,16 +88,8 @@ class InMemoryRoutineRepository(
         check(existing.deletedAt == null) { "Deleted RoutineSet cannot be updated." }
         check(existing.createdAt == routineSet.createdAt) { "RoutineSet.createdAt is immutable." }
         check(routineSet.updatedAt >= existing.updatedAt) { "RoutineSet.updatedAt cannot move backwards." }
-        check(!(existing.isActive && !routineSet.isActive)) {
-            "The active RoutineSet must be replaced by activating another set."
-        }
         val replacement = routineSet.copy(routines = existing.routines)
-        val updated = if (replacement.isActive) {
-            deactivateOthers(state.value, replacement.id, replacement.updatedAt)
-        } else {
-            state.value
-        }
-        state.value = updated + (replacement.id to replacement)
+        state.value = state.value + (replacement.id to replacement)
         visible(replacement)
     }
 
@@ -256,11 +261,4 @@ class InMemoryRoutineRepository(
         }
     }
 
-    private fun deactivateOthers(
-        source: Map<String, RoutineSet>,
-        exceptId: String,
-        updatedAt: Instant,
-    ): Map<String, RoutineSet> = source.mapValues { (id, set) ->
-        if (id != exceptId && set.isActive) set.copy(isActive = false, updatedAt = updatedAt) else set
-    }
 }

@@ -11,6 +11,7 @@ interface RoutineRepository {
     fun observeRoutineSets(): Flow<List<RoutineSet>>
     fun observeRoutineSetsForRecords(): Flow<List<RoutineSet>>
     fun observeRoutineSet(id: String): Flow<RoutineSet?>
+    fun observeRoutineSetsForDate(date: LocalDate): Flow<List<RoutineSet>>
     fun observeRoutineSetForDate(date: LocalDate): Flow<RoutineSet?>
     fun observeSelectedRoutineSetId(date: LocalDate): Flow<String?>
     suspend fun getRoutineSet(id: String): RoutineSet?

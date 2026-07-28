@@ -12,6 +12,8 @@ import com.example.steppie.domain.model.RoutineSet
 import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.domain.repository.RoutineRepository
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 enum class ChildSinglePane { Focus, List }
 
@@ -36,6 +39,15 @@ data class ChildRoutineUiState(
     val feedbackRoutineId: String? = null,
     val undoRoutineId: String? = null,
     val feedbackIntensity: FeedbackIntensity = FeedbackIntensity.Normal,
+    val currentRoutineSet: RoutineSet? = null,
+    val waitingRoutineSet: RoutineSet? = null,
+    val waitingUntil: LocalTime? = null,
+    val dayProgressCount: Int? = null,
+    val dayProgressTotal: Int? = null,
+    val dayAllComplete: Boolean? = null,
+    val scheduledRoutines: List<Routine> = emptyList(),
+    val hasRemainingSchedule: Boolean = false,
+    val isRoutineSetLocked: Boolean = false,
 ) {
     val selectedRoutine: Routine?
         get() = if (isAllComplete && feedbackRoutineId == null) {
@@ -48,17 +60,62 @@ data class ChildRoutineUiState(
     val undoRoutine: Routine?
         get() = routines.firstOrNull { it.id == undoRoutineId }
     val currentRoutine: Routine?
-        get() = routines.firstOrNull { it.id !in completedRoutineIds && it.id != feedbackRoutineId }
+        get() = if (isRoutineSetLocked) {
+            null
+        } else {
+            routines.firstOrNull { it.id !in completedRoutineIds && it.id != feedbackRoutineId }
+        }
     val nextIncompleteRoutine: Routine?
         get() = currentRoutine
     val isSelectedRoutineCompletable: Boolean
-        get() = feedbackRoutineId == null && selectedRoutineId != null && selectedRoutineId == currentRoutine?.id
+        get() = !isRoutineSetLocked &&
+            feedbackRoutineId == null &&
+            selectedRoutineId != null &&
+            selectedRoutineId == currentRoutine?.id
     val progressCount: Int
-        get() = routines.count { it.id in completedRoutineIds || it.id == feedbackRoutineId }
+        get() = dayProgressCount ?: routines.count { it.id in completedRoutineIds || it.id == feedbackRoutineId }
     val progressTotal: Int
-        get() = routines.size
+        get() = dayProgressTotal ?: routines.size
     val isAllComplete: Boolean
-        get() = routines.isNotEmpty() && routines.all { it.id in completedRoutineIds }
+        get() = dayAllComplete ?: (routines.isNotEmpty() && routines.all { it.id in completedRoutineIds })
+    val isWaiting: Boolean
+        get() = waitingRoutineSet != null
+}
+
+internal data class RoutineScheduleResolution(
+    val currentSet: RoutineSet?,
+    val waitingSet: RoutineSet?,
+    val allComplete: Boolean,
+)
+
+internal fun resolveRoutineSchedule(
+    routineSets: List<RoutineSet>,
+    completedRoutineIds: Set<String>,
+    now: LocalTime,
+): RoutineScheduleResolution {
+    val scheduledSets = routineSets
+        .filter { it.isActive && it.deletedAt == null }
+        .sortedWith(
+            compareBy<RoutineSet> { it.startTime != null }
+                .thenBy { it.startTime }
+                .thenBy { it.createdAt }
+                .thenBy { it.id },
+        )
+    val firstIncomplete = scheduledSets.firstOrNull { set ->
+        set.routines.any { it.isActive && it.deletedAt == null && it.id !in completedRoutineIds }
+    }
+    if (firstIncomplete == null) {
+        return RoutineScheduleResolution(
+            currentSet = null,
+            waitingSet = null,
+            allComplete = scheduledSets.isNotEmpty(),
+        )
+    }
+    return if (firstIncomplete.startTime == null || !now.isBefore(firstIncomplete.startTime)) {
+        RoutineScheduleResolution(firstIncomplete, null, false)
+    } else {
+        RoutineScheduleResolution(null, firstIncomplete, false)
+    }
 }
 
 data class ChildRoutineFeedbackEvent(
@@ -112,38 +169,52 @@ class ChildRoutineViewModel(
     private val _feedbackEvents = MutableSharedFlow<ChildRoutineFeedbackEvent>()
     val feedbackEvents: SharedFlow<ChildRoutineFeedbackEvent> = _feedbackEvents.asSharedFlow()
     private val settings = MutableStateFlow(AppSettings())
+    private val currentTime = MutableStateFlow(LocalTime.now().truncatedTo(ChronoUnit.MINUTES))
+    private var latestRoutineSets: List<RoutineSet> = emptyList()
+    private var latestCompletedIds: Set<String> = emptySet()
     private var lastGuidedRoutineId: String? = null
 
     init {
         val routineDataForDate = currentDate.flatMapLatest { date ->
             combine(
-                repository.observeRoutineSetForDate(date),
+                repository.observeRoutineSetsForDate(date),
                 repository.observeDailyLogs(date),
-            ) { routineSet, logs ->
-                ChildRoutineDateData(routineSet = routineSet, logs = logs)
+            ) { routineSets, logs ->
+                ChildRoutineDateData(routineSets = routineSets, logs = logs)
             }
         }
         viewModelScope.launch {
             combine(
                 appSettingsRepository.observeAppSettings(),
                 routineDataForDate,
-            ) { appSettings, routineData ->
+                currentTime,
+            ) { appSettings, routineData, now ->
                 settings.value = appSettings
                 val completedIds = routineData.logs
                     .filter { it.status == LogStatus.Completed }
                     .mapTo(mutableSetOf()) { it.routineId }
-                childRoutineState(
-                    routines = routineData.routineSet?.routines.orEmpty(),
+                latestRoutineSets = routineData.routineSets
+                latestCompletedIds = completedIds
+                scheduledChildRoutineState(
+                    routineSets = routineData.routineSets,
                     completedRoutineIds = completedIds,
                     selectedRoutineId = _uiState.value.selectedRoutineId,
                     singlePane = _uiState.value.singlePane,
                     feedbackRoutineId = _uiState.value.feedbackRoutineId,
                     undoRoutineId = _uiState.value.undoRoutineId,
                     feedbackIntensity = appSettings.feedbackIntensity,
+                    now = now,
                 )
             }.collectLatest { state ->
                 _uiState.value = state
                 announceSelectedRoutineIfNeeded(state)
+            }
+        }
+        viewModelScope.launch {
+            while (true) {
+                delay(30_000L)
+                refreshCurrentDate()
+                currentTime.value = LocalTime.now().truncatedTo(ChronoUnit.MINUTES)
             }
         }
     }
@@ -157,6 +228,8 @@ class ChildRoutineViewModel(
         _uiState.value = state.copy(
             selectedRoutineId = if (state.feedbackRoutineId == null) {
                 state.currentRoutine?.id
+                    ?: state.selectedRoutineId
+                    ?: state.routines.firstOrNull()?.id
             } else {
                 state.selectedRoutineId
             },
@@ -187,6 +260,7 @@ class ChildRoutineViewModel(
             undoRoutineId = routine.id,
             singlePane = ChildSinglePane.Focus,
         )
+        latestCompletedIds = latestCompletedIds + routine.id
 
         viewModelScope.launch {
             repository.completeRoutine(routine.id, actionDate)
@@ -210,11 +284,15 @@ class ChildRoutineViewModel(
     fun advanceFromFeedback() {
         val state = _uiState.value
         if (state.feedbackRoutineId == null) return
-        _uiState.value = state.copy(
-            selectedRoutineId = state.nextIncompleteRoutine?.id,
+        _uiState.value = scheduledChildRoutineState(
+            routineSets = latestRoutineSets,
+            completedRoutineIds = latestCompletedIds,
+            selectedRoutineId = null,
+            singlePane = ChildSinglePane.Focus,
             feedbackRoutineId = null,
             undoRoutineId = null,
-            singlePane = ChildSinglePane.Focus,
+            feedbackIntensity = settings.value.feedbackIntensity,
+            now = currentTime.value,
         )
         announceSelectedRoutineIfNeeded(_uiState.value)
     }
@@ -224,6 +302,7 @@ class ChildRoutineViewModel(
         val actionDate = refreshCurrentDate()
         if (actionDate != previousDate) return
         val routineId = _uiState.value.undoRoutineId ?: return
+        latestCompletedIds = latestCompletedIds - routineId
         _uiState.value = _uiState.value.copy(
             selectedRoutineId = routineId,
             feedbackRoutineId = null,
@@ -237,6 +316,7 @@ class ChildRoutineViewModel(
 
     fun onDataChanged() {
         refreshCurrentDate()
+        currentTime.value = LocalTime.now().truncatedTo(ChronoUnit.MINUTES)
         lastGuidedRoutineId = null
         _uiState.value = _uiState.value.copy(
             feedbackRoutineId = null,
@@ -246,7 +326,7 @@ class ChildRoutineViewModel(
     }
 
     private fun announceSelectedRoutineIfNeeded(state: ChildRoutineUiState) {
-        if (state.feedbackRoutineId != null) return
+        if (state.feedbackRoutineId != null || state.isRoutineSetLocked) return
         val routine = state.selectedRoutine ?: return
         if (routine.id == lastGuidedRoutineId) return
         val appSettings = settings.value
@@ -290,9 +370,55 @@ class ChildRoutineViewModel(
 }
 
 private data class ChildRoutineDateData(
-    val routineSet: RoutineSet?,
+    val routineSets: List<RoutineSet>,
     val logs: List<DailyLog>,
 )
+
+internal fun scheduledChildRoutineState(
+    routineSets: List<RoutineSet>,
+    completedRoutineIds: Set<String>,
+    selectedRoutineId: String?,
+    singlePane: ChildSinglePane,
+    feedbackRoutineId: String? = null,
+    undoRoutineId: String? = null,
+    feedbackIntensity: FeedbackIntensity = FeedbackIntensity.Normal,
+    now: LocalTime,
+): ChildRoutineUiState {
+    val feedbackSet = feedbackRoutineId?.let { id ->
+        routineSets.firstOrNull { set -> set.routines.any { it.id == id } }
+    }
+    val resolution = resolveRoutineSchedule(routineSets, completedRoutineIds, now)
+    val displaySet = feedbackSet ?: resolution.currentSet ?: resolution.waitingSet
+    val base = childRoutineState(
+        routines = displaySet?.routines.orEmpty(),
+        completedRoutineIds = completedRoutineIds,
+        selectedRoutineId = selectedRoutineId,
+        singlePane = singlePane,
+        feedbackRoutineId = feedbackRoutineId,
+        undoRoutineId = undoRoutineId,
+        feedbackIntensity = feedbackIntensity,
+    )
+    val allVisibleRoutines = routineSets
+        .filter { it.isActive && it.deletedAt == null }
+        .flatMap { set -> set.routines.filter { it.isActive && it.deletedAt == null } }
+    val progressRoutines = when {
+        displaySet != null -> displaySet.routines.filter { it.isActive && it.deletedAt == null }
+        resolution.waitingSet != null -> resolution.waitingSet.routines.filter { it.isActive && it.deletedAt == null }
+        resolution.allComplete -> allVisibleRoutines
+        else -> emptyList()
+    }
+    return base.copy(
+        currentRoutineSet = feedbackSet ?: resolution.currentSet,
+        waitingRoutineSet = if (feedbackSet == null) resolution.waitingSet else null,
+        waitingUntil = if (feedbackSet == null) resolution.waitingSet?.startTime else null,
+        dayProgressCount = progressRoutines.count { it.id in completedRoutineIds || it.id == feedbackRoutineId },
+        dayProgressTotal = progressRoutines.size,
+        dayAllComplete = resolution.allComplete && feedbackRoutineId == null,
+        scheduledRoutines = allVisibleRoutines,
+        hasRemainingSchedule = !resolution.allComplete,
+        isRoutineSetLocked = feedbackSet == null && resolution.waitingSet != null,
+    )
+}
 
 private fun FeedbackIntensity.allowsHaptic(): Boolean = this == FeedbackIntensity.Strong || this == FeedbackIntensity.Normal
 

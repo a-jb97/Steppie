@@ -12,6 +12,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -35,6 +36,7 @@ class BackupArchiveTest {
         assertEquals(1, read.snapshot.routines.size)
         assertEquals(1, read.snapshot.dailyLogs.size)
         assertEquals("pin-hash", read.snapshot.appSettings.guardianPinHash)
+        assertEquals("08:00", read.snapshot.routineSets.single().startTime)
     }
 
     @Test
@@ -113,6 +115,7 @@ class BackupArchiveTest {
             id = routineSetId,
             name = LocalizedText(mapOf("ko" to "아침", "en" to "Morning")),
             isActive = true,
+            startTime = LocalTime.of(8, 0),
             createdAt = now,
             updatedAt = now,
         )

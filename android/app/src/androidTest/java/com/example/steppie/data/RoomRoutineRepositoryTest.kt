@@ -187,20 +187,21 @@ class RoomRoutineRepositoryTest {
 
 
     @Test
-    fun routineSetCrud_enforcesSingleActiveSetAndSoftDeleteRule() = runBlocking {
+    fun routineSetCrud_allowsMultipleActiveSetsAndSoftDeleteRule() = runBlocking {
         val first = repository.createRoutineSet(testSet(active = true))
         val secondId = "30000000-0000-4000-8000-000000000002"
         val second = repository.createRoutineSet(testSet(id = secondId, active = true))
 
-        assertEquals(false, repository.getRoutineSet(first.id)?.isActive)
+        assertEquals(true, repository.getRoutineSet(first.id)?.isActive)
         assertEquals(true, repository.getRoutineSet(second.id)?.isActive)
 
+        repository.updateRoutineSet(first.copy(isActive = false, updatedAt = Instant.parse("2026-01-01T03:00:00Z")))
         repository.deleteRoutineSet(first.id, Instant.parse("2026-01-01T04:00:00Z"))
         assertNull(repository.getRoutineSet(first.id))
     }
 
     @Test
-    fun createRoutineSet_persistsInitialRoutinesAndMakesNewSetActive() = runBlocking {
+    fun createRoutineSet_persistsInitialRoutinesWithoutDeactivatingExistingSet() = runBlocking {
         val first = repository.createRoutineSet(testSet(active = true))
         val secondId = "30000000-0000-4000-8000-000000000003"
         val created = repository.createRoutineSet(
@@ -212,7 +213,7 @@ class RoomRoutineRepositoryTest {
             ),
         )
 
-        assertEquals(false, repository.getRoutineSet(first.id)?.isActive)
+        assertEquals(true, repository.getRoutineSet(first.id)?.isActive)
         assertEquals(true, created.isActive)
         assertEquals(listOf(0, 1), created.routines.map { it.order })
         assertEquals(listOf(secondId, secondId), created.routines.map { it.routineSetId })

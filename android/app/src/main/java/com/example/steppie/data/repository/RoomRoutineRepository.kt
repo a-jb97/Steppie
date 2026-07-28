@@ -35,6 +35,18 @@ class RoomRoutineRepository(
         return dao.observeRoutineSet(id).map { it?.toDomain() }
     }
 
+    override fun observeRoutineSetsForDate(date: LocalDate): Flow<List<RoutineSet>> =
+        dao.observeRoutineSets().map { sets ->
+            sets.map { it.toDomain() }
+                .filter(RoutineSet::isActive)
+                .sortedWith(
+                    compareBy<RoutineSet> { it.startTime != null }
+                        .thenBy { it.startTime }
+                        .thenBy { it.createdAt }
+                        .thenBy { it.id },
+                )
+        }
+
     override fun observeRoutineSetForDate(date: LocalDate): Flow<RoutineSet?> =
         combine(
             dao.observeDailyRoutineSelection(date.toString()),
@@ -70,9 +82,6 @@ class RoomRoutineRepository(
 
     override suspend fun createRoutineSet(routineSet: RoutineSet): RoutineSet = database.withTransaction {
         check(dao.getRoutineSetEntity(routineSet.id) == null) { "RoutineSet already exists: ${routineSet.id}" }
-        if (routineSet.isActive) {
-            dao.deactivateOtherRoutineSets(routineSet.id, routineSet.updatedAt.toEpochMilli())
-        }
         dao.insertRoutineSet(routineSet.toEntity())
         routineSet.routines.sortedBy(Routine::order).forEach { dao.insertRoutine(it.toEntity()) }
         requireNotNull(dao.getRoutineSet(routineSet.id)).toDomain()
@@ -88,12 +97,6 @@ class RoomRoutineRepository(
         }
         check(routineSet.updatedAt.toEpochMilli() >= existing.updatedAtEpochMillis) {
             "RoutineSet.updatedAt cannot move backwards."
-        }
-        check(!(existing.isActive && !routineSet.isActive && dao.getActiveRoutineSetId() == routineSet.id)) {
-            "The active RoutineSet must be replaced by activating another set."
-        }
-        if (routineSet.isActive) {
-            dao.deactivateOtherRoutineSets(routineSet.id, routineSet.updatedAt.toEpochMilli())
         }
         dao.updateRoutineSet(routineSet.copy(routines = emptyList()).toEntity())
         requireNotNull(dao.getRoutineSet(routineSet.id)).toDomain()

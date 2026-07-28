@@ -15,6 +15,7 @@ data class RoutineSetEntity(
     @PrimaryKey val id: String,
     val localizedName: String,
     val isActive: Boolean,
+    val startTime: String?,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
     val deletedAtEpochMillis: Long?,

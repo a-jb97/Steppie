@@ -26,7 +26,7 @@ class RoutineTemplatesTest {
     fun `instantiating template creates new active routine set with consecutive routine order`() {
         val routineSet = requireNotNull(RoutineTemplates.find(RoutineTemplateId.Morning)).instantiate(now)
 
-        assertEquals(true, routineSet.isActive)
+        assertEquals(false, routineSet.isActive)
         assertEquals(listOf(0, 1, 2, 3, 4, 5), routineSet.routines.map { it.order })
         assertEquals(List(routineSet.routines.size) { routineSet.id }, routineSet.routines.map { it.routineSetId })
         assertEquals(routineSet.routines.size, routineSet.routines.map { it.id }.distinct().size)

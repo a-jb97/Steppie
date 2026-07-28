@@ -708,7 +708,7 @@ class GuardianModeScreenTest {
     }
 
     @Test
-    fun routineEditShowsAllRoutineSetsHidesSetActionForTodaySetAndSelectsOne() {
+    fun routineEditShowsDailyScheduleActionsAndSelectsAnEditingTarget() {
         var selectedRoutineSetId: String? = null
 
         composeRule.setContent {
@@ -770,7 +770,8 @@ class GuardianModeScreenTest {
         composeRule.onNodeWithText("아침 루틴").assertIsDisplayed()
         composeRule.onNodeWithText("학교 루틴").assertIsDisplayed()
         composeRule.onNodeWithText("취침 루틴").assertIsDisplayed()
-        composeRule.onAllNodesWithText("설정").assertCountEquals(0)
+        composeRule.onAllNodesWithText("진행 제외").assertCountEquals(1)
+        composeRule.onAllNodesWithText("매일 진행").assertCountEquals(2)
         composeRule.onNodeWithText("학교 루틴").performClick()
 
         composeRule.runOnIdle {

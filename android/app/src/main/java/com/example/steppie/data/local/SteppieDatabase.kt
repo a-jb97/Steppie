@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DailyLogEntity::class,
         DailyRoutineSelectionEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class SteppieDatabase : RoomDatabase() {
@@ -30,7 +30,7 @@ abstract class SteppieDatabase : RoomDatabase() {
                 SteppieDatabase::class.java,
                 "steppie.db",
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
                 .also { instance = it }
         }
@@ -79,6 +79,12 @@ abstract class SteppieDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_daily_routine_selections_routineSetId` ON `daily_routine_selections` (`routineSetId`)",
                 )
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `routine_sets` ADD COLUMN `startTime` TEXT")
             }
         }
     }

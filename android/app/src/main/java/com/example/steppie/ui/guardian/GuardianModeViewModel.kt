@@ -232,7 +232,10 @@ class GuardianModeViewModel(
                         selectedDate = selectedCalendarDate,
                         routineSets = snapshot.recordRoutineSets,
                         dailyLogs = snapshot.allDailyLogs,
-                        routineSetForSelectedDate = todaySet.takeIf { selectedCalendarDate == snapshot.today },
+                        routineSetsForSelectedDate = snapshot.visibleRoutineSets
+                            .filter(RoutineSet::isActive)
+                            .takeIf { selectedCalendarDate == snapshot.today }
+                            .orEmpty(),
                     )
                     val resolvedPinMode = if (
                         state.isActive &&
@@ -472,7 +475,7 @@ class GuardianModeViewModel(
             selectedDate = today,
             routineSets = recordRoutineSetsCache,
             dailyLogs = allDailyLogsCache,
-            routineSetForSelectedDate = current.activeRoutineSet.takeIf { current.todayRoutineSetId == it?.id },
+            routineSetsForSelectedDate = current.routineSets.filter(RoutineSet::isActive),
         )
         _uiState.update {
             it.copy(
@@ -521,15 +524,16 @@ class GuardianModeViewModel(
     fun selectRecordsCalendarDate(date: LocalDate) {
         val current = _uiState.value
         val today = currentDate.value
-        val canSelectTodayRoutine = date == today && current.todayRoutineSetId != null
+        val canSelectTodayRoutine = date == today && current.routineSets.any(RoutineSet::isActive)
         if (date !in current.calendarRecordDates && !canSelectTodayRoutine) return
         val records = buildGuardianRecordDetail(
             selectedDate = date,
             routineSets = recordRoutineSetsCache,
             dailyLogs = allDailyLogsCache,
-            routineSetForSelectedDate = current.activeRoutineSet.takeIf {
-                date == today && current.todayRoutineSetId == it?.id
-            },
+            routineSetsForSelectedDate = current.routineSets
+                .filter(RoutineSet::isActive)
+                .takeIf { date == today }
+                .orEmpty(),
         )
         _uiState.update {
             it.copy(
@@ -877,7 +881,10 @@ class GuardianModeViewModel(
         val template = _uiState.value.selectedTemplate ?: return
         viewModelScope.launch {
             runCatching {
-                routineRepository.createRoutineSet(template.instantiate(Instant.now()))
+                val created = template.instantiate(Instant.now())
+                routineRepository.createRoutineSet(
+                    created.copy(isActive = _uiState.value.routineSets.none(RoutineSet::isActive)),
+                )
             }.onSuccess {
                 onDataChanged()
                 _uiState.update { state ->
@@ -930,16 +937,79 @@ class GuardianModeViewModel(
     }
 
     fun setRoutineSetForToday(routineSetId: String) {
-        if (_uiState.value.routineSets.none { it.id == routineSetId }) return
-        viewModelScope.launch {
-            val today = refreshCurrentDate()
-            routineRepository.selectRoutineSetForDate(today, routineSetId)
+        val state = _uiState.value
+        val target = state.routineSets.firstOrNull { it.id == routineSetId } ?: return
+        if (target.isActive && state.routineSets.count(RoutineSet::isActive) <= 1) {
             _uiState.update {
                 it.copy(
-                    todayRoutineSetId = routineSetId,
+                    notice = "최소 한 개의 루틴 세트는 매일 진행해야 합니다.",
+                    interactionToken = it.interactionToken + 1,
+                )
+            }
+            return
+        }
+        if (!target.isActive && target.startTime == null) {
+            _uiState.update {
+                it.copy(
+                    notice = "추가할 루틴 세트의 시작 시간을 먼저 설정해 주세요.",
+                    interactionToken = it.interactionToken + 1,
+                )
+            }
+            return
+        }
+        if (
+            !target.isActive &&
+            state.routineSets.any { it.id != target.id && it.isActive && it.startTime == target.startTime }
+        ) {
+            _uiState.update {
+                it.copy(
+                    notice = "다른 루틴 세트와 시작 시간이 같아요.",
+                    interactionToken = it.interactionToken + 1,
+                )
+            }
+            return
+        }
+        viewModelScope.launch {
+            routineRepository.updateRoutineSet(
+                target.copy(isActive = !target.isActive, updatedAt = Instant.now()),
+            )
+            _uiState.update {
+                it.copy(
                     selectedRoutineSetId = routineSetId,
                     showDailyRoutineSelectionPrompt = false,
-                    notice = "오늘의 루틴으로 설정했습니다.",
+                    notice = if (target.isActive) {
+                        "매일 진행에서 제외했습니다."
+                    } else {
+                        "매일 진행에 추가했습니다."
+                    },
+                    interactionToken = it.interactionToken + 1,
+                )
+            }
+        }
+    }
+
+    fun updateRoutineSetStartTime(routineSetId: String, value: String) {
+        val target = _uiState.value.routineSets.firstOrNull { it.id == routineSetId } ?: return
+        val parsed = parseDraftScheduledTime(value)
+        if (value.isNotBlank() && parsed == null) {
+            _uiState.update { it.copy(draftError = "시작 시각은 HH:mm 형식으로 입력해 주세요.") }
+            return
+        }
+        if (
+            parsed != null &&
+            _uiState.value.routineSets.any { it.id != target.id && it.isActive && it.startTime == parsed }
+        ) {
+            _uiState.update { it.copy(draftError = "다른 루틴 세트와 시작 시간이 같아요.") }
+            return
+        }
+        viewModelScope.launch {
+            routineRepository.updateRoutineSet(
+                target.copy(startTime = parsed, updatedAt = Instant.now()),
+            )
+            _uiState.update {
+                it.copy(
+                    draftError = null,
+                    notice = "루틴 세트 시작 시간을 저장했습니다.",
                     interactionToken = it.interactionToken + 1,
                 )
             }
@@ -1175,7 +1245,9 @@ class GuardianModeViewModel(
         }
 
         viewModelScope.launch {
-            routineRepository.createRoutineSet(routineSet)
+            routineRepository.createRoutineSet(
+                routineSet.copy(isActive = _uiState.value.routineSets.none(RoutineSet::isActive)),
+            )
             returnToRoutineEdit()
         }
     }
@@ -1310,9 +1382,14 @@ class GuardianModeViewModel(
         }
         viewModelScope.launch {
             if (target.isActive) {
-                state.routineSets.firstOrNull { it.id != target.id }?.let { replacement ->
-                    routineRepository.updateRoutineSet(replacement.copy(isActive = true, updatedAt = Instant.now()))
+                if (state.routineSets.count(RoutineSet::isActive) <= 1) {
+                    state.routineSets.firstOrNull { it.id != target.id }?.let { replacement ->
+                        routineRepository.updateRoutineSet(
+                            replacement.copy(isActive = true, updatedAt = Instant.now()),
+                        )
+                    }
                 }
+                routineRepository.updateRoutineSet(target.copy(isActive = false, updatedAt = Instant.now()))
             }
             routineRepository.deleteRoutineSet(target.id)
             _uiState.update {
@@ -1813,11 +1890,7 @@ private fun List<GuardianDestination>.dropLastMatching(destination: GuardianDest
     if (lastOrNull() == destination) dropLast(1) else this
 
 private fun GuardianModeUiState.shouldShowDailyRoutineSelectionPrompt(): Boolean =
-    isActive &&
-        isAuthenticated &&
-        recoveryStep == null &&
-        todayRoutineSetId == null &&
-        routineSets.isNotEmpty()
+    false
 
 private fun backupErrorMessage(error: Throwable): String = when (error) {
     is BackupValidationException -> error.message ?: "백업 파일을 확인할 수 없습니다."
@@ -1893,7 +1966,7 @@ private fun buildGuardianRecordDetail(
     selectedDate: LocalDate?,
     routineSets: List<RoutineSet>,
     dailyLogs: List<DailyLog>,
-    routineSetForSelectedDate: RoutineSet? = null,
+    routineSetsForSelectedDate: List<RoutineSet> = emptyList(),
 ): GuardianRecordsResult {
     val date = selectedDate ?: LocalDate.now()
     val logs = if (selectedDate == null) emptyList() else dailyLogs.filter { it.date == selectedDate }
@@ -1906,7 +1979,7 @@ private fun buildGuardianRecordDetail(
         logs = logs,
         routineSetsById = routineSetsById,
         routinesById = routinesById,
-        fallbackRoutineSet = routineSetForSelectedDate,
+        fallbackRoutineSets = routineSetsForSelectedDate,
     )
     val summary = GuardianRecordDay(
         date = date,
@@ -1922,12 +1995,16 @@ private fun buildGuardianRecordRoutines(
     logs: List<DailyLog>,
     routineSetsById: Map<String, RoutineSet>,
     routinesById: Map<String, Routine>,
-    fallbackRoutineSet: RoutineSet? = null,
+    fallbackRoutineSets: List<RoutineSet> = emptyList(),
 ): List<GuardianRecordRoutine> {
     if (logs.isEmpty()) {
-        return fallbackRoutineSet
-            ?.routines
-            .orEmpty()
+        return fallbackRoutineSets
+            .sortedWith(
+                compareBy<RoutineSet> { it.startTime != null }
+                    .thenBy { it.startTime }
+                    .thenBy { it.createdAt },
+            )
+            .flatMap(RoutineSet::routines)
             .filter { it.existedOn(date) && it.deletedAt == null && it.isActive }
             .sortedWith(compareBy<Routine> { it.order }.thenBy { it.createdAt }.thenBy { it.id })
             .map { routine ->
@@ -2015,7 +2092,7 @@ internal fun buildRoutineSetFromDraft(
     return RoutineSet(
         id = routineSetId,
         name = LocalizedText(mapOf(localeTag to trimmedName)),
-        isActive = true,
+        isActive = false,
         createdAt = now,
         updatedAt = now,
         routines = routines,
