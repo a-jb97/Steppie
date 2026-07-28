@@ -195,6 +195,84 @@ struct SteppieTests {
         #expect(viewModel.isAllCompleted)
     }
 
+    @Test("첫 루틴 세트 시작 전에는 다음 세트와 시작 시각을 표시하며 대기한다")
+    func childRoutineWaitsUntilFirstScheduledSetStarts() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(
+            year: 2026, month: 1, day: 2, hour: 7, minute: 30
+        )))
+        let fixture = try makeScheduledRoutinePlan(createdAt: now)
+        let viewModel = ChildRoutineViewModel(
+            repository: fixture.repository,
+            now: { now },
+            calendar: calendar,
+            isNotificationSchedulingEnabled: false
+        )
+
+        viewModel.load()
+
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.isWaitingForNextRoutineSet)
+        #expect(viewModel.activeRoutineSet == nil)
+        #expect(viewModel.nextScheduledRoutineSet?.id == fixture.morningSet.id)
+    }
+
+    @Test("현재 세트를 일찍 완료하면 다음 세트 시작 시각까지 대기한다")
+    func childRoutineWaitsAfterEarlySetCompletion() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(
+            year: 2026, month: 1, day: 2, hour: 8, minute: 30
+        )))
+        let fixture = try makeScheduledRoutinePlan(createdAt: now)
+        let viewModel = ChildRoutineViewModel(
+            repository: fixture.repository,
+            now: { now },
+            calendar: calendar,
+            isNotificationSchedulingEnabled: false
+        )
+        viewModel.load()
+
+        #expect(viewModel.activeRoutineSet?.id == fixture.morningSet.id)
+        viewModel.completeSelectedRoutine()
+        #expect(!viewModel.canStartNextRoutineSetAfterFeedback)
+        viewModel.proceedAfterCompletionFeedback()
+
+        #expect(viewModel.isWaitingForNextRoutineSet)
+        #expect(viewModel.nextScheduledRoutineSet?.id == fixture.schoolSet.id)
+        #expect(!viewModel.isAllCompleted)
+
+        viewModel.completeSelectedRoutine()
+        let date = DailyLog.localDateString(for: now, calendar: calendar)
+        let schoolRoutine = try #require(
+            try fixture.repository.routines(in: fixture.schoolSet.id).first
+        )
+        #expect(try fixture.repository.dailyLog(on: date, routineID: schoolRoutine.id) == nil)
+    }
+
+    @Test("다음 세트 시각이 지나도 이전 세트가 미완료면 이전 세트를 우선한다")
+    func childRoutineKeepsIncompleteEarlierSetAfterNextStartTime() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(
+            year: 2026, month: 1, day: 2, hour: 9, minute: 30
+        )))
+        let fixture = try makeScheduledRoutinePlan(createdAt: now)
+        let viewModel = ChildRoutineViewModel(
+            repository: fixture.repository,
+            now: { now },
+            calendar: calendar,
+            isNotificationSchedulingEnabled: false
+        )
+        viewModel.load()
+
+        #expect(viewModel.activeRoutineSet?.id == fixture.morningSet.id)
+        viewModel.completeSelectedRoutine()
+        #expect(viewModel.canStartNextRoutineSetAfterFeedback)
+        viewModel.proceedAfterCompletionFeedback()
+
+        #expect(viewModel.activeRoutineSet?.id == fixture.schoolSet.id)
+        #expect(viewModel.currentRoutine?.routineSetID == fixture.schoolSet.id)
+    }
+
     @Test("포커스 로드는 알림 권한을 요청하고 오늘 남은 루틴 알림을 재예약한다")
     func childRoutineLoadRequestsNotificationAuthorizationAndSchedulesReminders() async throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
@@ -261,7 +339,6 @@ struct SteppieTests {
         let requests = IOSRoutineNotificationScheduler.notificationRequests(
             routines: fixture.routines,
             completedRoutineIDs: [],
-            routineSetID: fixture.routineSet.id,
             date: date,
             settings: try AppSettings(notificationLeadTimes: [10, 5]),
             now: beforeRoutine,
@@ -274,7 +351,6 @@ struct SteppieTests {
         let completedRequests = IOSRoutineNotificationScheduler.notificationRequests(
             routines: fixture.routines,
             completedRoutineIDs: [routine.id],
-            routineSetID: fixture.routineSet.id,
             date: date,
             settings: try AppSettings(notificationLeadTimes: [10, 5]),
             now: beforeRoutine,
@@ -286,7 +362,6 @@ struct SteppieTests {
         let disabledRequests = IOSRoutineNotificationScheduler.notificationRequests(
             routines: fixture.routines,
             completedRoutineIDs: [],
-            routineSetID: fixture.routineSet.id,
             date: date,
             settings: try AppSettings(notificationLeadTimes: []),
             now: beforeRoutine,
@@ -298,7 +373,6 @@ struct SteppieTests {
         let quietRequests = IOSRoutineNotificationScheduler.notificationRequests(
             routines: fixture.routines,
             completedRoutineIDs: [],
-            routineSetID: fixture.routineSet.id,
             date: date,
             settings: try AppSettings(
                 notificationLeadTimes: [5],
@@ -859,6 +933,40 @@ struct SteppieTests {
         #expect(viewModel.todayAssignedRoutineSetID == createdSet.id)
         #expect(!viewModel.requiresTodayRoutineSelection)
         #expect(childReloadCount == 2)
+    }
+
+    @Test("루틴 관리는 여러 세트의 매일 시작 시각을 저장하고 중복 시각을 거부한다")
+    func guardianSchedulesMultipleRoutineSetsDaily() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+        viewModel.load()
+        let morningSet = try #require(viewModel.selectedRoutineSet)
+
+        viewModel.beginCreateRoutineSet()
+        viewModel.routineSetDraft?.name = "학교 루틴"
+        viewModel.beginAddRoutineSetStep()
+        viewModel.routineSetStepDraft?.title = "학교 가기"
+        viewModel.saveRoutineSetStepDraft()
+        viewModel.saveRoutineSetDraft(localeIdentifier: "ko")
+        let schoolSet = try #require(viewModel.selectedRoutineSet)
+
+        viewModel.beginScheduleRoutineSet(morningSet)
+        viewModel.routineSetScheduleDraft?.startTime = try LocalTime(hour: 8, minute: 0)
+        viewModel.saveRoutineSetSchedule()
+        viewModel.beginScheduleRoutineSet(schoolSet)
+        viewModel.routineSetScheduleDraft?.startTime = try LocalTime(hour: 9, minute: 0)
+        viewModel.saveRoutineSetSchedule()
+
+        #expect(viewModel.scheduledRoutineSets.map(\.id) == [morningSet.id, schoolSet.id])
+        #expect(try repository.routineSet(id: morningSet.id)?.dailyStartTime == LocalTime(hour: 8, minute: 0))
+        #expect(try repository.routineSet(id: schoolSet.id)?.dailyStartTime == LocalTime(hour: 9, minute: 0))
+
+        viewModel.beginScheduleRoutineSet(schoolSet)
+        viewModel.routineSetScheduleDraft?.startTime = try LocalTime(hour: 8, minute: 0)
+        viewModel.saveRoutineSetSchedule()
+
+        #expect(viewModel.errorMessage != nil)
+        #expect(try repository.routineSet(id: schoolSet.id)?.dailyStartTime == LocalTime(hour: 9, minute: 0))
     }
 
     @Test("루틴 관리 진입 시 오늘 배정된 루틴 세트를 선택한다")
@@ -1873,6 +1981,53 @@ struct SteppieTests {
         }
         return (repository, routineSet, routines)
     }
+
+    private func makeScheduledRoutinePlan(
+        createdAt: Date
+    ) throws -> (
+        repository: SwiftDataRoutineRepository,
+        morningSet: RoutineSet,
+        schoolSet: RoutineSet
+    ) {
+        let repository = try RoutinePreviewStore.makeRepository()
+        let morningSet = try RoutineSet(
+            name: LocalizedText(["ko": "아침 루틴"]),
+            isActive: true,
+            dailyStartTime: LocalTime(hour: 8, minute: 0),
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+        let schoolCreatedAt = createdAt.addingTimeInterval(1)
+        let schoolSet = try RoutineSet(
+            name: LocalizedText(["ko": "학교 루틴"]),
+            dailyStartTime: LocalTime(hour: 9, minute: 0),
+            createdAt: schoolCreatedAt,
+            updatedAt: schoolCreatedAt
+        )
+        try repository.createRoutineSet(morningSet)
+        try repository.createRoutineSet(schoolSet)
+        try repository.createRoutine(
+            Routine(
+                routineSetID: morningSet.id,
+                title: LocalizedText(["ko": "일어나기"]),
+                icon: IconRef.builtin(name: "wake-up"),
+                order: 0,
+                createdAt: createdAt,
+                updatedAt: createdAt
+            )
+        )
+        try repository.createRoutine(
+            Routine(
+                routineSetID: schoolSet.id,
+                title: LocalizedText(["ko": "학교 가기"]),
+                icon: IconRef.builtin(name: "school"),
+                order: 0,
+                createdAt: schoolCreatedAt,
+                updatedAt: schoolCreatedAt
+            )
+        )
+        return (repository, morningSet, schoolSet)
+    }
 }
 
 @MainActor
@@ -1893,7 +2048,6 @@ private final class FakeRoutineNotificationScheduler: RoutineNotificationSchedul
     func rescheduleTodayReminders(
         routines: [Routine],
         completedRoutineIDs: Set<UUID>,
-        routineSetID: UUID,
         date: String,
         settings: AppSettings,
         now: Date,

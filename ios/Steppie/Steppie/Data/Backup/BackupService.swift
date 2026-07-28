@@ -409,6 +409,7 @@ struct BackupService {
                 id: routineSet.id,
                 name: routineSet.name,
                 isActive: shouldBeActive,
+                dailyStartTime: routineSet.dailyStartTime,
                 createdAt: routineSet.createdAt,
                 updatedAt: routineSet.updatedAt,
                 deletedAt: routineSet.deletedAt

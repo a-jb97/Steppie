@@ -78,7 +78,9 @@ struct ChildRoutineView: View {
                 allowsRetry: true
             )
         case .loaded:
-            if viewModel.isAllCompleted && !viewModel.isShowingCompletionFeedback {
+            if viewModel.isWaitingForNextRoutineSet {
+                waitingForNextRoutineSetView
+            } else if viewModel.isAllCompleted && !viewModel.isShowingCompletionFeedback {
                 allDoneView
             } else {
                 loadedContent(layout: layout)
@@ -490,6 +492,32 @@ struct ChildRoutineView: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text("screen.feedback.nextPrefix") + Text(verbatim: localizedTitle(for: nextRoutine)))
+        } else if let next = viewModel.nextRoutineSetAfterFeedback {
+            if viewModel.canStartNextRoutineSetAfterFeedback {
+                Button(action: viewModel.proceedAfterCompletionFeedback) {
+                    nextRoutineSetPreview(
+                        routineSet: next.routineSet,
+                        firstRoutine: next.firstRoutine,
+                        isLocked: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(verbatim: "다음 루틴 \(localizedTitle(for: next.routineSet))"))
+                .accessibilityValue(Text("시작할 수 있음"))
+            } else {
+                nextRoutineSetPreview(
+                    routineSet: next.routineSet,
+                    firstRoutine: next.firstRoutine,
+                    isLocked: true
+                )
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: "다음 루틴 \(localizedTitle(for: next.routineSet))"))
+                .accessibilityValue(
+                    Text(verbatim: next.routineSet.dailyStartTime.map {
+                        "\($0.description) 전에는 시작하거나 완료할 수 없음"
+                    } ?? "아직 시작할 수 없음")
+                )
+            }
         } else if viewModel.isAllCompleted {
             Button(action: viewModel.proceedAfterCompletionFeedback) {
                 adaptivePreviewStack {
@@ -520,6 +548,55 @@ struct ChildRoutineView: View {
             .accessibilityLabel(Text("screen.allDone.title"))
             .accessibilityValue(Text("screen.allDone.subtitle"))
         }
+    }
+
+    private func nextRoutineSetPreview(
+        routineSet: RoutineSet,
+        firstRoutine: Routine,
+        isLocked: Bool
+    ) -> some View {
+        adaptivePreviewStack {
+            RoutineVisualView(icon: firstRoutine.icon, size: .list)
+                .frame(width: 52, height: 52)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
+                Text(verbatim: localizedTitle(for: routineSet))
+                if let startTime = routineSet.dailyStartTime {
+                    Text(
+                        verbatim: isLocked
+                            ? "\(startTime.description) 전에는 시작할 수 없어요"
+                            : "\(startTime.description)에 시작해요"
+                    )
+                    .steppieTextStyle(.childCaption)
+                    .foregroundStyle(Color.steppieTextSecondary)
+                }
+            }
+
+            if isLocked {
+                Image(systemName: "lock.fill")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(Color.steppieTextSecondary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .steppieTextStyle(.childListTitle)
+        .foregroundStyle(Color.steppieTextPrimary)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: SteppieLayout.childMinimumTouchTarget,
+            alignment: .leading
+        )
+        .padding(.horizontal, SteppieSpacing.medium)
+        .background(isLocked ? Color.steppieBackgroundPrimary : Color.steppieCardPeach)
+        .overlay {
+            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
+                .stroke(
+                    isLocked ? Color.steppieBorderSubtle : Color.clear,
+                    lineWidth: SteppieStroke.divider
+                )
+        }
+        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
     }
 
     private var allDoneView: some View {
@@ -572,8 +649,61 @@ struct ChildRoutineView: View {
         .background(Color.steppieBackgroundSecondary)
     }
 
+    private var waitingForNextRoutineSetView: some View {
+        ScrollView {
+            VStack {
+                Spacer(minLength: 72)
+                VStack(spacing: SteppieSpacing.large) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 96, weight: .semibold))
+                        .foregroundStyle(Color.steppieFocusRing)
+                        .accessibilityHidden(true)
+
+                    Text("다음 루틴을 기다려요")
+                        .steppieTextStyle(.childScreenTitle)
+                        .foregroundStyle(Color.steppieTextSecondary)
+                        .multilineTextAlignment(.center)
+
+                    if let routineSet = viewModel.nextScheduledRoutineSet {
+                        Text(verbatim: localizedTitle(for: routineSet))
+                            .steppieTextStyle(.childCardTitle)
+                            .foregroundStyle(Color.steppieTextPrimary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if let startTime = routineSet.dailyStartTime {
+                            Text(verbatim: "\(startTime.description)에 시작해요")
+                                .steppieTextStyle(.childProgress)
+                                .foregroundStyle(Color.steppieFocusRing)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .padding(SteppieSpacing.extraLarge)
+                .frame(maxWidth: SteppieLayout.focusCardPhoneMaximumWidth)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 520)
+                .background(Color.steppieCardSky)
+                .clipShape(.rect(cornerRadius: SteppieCornerRadius.sheet))
+                .accessibilityElement(children: .combine)
+                Spacer(minLength: 72)
+            }
+            .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, SteppieLayout.childScreenPadding)
+        }
+        .background(Color.steppieBackgroundSecondary)
+    }
+
     private func localizedTitle(for routine: Routine) -> String {
         routine.title.resolved(
+            appLocale: locale.identifier,
+            systemLanguages: [locale.identifier]
+        )
+    }
+
+    private func localizedTitle(for routineSet: RoutineSet) -> String {
+        routineSet.name.resolved(
             appLocale: locale.identifier,
             systemLanguages: [locale.identifier]
         )

@@ -4,6 +4,7 @@ nonisolated struct RoutineSet: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let name: LocalizedText
     let isActive: Bool
+    let dailyStartTime: LocalTime?
     let createdAt: Date
     let updatedAt: Date
     let deletedAt: Date?
@@ -12,6 +13,7 @@ nonisolated struct RoutineSet: Codable, Equatable, Identifiable, Sendable {
         id: UUID = UUID(),
         name: LocalizedText,
         isActive: Bool = false,
+        dailyStartTime: LocalTime? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now,
         deletedAt: Date? = nil
@@ -19,6 +21,7 @@ nonisolated struct RoutineSet: Codable, Equatable, Identifiable, Sendable {
         self.id = id
         self.name = name
         self.isActive = isActive
+        self.dailyStartTime = dailyStartTime
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.deletedAt = deletedAt

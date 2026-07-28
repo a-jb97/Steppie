@@ -26,7 +26,6 @@ protocol RoutineNotificationScheduling {
     func rescheduleTodayReminders(
         routines: [Routine],
         completedRoutineIDs: Set<UUID>,
-        routineSetID: UUID,
         date: String,
         settings: AppSettings,
         now: Date,
@@ -45,7 +44,6 @@ struct NoopRoutineNotificationScheduler: RoutineNotificationScheduling {
     func rescheduleTodayReminders(
         routines: [Routine],
         completedRoutineIDs: Set<UUID>,
-        routineSetID: UUID,
         date: String,
         settings: AppSettings,
         now: Date,
@@ -79,7 +77,6 @@ final class IOSRoutineNotificationScheduler: RoutineNotificationScheduling {
     func rescheduleTodayReminders(
         routines: [Routine],
         completedRoutineIDs: Set<UUID>,
-        routineSetID: UUID,
         date: String,
         settings: AppSettings,
         now: Date,
@@ -95,7 +92,6 @@ final class IOSRoutineNotificationScheduler: RoutineNotificationScheduling {
         for request in Self.notificationRequests(
             routines: routines,
             completedRoutineIDs: completedRoutineIDs,
-            routineSetID: routineSetID,
             date: date,
             settings: settings,
             now: now,
@@ -130,7 +126,6 @@ final class IOSRoutineNotificationScheduler: RoutineNotificationScheduling {
     static func notificationRequests(
         routines: [Routine],
         completedRoutineIDs: Set<UUID>,
-        routineSetID: UUID,
         date: String,
         settings: AppSettings,
         now: Date,
@@ -141,8 +136,7 @@ final class IOSRoutineNotificationScheduler: RoutineNotificationScheduling {
         guard !settings.notificationLeadTimes.isEmpty else { return [] }
 
         return routines.flatMap { routine in
-            guard routine.routineSetID == routineSetID,
-                  !completedRoutineIDs.contains(routine.id),
+            guard !completedRoutineIDs.contains(routine.id),
                   let scheduledTime = routine.scheduledTime,
                   let scheduledDate = dateForRoutine(
                     date: date,
@@ -170,7 +164,7 @@ final class IOSRoutineNotificationScheduler: RoutineNotificationScheduling {
                 return RoutineNotificationRequest(
                     id: "\(identifierPrefix).\(date).\(routine.id.uuidString).\(leadTime)",
                     routineID: routine.id,
-                    routineSetID: routineSetID,
+                    routineSetID: routine.routineSetID,
                     date: date,
                     fireDate: fireDate,
                     title: notificationTitle(locale: locale),

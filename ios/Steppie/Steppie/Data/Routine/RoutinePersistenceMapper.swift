@@ -12,6 +12,7 @@ extension RoutineSetRecord {
             id: domain.id,
             nameData: try RoutineDataCoder.encode(domain.name),
             isActive: domain.isActive,
+            dailyStartTime: domain.dailyStartTime?.description,
             createdAt: domain.createdAt,
             updatedAt: domain.updatedAt,
             deletedAt: domain.deletedAt
@@ -19,10 +20,21 @@ extension RoutineSetRecord {
     }
 
     func domainModel() throws -> RoutineSet {
-        try RoutineSet(
+        let decodedDailyStartTime: LocalTime?
+        if let dailyStartTime {
+            do {
+                decodedDailyStartTime = try LocalTime(dailyStartTime)
+            } catch {
+                throw RoutinePersistenceMappingError.invalidStoredLocalTime(dailyStartTime)
+            }
+        } else {
+            decodedDailyStartTime = nil
+        }
+        return try RoutineSet(
             id: id,
             name: RoutineDataCoder.decode(LocalizedText.self, from: nameData),
             isActive: isActive,
+            dailyStartTime: decodedDailyStartTime,
             createdAt: createdAt,
             updatedAt: updatedAt,
             deletedAt: deletedAt
@@ -32,6 +44,7 @@ extension RoutineSetRecord {
     func apply(_ domain: RoutineSet) throws {
         nameData = try RoutineDataCoder.encode(domain.name)
         isActive = domain.isActive
+        dailyStartTime = domain.dailyStartTime?.description
         createdAt = domain.createdAt
         updatedAt = domain.updatedAt
         deletedAt = domain.deletedAt

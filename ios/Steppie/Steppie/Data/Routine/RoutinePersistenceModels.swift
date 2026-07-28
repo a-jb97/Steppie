@@ -6,6 +6,7 @@ final class RoutineSetRecord {
     @Attribute(.unique) var id: UUID
     var nameData: Data
     var isActive: Bool
+    var dailyStartTime: String?
     var createdAt: Date
     var updatedAt: Date
     var deletedAt: Date?
@@ -14,6 +15,7 @@ final class RoutineSetRecord {
         id: UUID,
         nameData: Data,
         isActive: Bool,
+        dailyStartTime: String? = nil,
         createdAt: Date,
         updatedAt: Date,
         deletedAt: Date?
@@ -21,6 +23,7 @@ final class RoutineSetRecord {
         self.id = id
         self.nameData = nameData
         self.isActive = isActive
+        self.dailyStartTime = dailyStartTime
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.deletedAt = deletedAt
