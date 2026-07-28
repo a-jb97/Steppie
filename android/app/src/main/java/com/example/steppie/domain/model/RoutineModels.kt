@@ -110,6 +110,7 @@ data class RoutineSet(
     val id: String = newUuidV4(),
     val name: LocalizedText,
     val isActive: Boolean = false,
+    val startTime: LocalTime? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = createdAt,
     val deletedAt: Instant? = null,
@@ -117,6 +118,9 @@ data class RoutineSet(
 ) {
     init {
         requireUuidV4(id, "RoutineSet.id")
+        require(startTime == null || (startTime.second == 0 && startTime.nano == 0)) {
+            "RoutineSet.startTime must use HH:mm precision."
+        }
         require(updatedAt >= createdAt) { "RoutineSet.updatedAt cannot precede createdAt." }
         require(deletedAt == null || deletedAt >= createdAt) { "RoutineSet.deletedAt cannot precede createdAt." }
         require(!(isActive && deletedAt != null)) { "An active RoutineSet cannot be deleted." }

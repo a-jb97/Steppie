@@ -38,7 +38,8 @@ internal object BackupJson {
         val root = runCatching { JSONObject(json) }.getOrElse {
             throw BackupValidationException("data.json 형식이 올바르지 않습니다.")
         }
-        if (root.optInt("schemaVersion", -1) != BackupSchemaVersion) {
+        val schemaVersion = root.optInt("schemaVersion", -1)
+        if (schemaVersion !in 1..BackupSchemaVersion) {
             throw BackupValidationException("지원하지 않는 백업 데이터 버전입니다.")
         }
         val exportedAt = parseInstant(root.requiredString("exportedAt"), "exportedAt")
@@ -49,7 +50,7 @@ internal object BackupJson {
         validateReferences(routineSets, routines, dailyLogs)
         return BackupSnapshot(
             exportedAt = exportedAt,
-            routineSets = normalizeActiveRoutineSet(routineSets),
+            routineSets = if (schemaVersion == 1) normalizeActiveRoutineSet(routineSets) else routineSets,
             routines = routines,
             dailyLogs = dailyLogs,
             appSettings = settings,
@@ -83,7 +84,7 @@ internal object BackupJson {
         if (root.optString("app") != BackupAppName) {
             throw BackupValidationException("Steppie 백업 파일이 아닙니다.")
         }
-        if (root.optInt("backupSchemaVersion", -1) != BackupSchemaVersion) {
+        if (root.optInt("backupSchemaVersion", -1) !in 1..BackupSchemaVersion) {
             throw BackupValidationException("지원하지 않는 백업 버전입니다.")
         }
         if (root.optString("dataFile") != BackupDataFileName) {
@@ -107,6 +108,7 @@ internal object BackupJson {
         .put("id", entity.id)
         .put("name", encodeLocalizedText(entity.localizedName))
         .put("isActive", entity.isActive)
+        .putNullable("startTime", entity.startTime)
         .put("createdAt", formatEpochMillis(entity.createdAtEpochMillis))
         .put("updatedAt", formatEpochMillis(entity.updatedAtEpochMillis))
         .putNullable("deletedAt", entity.deletedAtEpochMillis?.let(::formatEpochMillis))
@@ -116,6 +118,7 @@ internal object BackupJson {
             id = json.requiredString("id"),
             name = decodeLocalizedText(json.requiredObject("name")),
             isActive = json.requiredBoolean("isActive"),
+            startTime = json.optionalString("startTime")?.let(LocalTime::parse),
             createdAt = parseInstant(json.requiredString("createdAt"), "RoutineSet.createdAt"),
             updatedAt = parseInstant(json.requiredString("updatedAt"), "RoutineSet.updatedAt"),
             deletedAt = json.optionalString("deletedAt")?.let { parseInstant(it, "RoutineSet.deletedAt") },
