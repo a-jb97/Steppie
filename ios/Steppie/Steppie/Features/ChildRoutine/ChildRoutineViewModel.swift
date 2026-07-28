@@ -38,10 +38,16 @@ final class ChildRoutineViewModel {
     @ObservationIgnored private var didRequestNotificationAuthorization = false
     @ObservationIgnored private var pendingNotificationRoute: RoutineNotificationRoute?
     @ObservationIgnored private var isRoutineSpeechActive = true
+    @ObservationIgnored private var scheduledTransitionTask: Task<Void, Never>?
+    @ObservationIgnored private var feedbackAdvanceTask: Task<Void, Never>?
 
     private(set) var loadState: ChildRoutineLoadState = .idle
     private(set) var activeRoutineSet: RoutineSet?
+    private(set) var plannedRoutineSets: [RoutineSet] = []
     private(set) var routines: [Routine] = []
+    private(set) var plannedRoutines: [Routine] = []
+    private(set) var nextScheduledRoutineSet: RoutineSet?
+    private(set) var nextScheduledStartDate: Date?
     private(set) var selectedRoutineID: UUID?
     private(set) var page: ChildRoutinePage = .focus
     private(set) var settings: AppSettings?
@@ -93,7 +99,13 @@ final class ChildRoutineViewModel {
 
     var completedCount: Int { routines.filter { completedRoutineIDs.contains($0.id) }.count }
     var totalCount: Int { routines.count }
-    var isAllCompleted: Bool { totalCount > 0 && completedCount == totalCount }
+    var isAllCompleted: Bool {
+        !plannedRoutines.isEmpty
+            && plannedRoutines.allSatisfy { completedRoutineIDs.contains($0.id) }
+    }
+    var isWaitingForNextRoutineSet: Bool {
+        activeRoutineSet == nil && nextScheduledRoutineSet != nil
+    }
     var isShowingCompletionFeedback: Bool { completionFeedbackRoutineID != nil }
     var canUndoCompletion: Bool { undoRoutineID != nil }
     var undoDurationSeconds: Int { settings?.undoDurationSeconds ?? 5 }
@@ -108,6 +120,32 @@ final class ChildRoutineViewModel {
         }
     }
 
+    var nextRoutineSetAfterFeedback: (routineSet: RoutineSet, firstRoutine: Routine)? {
+        guard let activeRoutineSet,
+              routines.allSatisfy({ completedRoutineIDs.contains($0.id) }),
+              let currentIndex = plannedRoutineSets.firstIndex(where: { $0.id == activeRoutineSet.id })
+        else {
+            return nil
+        }
+        for routineSet in plannedRoutineSets.dropFirst(currentIndex + 1) {
+            if let firstRoutine = plannedRoutines.first(where: {
+                $0.routineSetID == routineSet.id && !completedRoutineIDs.contains($0.id)
+            }) {
+                return (routineSet, firstRoutine)
+            }
+        }
+        return nil
+    }
+
+    var canStartNextRoutineSetAfterFeedback: Bool {
+        guard let next = nextRoutineSetAfterFeedback,
+              let startTime = next.routineSet.dailyStartTime,
+              let startDate = scheduledDate(for: startTime) else {
+            return nextRoutineSetAfterFeedback != nil
+        }
+        return startDate <= now()
+    }
+
     func loadIfNeeded() {
         guard loadState == .idle else { return }
         load()
@@ -115,49 +153,97 @@ final class ChildRoutineViewModel {
 
     func load() {
         do {
+            scheduledTransitionTask?.cancel()
             today = DailyLog.localDateString(for: now(), calendar: calendar)
             settings = try repository.appSettings()
-            guard let activeSet = try routineSetForToday() else {
+            let plan = try routineSetsForToday()
+            guard !plan.isEmpty else {
                 reset(to: .empty)
                 return
             }
 
-            let fetchedRoutines = try repository.routines(in: activeSet.id)
-            let dailyLogs = try repository.dailyLogs(on: today, routineSetID: activeSet.id)
+            var fetchedRoutines: [Routine] = []
+            for routineSet in plan {
+                fetchedRoutines.append(contentsOf: try repository.routines(in: routineSet.id))
+            }
             guard !fetchedRoutines.isEmpty else {
-                activeRoutineSet = activeSet
+                plannedRoutineSets = plan
                 resetRoutines(to: .empty)
                 return
             }
 
-            activeRoutineSet = activeSet
-            routines = fetchedRoutines
+            let dailyLogs = try repository.dailyLogs(on: today, routineSetID: nil)
+            plannedRoutineSets = plan
+            plannedRoutines = fetchedRoutines
             completedRoutineIDs = Set(
                 dailyLogs
                     .filter { $0.status == .completed }
                     .map(\.routineID)
             )
             completionFeedbackRoutineID = nil
-            if !fetchedRoutines.contains(where: { $0.id == selectedRoutineID })
-                || selectedRoutineID.map(completedRoutineIDs.contains) == true {
-                selectedRoutineID = currentRoutine?.id
-            }
+            resolveCurrentRoutineSet(at: now())
             loadState = .loaded
             applyPendingNotificationRouteIfNeeded()
             speakSelectedRoutineIfNeeded()
             requestNotificationAuthorizationAndRescheduleIfNeeded()
+            scheduleAutomaticTransitionIfNeeded()
         } catch {
             reset(to: .failed)
         }
     }
 
-    private func routineSetForToday() throws -> RoutineSet? {
+    private func routineSetsForToday() throws -> [RoutineSet] {
+        let scheduledSets = try repository.routineSets()
+            .filter { $0.dailyStartTime != nil }
+            .sorted(by: routineSetScheduleSort)
+        if !scheduledSets.isEmpty {
+            return scheduledSets
+        }
+
         guard let assignment = try repository.dailyRoutineAssignment(on: today),
               let assignedSet = try repository.routineSet(id: assignment.routineSetID),
               assignedSet.deletedAt == nil else {
-            return nil
+            return []
         }
-        return assignedSet
+        return [assignedSet]
+    }
+
+    private func resolveCurrentRoutineSet(at date: Date) {
+        activeRoutineSet = nil
+        routines = []
+        nextScheduledRoutineSet = nil
+        nextScheduledStartDate = nil
+
+        for routineSet in plannedRoutineSets {
+            let setRoutines = plannedRoutines.filter { $0.routineSetID == routineSet.id }
+            guard !setRoutines.isEmpty,
+                  setRoutines.contains(where: { !completedRoutineIDs.contains($0.id) }) else {
+                continue
+            }
+
+            if let startTime = routineSet.dailyStartTime,
+               let startDate = scheduledDate(for: startTime),
+               startDate > date {
+                nextScheduledRoutineSet = routineSet
+                nextScheduledStartDate = startDate
+                selectedRoutineID = nil
+                return
+            }
+
+            activeRoutineSet = routineSet
+            routines = setRoutines
+            if !setRoutines.contains(where: { $0.id == selectedRoutineID })
+                || selectedRoutineID.map(completedRoutineIDs.contains) == true {
+                selectedRoutineID = currentRoutine?.id
+            }
+            return
+        }
+
+        if let lastSet = plannedRoutineSets.last {
+            activeRoutineSet = lastSet
+            routines = plannedRoutines.filter { $0.routineSetID == lastSet.id }
+        }
+        selectedRoutineID = nil
     }
 
     func selectRoutine(_ routine: Routine, showFocus: Bool) {
@@ -226,6 +312,7 @@ final class ChildRoutineViewModel {
                 feedbackPerformer.routineCompleted(settings: settings)
                 speechGuide.speak(localizedCompletionSpeech(for: routine), settings: settings)
             }
+            scheduleAutomaticFeedbackAdvance()
             rescheduleNotifications()
         } catch {
             reset(to: .failed)
@@ -234,6 +321,7 @@ final class ChildRoutineViewModel {
 
     func undoLastCompletion() {
         guard let undoRoutineID else { return }
+        feedbackAdvanceTask?.cancel()
         do {
             _ = try repository.undoRoutineCompletion(
                 routineID: undoRoutineID,
@@ -254,6 +342,7 @@ final class ChildRoutineViewModel {
 
     func proceedAfterCompletionFeedback() {
         guard completionFeedbackRoutineID != nil else { return }
+        feedbackAdvanceTask?.cancel()
         completionFeedbackRoutineID = nil
         undoRoutineID = nil
 
@@ -263,6 +352,8 @@ final class ChildRoutineViewModel {
                 feedbackPerformer.allRoutinesCompleted(settings: settings)
                 speechGuide.speak(localizedAllDoneSpeech, settings: settings)
             }
+        } else if routines.allSatisfy({ completedRoutineIDs.contains($0.id) }) {
+            load()
         } else {
             selectedRoutineID = currentRoutine?.id
             speakSelectedRoutineIfNeeded()
@@ -273,7 +364,7 @@ final class ChildRoutineViewModel {
     func appDidBecomeActive() {
         guard loadState == .loaded else { return }
         let currentDate = DailyLog.localDateString(for: now(), calendar: calendar)
-        if currentDate == today {
+        if currentDate == today, !isWaitingForNextRoutineSet {
             rescheduleNotifications()
         } else {
             load()
@@ -289,7 +380,13 @@ final class ChildRoutineViewModel {
     }
 
     private func reset(to state: ChildRoutineLoadState) {
+        scheduledTransitionTask?.cancel()
+        feedbackAdvanceTask?.cancel()
         activeRoutineSet = nil
+        plannedRoutineSets = []
+        plannedRoutines = []
+        nextScheduledRoutineSet = nil
+        nextScheduledStartDate = nil
         resetRoutines(to: state)
     }
 
@@ -352,10 +449,9 @@ final class ChildRoutineViewModel {
 
     private func rescheduleNotifications() {
         guard isNotificationSchedulingEnabled else { return }
-        guard let activeRoutineSet, let settings else { return }
-        let routines = routines
+        guard let settings else { return }
+        let routines = plannedRoutines
         let completedRoutineIDs = completedRoutineIDs
-        let routineSetID = activeRoutineSet.id
         let date = today
         let now = now()
         let calendar = calendar
@@ -364,7 +460,6 @@ final class ChildRoutineViewModel {
             await notificationScheduler.rescheduleTodayReminders(
                 routines: routines,
                 completedRoutineIDs: completedRoutineIDs,
-                routineSetID: routineSetID,
                 date: date,
                 settings: settings,
                 now: now,
@@ -372,6 +467,48 @@ final class ChildRoutineViewModel {
                 locale: locale
             )
         }
+    }
+
+    private func scheduleAutomaticTransitionIfNeeded() {
+        scheduledTransitionTask?.cancel()
+        guard let nextScheduledStartDate else { return }
+        let delay = nextScheduledStartDate.timeIntervalSince(now())
+        guard delay > 0 else {
+            load()
+            return
+        }
+        scheduledTransitionTask = Task { [weak self] in
+            let nanoseconds = UInt64(min(delay, 86_400) * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            guard !Task.isCancelled else { return }
+            self?.load()
+        }
+    }
+
+    private func scheduleAutomaticFeedbackAdvance() {
+        feedbackAdvanceTask?.cancel()
+        let delay = UInt64(max(undoDurationSeconds, 1)) * 1_000_000_000
+        feedbackAdvanceTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: delay)
+            guard !Task.isCancelled else { return }
+            self?.proceedAfterCompletionFeedback()
+        }
+    }
+
+    private func scheduledDate(for time: LocalTime) -> Date? {
+        var components = calendar.dateComponents([.year, .month, .day], from: now())
+        components.hour = time.hour
+        components.minute = time.minute
+        components.second = 0
+        return calendar.date(from: components)
+    }
+
+    private func routineSetScheduleSort(_ lhs: RoutineSet, _ rhs: RoutineSet) -> Bool {
+        guard let lhsTime = lhs.dailyStartTime, let rhsTime = rhs.dailyStartTime else {
+            return lhs.dailyStartTime != nil
+        }
+        if lhsTime == rhsTime { return lhs.createdAt < rhs.createdAt }
+        return (lhsTime.hour, lhsTime.minute) < (rhsTime.hour, rhsTime.minute)
     }
 
     private func localizedTitle(for routine: Routine) -> String {
