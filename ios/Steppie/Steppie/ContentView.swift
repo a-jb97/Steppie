@@ -1,32 +1,11 @@
 import SwiftUI
 
-private enum SteppieAppMode {
-    case child
-    case guardian
-}
-
-private enum GuardianPINFlow {
-    case guardianEntry
-    case pinChange
-    case recoveryRegeneration
-    case recoveryReset
-}
-
-private enum GuardianSheet {
-    case pin
-    case recoveryCodeReset
-    case recoveryCodeDisplay
-}
-
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var childViewModel: ChildRoutineViewModel
     @State private var guardianViewModel: GuardianModeViewModel
     @State private var tutorialCoordinator = TutorialCoordinator()
-    @State private var appMode: SteppieAppMode = .child
-    @State private var pinPurpose: GuardianPINPurpose?
-    @State private var pinFlow: GuardianPINFlow?
-    @State private var guardianSheet: GuardianSheet?
+    @State private var flowCoordinator = AppFlowCoordinator()
     @State private var inactivityToken = UUID()
     private let notificationRouter: RoutineNotificationRouter?
 
@@ -61,7 +40,7 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            switch appMode {
+            switch flowCoordinator.state.mode {
             case .child:
                 ChildRoutineView(
                     viewModel: childViewModel,
@@ -86,24 +65,20 @@ struct ContentView: View {
                 consumePendingNotificationRoute()
             }
             .onReceive(NotificationCenter.default.publisher(for: .guardianPINChangeRequested)) { _ in
-                pinPurpose = .change
-                pinFlow = .pinChange
-                guardianSheet = .pin
+                flowCoordinator.requestPINChange()
             }
             .onReceive(NotificationCenter.default.publisher(for: .guardianRecoveryCodeRegenerationRequested)) { _ in
-                pinPurpose = .enter
-                pinFlow = .recoveryRegeneration
-                guardianSheet = .pin
+                flowCoordinator.requestRecoveryCodeRegeneration()
             }
             .sheet(isPresented: guardianSheetBinding, onDismiss: handleGuardianSheetDismiss) {
-                if let guardianSheet {
+                if let guardianSheet = flowCoordinator.state.sheet {
                     guardianSheetContent(guardianSheet)
                 }
             }
             .task(id: inactivityToken) {
-                guard appMode == .guardian else { return }
+                guard flowCoordinator.state.mode == .guardian else { return }
                 try? await Task.sleep(for: .seconds(180))
-                guard !Task.isCancelled, appMode == .guardian else { return }
+                guard !Task.isCancelled, flowCoordinator.state.mode == .guardian else { return }
                 exitGuardianMode()
             }
     }
@@ -116,22 +91,19 @@ struct ContentView: View {
     private func beginGuardianEntry() {
         childViewModel.setRoutineSpeechActive(false)
         guardianViewModel.load()
-        pinFlow = .guardianEntry
-        pinPurpose = guardianViewModel.hasGuardianPIN() ? .enter : .setup
-        guardianSheet = .pin
+        flowCoordinator.beginGuardianEntry(
+            hasGuardianPIN: guardianViewModel.hasGuardianPIN()
+        )
     }
 
-    private func handlePINSuccess(for purpose: GuardianPINPurpose) {
-        let completedFlow = pinFlow
-        self.pinPurpose = nil
-        pinFlow = nil
-
-        if completedFlow == .recoveryRegeneration {
-            if guardianViewModel.regenerateRecoveryCode() {
-                guardianSheet = .recoveryCodeDisplay
-            } else {
-                guardianSheet = nil
-            }
+    private func handlePINSuccess(
+        for purpose: GuardianPINPurpose,
+        flow: GuardianPINFlow
+    ) {
+        if flow == .recoveryRegeneration {
+            flowCoordinator.completeRecoveryCodeRegeneration(
+                succeeded: guardianViewModel.regenerateRecoveryCode()
+            )
             resetGuardianInactivityTimer()
             return
         }
@@ -139,33 +111,27 @@ struct ContentView: View {
         switch purpose {
         case .enter:
             guardianViewModel.selectedDestination = nil
-            appMode = .guardian
             guardianViewModel.load()
-            guardianSheet = nil
+            flowCoordinator.completePIN(purpose: purpose)
             resetGuardianInactivityTimer()
         case .setup:
             guardianViewModel.selectedDestination = nil
-            appMode = .guardian
             guardianViewModel.load()
-            if guardianViewModel.oneTimeRecoveryCode != nil {
-                guardianSheet = .recoveryCodeDisplay
-            } else {
-                guardianSheet = nil
-            }
+            flowCoordinator.completePIN(
+                purpose: purpose,
+                shouldDisplayRecoveryCode: guardianViewModel.oneTimeRecoveryCode != nil
+            )
             resetGuardianInactivityTimer()
         case .change:
             guardianViewModel.load()
-            guardianSheet = nil
+            flowCoordinator.completePIN(purpose: purpose)
             resetGuardianInactivityTimer()
         }
     }
 
     private func exitGuardianMode() {
-        pinPurpose = nil
-        pinFlow = nil
-        guardianSheet = nil
         guardianViewModel.selectedDestination = nil
-        appMode = .child
+        flowCoordinator.exitGuardianMode()
         childViewModel.load()
     }
 
@@ -184,59 +150,51 @@ struct ContentView: View {
 
     private var guardianSheetBinding: Binding<Bool> {
         Binding(
-            get: { guardianSheet != nil },
+            get: { flowCoordinator.state.sheet != nil },
             set: {
                 if !$0 {
-                    guardianSheet = nil
+                    flowCoordinator.dismissSheet()
                 }
             }
         )
     }
 
     @ViewBuilder
-    private func guardianSheetContent(_ sheet: GuardianSheet) -> some View {
+    private func guardianSheetContent(_ sheet: GuardianSheetDestination) -> some View {
         switch sheet {
-        case .pin:
-            if let pinPurpose {
-                NavigationStack {
-                    GuardianPINView(
-                        purpose: pinPurpose,
-                        showsRecoveryReset: pinFlow == .guardianEntry && pinPurpose == .enter,
-                        verifyPIN: guardianViewModel.verifyPIN,
-                        savePIN: savePINHandler(for: pinPurpose),
-                        onSuccess: {
-                            handlePINSuccess(for: pinPurpose)
-                        },
-                        onCancel: {
-                            guardianSheet = nil
-                            self.pinPurpose = nil
-                            pinFlow = nil
-                        },
-                        onRecoveryRequested: {
-                            self.pinPurpose = nil
-                            pinFlow = nil
-                            guardianViewModel.clearRecoveryCodeError()
-                            guardianSheet = .recoveryCodeReset
-                        }
-                    )
-                    .tutorialTarget(.primary)
-                    .tutorialOverlay(coordinator: tutorialCoordinator, screen: .guardianPIN)
-                }
-                .presentationDetents([.large])
+        case let .pin(pinPurpose, pinFlow):
+            NavigationStack {
+                GuardianPINView(
+                    purpose: pinPurpose,
+                    showsRecoveryReset: pinFlow == .guardianEntry && pinPurpose == .enter,
+                    verifyPIN: guardianViewModel.verifyPIN,
+                    savePIN: savePINHandler(for: pinPurpose),
+                    onSuccess: {
+                        handlePINSuccess(for: pinPurpose, flow: pinFlow)
+                    },
+                    onCancel: {
+                        flowCoordinator.dismissSheet()
+                    },
+                    onRecoveryRequested: {
+                        guardianViewModel.clearRecoveryCodeError()
+                        flowCoordinator.requestRecoveryCodeReset()
+                    }
+                )
+                .tutorialTarget(.primary)
+                .tutorialOverlay(coordinator: tutorialCoordinator, screen: .guardianPIN)
             }
+            .presentationDetents([.large])
         case .recoveryCodeReset:
             NavigationStack {
                 RecoveryCodeResetView(
                     errorMessage: guardianViewModel.recoveryCodeErrorMessage,
                     verifyRecoveryCode: guardianViewModel.verifyRecoveryCode,
                     onVerified: {
-                        pinPurpose = .setup
-                        pinFlow = .recoveryReset
-                        guardianSheet = .pin
+                        flowCoordinator.completeRecoveryCodeVerification()
                     },
                     onCancel: {
                         guardianViewModel.clearRecoveryCodeError()
-                        guardianSheet = nil
+                        flowCoordinator.dismissSheet()
                     }
                 )
             }
@@ -248,7 +206,7 @@ struct ContentView: View {
                     message: guardianViewModel.recoveryCodeStatusMessage,
                     onDone: {
                         guardianViewModel.clearOneTimeRecoveryCode()
-                        guardianSheet = nil
+                        flowCoordinator.dismissSheet()
                     }
                 )
                 .tutorialTarget(.primary)
@@ -259,12 +217,10 @@ struct ContentView: View {
     }
 
     private func handleGuardianSheetDismiss() {
-        if guardianSheet == nil {
-            pinPurpose = nil
-            pinFlow = nil
+        if flowCoordinator.state.sheet == nil {
             guardianViewModel.clearRecoveryCodeError()
             guardianViewModel.clearOneTimeRecoveryCode()
-            if appMode == .child {
+            if flowCoordinator.state.mode == .child {
                 childViewModel.setRoutineSpeechActive(true)
             }
         }
