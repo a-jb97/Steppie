@@ -20,6 +20,7 @@ struct GuardianModeView: View {
     let viewModel: GuardianModeViewModel
     let tutorialCoordinator: TutorialCoordinator
     let onDone: () -> Void
+    let onSecurityAction: (GuardianSecurityAction) -> Void
     let onInteraction: () -> Void
 
     var body: some View {
@@ -2113,11 +2114,11 @@ struct GuardianModeView: View {
             VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
                 header(title: "보안", subtitle: "PIN, 복구 코드, 개인정보 설정")
                 securityCard(title: "PIN 변경", subtitle: "4자리 보호자 PIN 재설정", assetName: "guardian-security-warning", iconSize: 55) {
-                    NotificationCenter.default.post(name: .guardianPINChangeRequested, object: nil)
+                    onSecurityAction(.changePIN)
                     onInteraction()
                 }
                 securityCard(title: "복구 코드 확인", subtitle: "PIN 확인 후 새 6자리 복구 코드를 한 번만 표시", assetName: "guardian-security-warning", iconSize: 55) {
-                    NotificationCenter.default.post(name: .guardianRecoveryCodeRegenerationRequested, object: nil)
+                    onSecurityAction(.regenerateRecoveryCode)
                     onInteraction()
                 }
                 securityCard(title: "백업/복원", subtitle: "로컬 파일 백업과 Replace 복원", assetName: "guardian-security-backup", iconSize: 50) {

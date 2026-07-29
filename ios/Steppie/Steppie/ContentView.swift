@@ -52,6 +52,7 @@ struct ContentView: View {
                     viewModel: guardianViewModel,
                     tutorialCoordinator: tutorialCoordinator,
                     onDone: exitGuardianMode,
+                    onSecurityAction: postGuardianSecurityAction,
                     onInteraction: resetGuardianInactivityTimer
                 )
             }
@@ -137,6 +138,15 @@ struct ContentView: View {
 
     private func resetGuardianInactivityTimer() {
         inactivityToken = UUID()
+    }
+
+    private func postGuardianSecurityAction(_ action: GuardianSecurityAction) {
+        switch action {
+        case .changePIN:
+            NotificationCenter.default.post(name: .guardianPINChangeRequested, object: nil)
+        case .regenerateRecoveryCode:
+            NotificationCenter.default.post(name: .guardianRecoveryCodeRegenerationRequested, object: nil)
+        }
     }
 
     private func savePINHandler(for purpose: GuardianPINPurpose) -> (String) -> Bool {
