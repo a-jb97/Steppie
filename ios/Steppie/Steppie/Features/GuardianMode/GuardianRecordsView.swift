@@ -436,7 +436,11 @@ struct GuardianRecordEmptyStateView: View {
     }
 }
 
-private enum GuardianRecordFormatting {
+enum GuardianRecordFormatting {
+    static func date(from localDate: String) -> Date? {
+        localDateFormatter.date(from: localDate)
+    }
+
     static func shortDateText(_ localDate: String, locale: Locale) -> String {
         guard let date = localDateFormatter.date(from: localDate) else {
             return localDate
