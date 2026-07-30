@@ -1,14 +1,39 @@
 package com.example.steppie.ui.child
 
+import androidx.lifecycle.viewModelScope
+import com.example.steppie.data.repository.InMemoryRoutineRepository
 import com.example.steppie.data.sample.RoutineSampleData
+import com.example.steppie.domain.model.AppSettings
+import com.example.steppie.domain.model.DailyLog
 import com.example.steppie.domain.model.FeedbackIntensity
+import com.example.steppie.domain.model.LogStatus
+import com.example.steppie.domain.repository.AppSettingsRepository
+import com.example.steppie.domain.repository.RoutineRepository
+import com.example.steppie.testing.MainDispatcherRule
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ChildRoutineViewModelTest {
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
     @Test
     fun `scheduled state exposes only the current routine set to the child screen`() {
         val morning = RoutineSampleData.morning.copy(isActive = true, startTime = null)
@@ -284,4 +309,237 @@ class ChildRoutineViewModelTest {
 
         assertEquals(FeedbackIntensity.Strong, state.feedbackIntensity)
     }
+
+    @Test
+    fun `completion enters feedback and persists the selected routine exactly once`() = runTest {
+        val target = RoutineSampleData.morning.routines.first()
+        val (viewModel, repository) = childViewModel()
+        val feedback = async(start = CoroutineStart.UNDISPATCHED) {
+            viewModel.feedbackEvents.first()
+        }
+
+        try {
+            assertEquals(target.id, viewModel.uiState.value.selectedRoutineId)
+            assertTrue(viewModel.uiState.value.isSelectedRoutineCompletable)
+
+            viewModel.completeSelectedRoutine()
+            viewModel.completeSelectedRoutine()
+            runCurrent()
+
+            val state = viewModel.uiState.value
+            val log = repository.observeDailyLogs(LocalDate.now()).first().single()
+            val event = feedback.await()
+
+            assertEquals(listOf(target.id), repository.completeCalls.map { it.routineId })
+            assertTrue(repository.undoCalls.isEmpty())
+            assertEquals(LogStatus.Completed, log.status)
+            assertEquals(target.id, state.feedbackRoutineId)
+            assertEquals(target.id, state.undoRoutineId)
+            assertEquals(target.id, state.selectedRoutineId)
+            assertTrue(target.id in state.completedRoutineIds)
+            assertFalse(state.isSelectedRoutineCompletable)
+            assertEquals("일어나기 완료! 잘했어요!", event.spokenText)
+            assertTrue(event.vibrate)
+            assertTrue(event.sound)
+            assertEquals(1.0f, event.ttsRate)
+            assertEquals(1.0f, event.ttsVolume)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `undo during feedback restores the routine and persists an undone log`() = runTest {
+        val target = RoutineSampleData.morning.routines.first()
+        val (viewModel, repository) = childViewModel()
+
+        try {
+            viewModel.completeSelectedRoutine()
+            runCurrent()
+            viewModel.undoLastCompletion()
+            runCurrent()
+
+            val state = viewModel.uiState.value
+            val log = repository.observeDailyLogs(LocalDate.now()).first().single()
+
+            assertEquals(listOf(target.id), repository.completeCalls.map { it.routineId })
+            assertEquals(listOf(target.id), repository.undoCalls.map { it.routineId })
+            assertEquals(LogStatus.Undone, log.status)
+            assertNull(log.completedAt)
+            assertEquals(target.id, state.selectedRoutineId)
+            assertNull(state.feedbackRoutineId)
+            assertNull(state.undoRoutineId)
+            assertFalse(target.id in state.completedRoutineIds)
+            assertTrue(state.isSelectedRoutineCompletable)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `advancing feedback selects the next routine without another repository write`() = runTest {
+        val routines = RoutineSampleData.morning.routines
+        val (viewModel, repository) = childViewModel()
+
+        try {
+            viewModel.completeSelectedRoutine()
+            runCurrent()
+            viewModel.advanceFromFeedback()
+            runCurrent()
+
+            val state = viewModel.uiState.value
+
+            assertEquals(listOf(routines.first().id), repository.completeCalls.map { it.routineId })
+            assertTrue(repository.undoCalls.isEmpty())
+            assertEquals(routines[1].id, state.selectedRoutineId)
+            assertEquals(routines[1].id, state.currentRoutine?.id)
+            assertNull(state.feedbackRoutineId)
+            assertNull(state.undoRoutineId)
+            assertTrue(routines.first().id in state.completedRoutineIds)
+            assertTrue(state.isSelectedRoutineCompletable)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `completion feedback event follows intensity and device feedback settings`() = runTest {
+        val cases = listOf(
+            FeedbackCase(
+                settings = AppSettings(feedbackIntensity = FeedbackIntensity.Strong, locale = "ko"),
+                spokenText = "일어나기 완료! 잘했어요!",
+                vibrate = true,
+                sound = true,
+            ),
+            FeedbackCase(
+                settings = AppSettings(feedbackIntensity = FeedbackIntensity.Normal, locale = "ko"),
+                spokenText = "일어나기 완료! 잘했어요!",
+                vibrate = true,
+                sound = true,
+            ),
+            FeedbackCase(
+                settings = AppSettings(feedbackIntensity = FeedbackIntensity.Quiet, locale = "ko"),
+                spokenText = "일어나기 완료! 잘했어요!",
+                vibrate = false,
+                sound = false,
+            ),
+            FeedbackCase(
+                settings = AppSettings(feedbackIntensity = FeedbackIntensity.Off, locale = "ko"),
+                spokenText = "일어나기 완료! 잘했어요!",
+                vibrate = false,
+                sound = false,
+            ),
+            FeedbackCase(
+                settings = AppSettings(
+                    feedbackIntensity = FeedbackIntensity.Strong,
+                    soundEnabled = false,
+                    ttsEnabled = false,
+                    ttsRate = 0.75,
+                    ttsVolume = 0.4,
+                    hapticEnabled = false,
+                    locale = "ko",
+                ),
+                spokenText = null,
+                vibrate = false,
+                sound = false,
+            ),
+        )
+
+        cases.forEach { case ->
+            val (viewModel) = childViewModel(case.settings)
+            val feedback = async(start = CoroutineStart.UNDISPATCHED) {
+                viewModel.feedbackEvents.first()
+            }
+
+            try {
+                viewModel.completeSelectedRoutine()
+                runCurrent()
+
+                val event = feedback.await()
+                assertEquals(case.spokenText, event.spokenText)
+                assertEquals(case.vibrate, event.vibrate)
+                assertEquals(case.sound, event.sound)
+                assertEquals(case.settings.ttsRate.toFloat(), event.ttsRate)
+                assertEquals(case.settings.ttsVolume.toFloat(), event.ttsVolume)
+            } finally {
+                viewModel.viewModelScope.cancel()
+            }
+        }
+    }
+
+    private fun childViewModel(
+        settings: AppSettings = AppSettings(locale = "ko"),
+    ): Pair<ChildRoutineViewModel, RecordingRoutineRepository> {
+        val source = InMemoryRoutineRepository(
+            initialData = listOf(RoutineSampleData.morning.copy(isActive = true, startTime = null)),
+        )
+        val repository = RecordingRoutineRepository(source)
+        return ChildRoutineViewModel(
+            repository = repository,
+            appSettingsRepository = FakeAppSettingsRepository(settings),
+        ) to repository
+    }
+}
+
+private data class FeedbackCase(
+    val settings: AppSettings,
+    val spokenText: String?,
+    val vibrate: Boolean,
+    val sound: Boolean,
+)
+
+private data class RoutineWrite(
+    val routineId: String,
+    val date: LocalDate,
+)
+
+private class RecordingRoutineRepository(
+    private val delegate: RoutineRepository,
+) : RoutineRepository by delegate {
+    val completeCalls = mutableListOf<RoutineWrite>()
+    val undoCalls = mutableListOf<RoutineWrite>()
+
+    override suspend fun completeRoutine(
+        routineId: String,
+        date: LocalDate,
+        completedAt: Instant,
+    ): DailyLog {
+        completeCalls += RoutineWrite(routineId, date)
+        return delegate.completeRoutine(routineId, date, completedAt)
+    }
+
+    override suspend fun undoRoutine(
+        routineId: String,
+        date: LocalDate,
+        updatedAt: Instant,
+    ): DailyLog {
+        undoCalls += RoutineWrite(routineId, date)
+        return delegate.undoRoutine(routineId, date, updatedAt)
+    }
+}
+
+private class FakeAppSettingsRepository(
+    initialSettings: AppSettings,
+) : AppSettingsRepository {
+    private val settings = MutableStateFlow(initialSettings)
+
+    override fun observeAppSettings(): Flow<AppSettings> = settings
+
+    override suspend fun updateAppSettings(settings: AppSettings) {
+        this.settings.value = settings
+    }
+
+    override suspend fun setGuardianPin(pin: String): String = error("Not used in child tests")
+
+    override suspend fun verifyGuardianPin(pin: String): Boolean = error("Not used in child tests")
+
+    override suspend fun verifyRecoveryCode(recoveryCode: String): Boolean = error("Not used in child tests")
+
+    override suspend fun changeGuardianPin(currentPin: String, newPin: String): String? =
+        error("Not used in child tests")
+
+    override suspend fun regenerateRecoveryCode(currentPin: String): String? = error("Not used in child tests")
+
+    override suspend fun resetGuardianPinWithRecoveryCode(recoveryCode: String, newPin: String): String? =
+        error("Not used in child tests")
 }
