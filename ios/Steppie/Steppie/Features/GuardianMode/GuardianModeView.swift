@@ -3281,8 +3281,3 @@ extension RoutineIconName {
         }
     }
 }
-
-extension Notification.Name {
-    static let guardianPINChangeRequested = Notification.Name("guardianPINChangeRequested")
-    static let guardianRecoveryCodeRegenerationRequested = Notification.Name("guardianRecoveryCodeRegenerationRequested")
-}

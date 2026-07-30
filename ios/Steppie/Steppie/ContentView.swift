@@ -52,7 +52,7 @@ struct ContentView: View {
                     viewModel: guardianViewModel,
                     tutorialCoordinator: tutorialCoordinator,
                     onDone: exitGuardianMode,
-                    onSecurityAction: postGuardianSecurityAction,
+                    onSecurityAction: handleGuardianSecurityAction,
                     onInteraction: resetGuardianInactivityTimer
                 )
             }
@@ -64,12 +64,6 @@ struct ContentView: View {
             }
             .onChange(of: notificationRouter?.pendingRoute) { _, _ in
                 consumePendingNotificationRoute()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .guardianPINChangeRequested)) { _ in
-                flowCoordinator.requestPINChange()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .guardianRecoveryCodeRegenerationRequested)) { _ in
-                flowCoordinator.requestRecoveryCodeRegeneration()
             }
             .sheet(isPresented: guardianSheetBinding, onDismiss: handleGuardianSheetDismiss) {
                 if let guardianSheet = flowCoordinator.state.sheet {
@@ -140,12 +134,12 @@ struct ContentView: View {
         inactivityToken = UUID()
     }
 
-    private func postGuardianSecurityAction(_ action: GuardianSecurityAction) {
+    private func handleGuardianSecurityAction(_ action: GuardianSecurityAction) {
         switch action {
         case .changePIN:
-            NotificationCenter.default.post(name: .guardianPINChangeRequested, object: nil)
+            flowCoordinator.requestPINChange()
         case .regenerateRecoveryCode:
-            NotificationCenter.default.post(name: .guardianRecoveryCodeRegenerationRequested, object: nil)
+            flowCoordinator.requestRecoveryCodeRegeneration()
         }
     }
 
