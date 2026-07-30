@@ -6,7 +6,6 @@ struct GuardianModeView: View {
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedRoutinePhotoItem: PhotosPickerItem?
-    @State private var selectedRoutineSetStepPhotoItem: PhotosPickerItem?
     @State private var draggedRoutineID: UUID?
     @State private var routineDragOrder: [UUID]?
     @State private var dragStartIndex: Int?
@@ -26,12 +25,6 @@ struct GuardianModeView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.steppieBackgroundSecondary)
                 .onTapGesture(perform: onInteraction)
-                .sheet(item: routineSetStepDraftBinding(isWide: isWide)) { _ in
-                    NavigationStack {
-                        AnyView(routineSetStepEditorPane)
-                    }
-                    .presentationDetents([.large])
-                }
                 .sheet(item: draftBinding(isWide: isWide)) { _ in
                     NavigationStack {
                         AnyView(cardEditorPane)
@@ -174,7 +167,12 @@ struct GuardianModeView: View {
     private func destinationDetail(_ destination: GuardianDestination, isWide: Bool) -> AnyView {
         switch destination {
         case .routineSetCreator:
-            AnyView(routineSetCreator(isWide: isWide))
+            AnyView(GuardianRoutineSetCreatorView(
+                isWide: isWide,
+                viewModel: viewModel,
+                onDone: onDone,
+                onInteraction: onInteraction
+            ))
         case .routineTemplates:
             AnyView(GuardianRoutineTemplateSelectionView(
                 isWide: isWide,
@@ -294,294 +292,6 @@ struct GuardianModeView: View {
                 AnyView(cardEditorPane)
                     .frame(maxWidth: .infinity)
             }
-        }
-    }
-
-    private func routineSetCreator(isWide: Bool) -> some View {
-        HStack(spacing: 0) {
-            AnyView(routineSetStepListPane(isWide: isWide))
-            if isWide {
-                Rectangle()
-                    .fill(Color.steppieBorderSubtle)
-                    .frame(width: SteppieStroke.divider)
-                AnyView(routineSetStepEditorPane)
-                    .frame(maxWidth: .infinity)
-            }
-        }
-        .onAppear {
-            if viewModel.routineSetDraft == nil {
-                viewModel.beginCreateRoutineSet()
-            }
-        }
-    }
-
-    private func routineSetStepListPane(isWide: Bool) -> some View {
-        List {
-            Section {
-                labeledCard("루틴 세트 제목") {
-                    TextField("예: 아침 루틴", text: routineSetNameBinding)
-                        .steppieTextStyle(.guardianBody)
-                        .textFieldStyle(.plain)
-                }
-                .listRowInsets(routineListRowInsets)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-            } header: {
-                header(
-                    title: "루틴 세트 생성",
-                    subtitle: "최소 1개 단계가 있어야 저장할 수 있습니다"
-                )
-                .padding(.top, SteppieSpacing.medium)
-                .padding(.horizontal, SteppieLayout.guardianScreenPadding)
-                .textCase(nil)
-            }
-
-            Section {
-                if viewModel.routineSetDraft?.steps.isEmpty != false {
-                    messageState(title: "단계가 없어요", message: "단계 추가로 첫 활동을 만들어 주세요.")
-                        .listRowInsets(routineListRowInsets)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                } else {
-                    ForEach(viewModel.routineSetDraft?.steps ?? []) { step in
-                        routineSetStepRow(step)
-                            .listRowInsets(routineListRowInsets)
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    viewModel.deleteRoutineSetStep(step)
-                                    onInteraction()
-                                } label: {
-                                    Label("삭제", systemImage: "trash")
-                                }
-                            }
-                    }
-                }
-            } header: {
-                Text("단계 목록")
-                    .steppieTextStyle(.guardianSection)
-                    .foregroundStyle(Color.steppieTextSecondary)
-                    .padding(.horizontal, SteppieLayout.guardianScreenPadding)
-                    .textCase(nil)
-            }
-
-            Section {
-                SteppieButton("+ 단계 추가") {
-                    viewModel.beginAddRoutineSetStep()
-                    onInteraction()
-                }
-                .listRowInsets(routineListRowInsets)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-
-                SteppieButton(
-                    "루틴 세트 저장",
-                    state: viewModel.canSaveRoutineSetDraft ? .enabled : .disabled
-                ) {
-                    viewModel.saveRoutineSetDraft(localeIdentifier: localeIdentifier)
-                    onInteraction()
-                }
-                .listRowInsets(routineListRowInsets)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-
-                SteppieButton("취소", role: .secondary) {
-                    viewModel.cancelRoutineSetDraft()
-                    viewModel.selectedDestination = nil
-                    onInteraction()
-                }
-                .listRowInsets(routineListRowInsets)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-            }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(Color.steppieBackgroundSecondary)
-        .frame(maxWidth: isWide ? SteppieLayout.splitListWidth : .infinity)
-        .navigationTitle("")
-        .toolbar {
-            if !isWide {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("완료", action: onDone)
-                }
-            }
-        }
-        .onDisappear {
-            if !isWide {
-                Task { @MainActor in
-                    if viewModel.selectedDestination != .routineSetCreator {
-                        viewModel.cancelRoutineSetDraft()
-                    }
-                }
-            }
-        }
-    }
-
-    private func routineSetStepRow(_ step: RoutineSetStepDraft) -> some View {
-        adaptiveCardStack(spacing: SteppieSpacing.small) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(SteppieCardColor(colorToken: step.colorToken).color)
-                .frame(width: dynamicTypeSize.isAccessibilitySize ? 68 : 20, height: dynamicTypeSize.isAccessibilitySize ? 20 : 68)
-                .accessibilityHidden(true)
-            RoutineVisualView(icon: step.icon, size: .list)
-                .frame(width: 52, height: 52)
-            VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
-                Text(step.title)
-                    .steppieTextStyle(.button)
-                    .foregroundStyle(Color.steppieTextPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(step.scheduledTime?.description ?? "시간 없음")
-                    .steppieTextStyle(.guardianCaption)
-                    .foregroundStyle(Color.steppieTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .contentShape(.rect)
-            .onTapGesture {
-                viewModel.beginEditRoutineSetStep(step)
-                onInteraction()
-            }
-            if !dynamicTypeSize.isAccessibilitySize {
-                Spacer()
-            }
-            VStack(spacing: SteppieSpacing.twoExtraSmall) {
-                Button {
-                    viewModel.moveRoutineSetStep(step, direction: -1)
-                    onInteraction()
-                } label: {
-                    Image(systemName: "chevron.up")
-                        .frame(
-                            width: SteppieLayout.guardianMinimumTouchTarget,
-                            height: SteppieLayout.guardianMinimumTouchTarget
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("\(step.title) 위로 이동"))
-
-                Button {
-                    viewModel.moveRoutineSetStep(step, direction: 1)
-                    onInteraction()
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .frame(
-                            width: SteppieLayout.guardianMinimumTouchTarget,
-                            height: SteppieLayout.guardianMinimumTouchTarget
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("\(step.title) 아래로 이동"))
-            }
-            .foregroundStyle(Color.steppieTextSecondary)
-        }
-        .padding(SteppieSpacing.small)
-        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
-        .background(Color.steppieBackgroundPrimary)
-        .overlay {
-            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
-                .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
-        }
-        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text(step.title))
-        .accessibilityValue(Text(step.scheduledTime?.description ?? "시간 없음"))
-        .accessibilityHint(Text("a11y.guardian.step.editOrReorderHint"))
-        .contextMenu {
-            Button("수정") { viewModel.beginEditRoutineSetStep(step) }
-            Button("삭제", role: .destructive) { viewModel.deleteRoutineSetStep(step) }
-        }
-    }
-
-    private var routineSetStepEditorPane: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
-                header(title: "단계 편집", subtitle: "이름, 아이콘, 색상, 시간을 설정합니다")
-                if viewModel.routineSetStepDraft == nil, let step = viewModel.selectedRoutineSetStep {
-                    SteppieButton("선택한 단계 편집") {
-                        viewModel.beginEditRoutineSetStep(step)
-                        onInteraction()
-                    }
-                    SteppieButton("선택한 단계 삭제", role: .danger) {
-                        viewModel.deleteRoutineSetStep(step)
-                        onInteraction()
-                    }
-                } else {
-                    routineSetStepForm
-                }
-                if viewModel.hasUnsavedRoutineSetDraft {
-                    warningNote("저장하지 않고 나가면 입력한 루틴 세트가 사라집니다.")
-                }
-            }
-            .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(SteppieLayout.guardianScreenPadding)
-        }
-        .background(Color.steppieBackgroundSecondary)
-    }
-
-    @ViewBuilder
-    private var routineSetStepForm: some View {
-        if let stepDraft = viewModel.routineSetStepDraft {
-            VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
-                labeledCard("활동 이름") {
-                    TextField("활동 이름", text: routineSetStepTitleBinding)
-                        .steppieTextStyle(.guardianBody)
-                        .textFieldStyle(.plain)
-                }
-                labeledCard("아이콘 또는 사진") {
-                    routineSetStepDraftVisualPicker(for: stepDraft)
-                }
-                labeledCard("카드 색상") {
-                    HStack(spacing: 10) {
-                        ForEach(SteppieCardColor.allCases, id: \.self) { color in
-                            Button {
-                                viewModel.routineSetStepDraft?.colorToken = color.token
-                                onInteraction()
-                            } label: {
-                                Circle()
-                                    .fill(color.color)
-                                    .frame(width: 44, height: 44)
-                                    .overlay {
-                                        if color.token == stepDraft.colorToken {
-                                            Circle().stroke(Color.steppieFocusRing, lineWidth: 3)
-                                        }
-                                    }
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(Text(color.accessibilityName))
-                            .accessibilityValue(Text(color.token == stepDraft.colorToken ? "a11y.selection.selected" : "a11y.selection.notSelected"))
-                            .accessibilityHint(Text("a11y.guardian.cardColor.selectHint"))
-                        }
-                    }
-                }
-                labeledCard("예정 시각") {
-                    scheduledTimeEditor(
-                        scheduledTime: stepDraft.scheduledTime,
-                        date: routineSetStepScheduledDateBinding,
-                        setDefaultTime: {
-                            viewModel.routineSetStepDraft?.scheduledTime = defaultScheduledTime
-                        },
-                        clearTime: {
-                            viewModel.routineSetStepDraft?.scheduledTime = nil
-                        }
-                    )
-                }
-                HStack(spacing: SteppieSpacing.medium) {
-                    SteppieButton("취소", role: .secondary) {
-                        viewModel.cancelRoutineSetStepDraft()
-                        onInteraction()
-                    }
-                    SteppieButton(
-                        "단계 저장",
-                        state: stepDraft.isValid ? .enabled : .disabled
-                    ) {
-                        viewModel.saveRoutineSetStepDraft()
-                        onInteraction()
-                    }
-                }
-            }
-        } else {
-            messageState(title: "단계를 선택해 주세요", message: "단계 추가 또는 목록의 단계를 선택해 편집할 수 있습니다.")
         }
     }
 
@@ -1333,55 +1043,6 @@ struct GuardianModeView: View {
         }
     }
 
-    private func routineSetStepDraftVisualPicker(for draft: RoutineSetStepDraft) -> some View {
-        VStack(alignment: .leading, spacing: SteppieSpacing.small) {
-            adaptiveCardStack(spacing: SteppieSpacing.medium) {
-                RoutineVisualView(icon: draft.icon, size: .list)
-                    .frame(width: 64, height: 64)
-                Picker("기본 아이콘", selection: routineSetStepIconBinding) {
-                    ForEach(RoutineIconName.allCases) { icon in
-                        Text(icon.displayName(for: locale)).tag(icon)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(minHeight: SteppieLayout.guardianMinimumTouchTarget)
-            }
-
-            adaptiveControlStack {
-                PhotosPicker(
-                    selection: $selectedRoutineSetStepPhotoItem,
-                    matching: .images,
-                    photoLibrary: .shared()
-                ) {
-                    secondaryPickerLabel("사진 선택")
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint(Text("사진 앱에서 활동 사진을 선택합니다"))
-
-                RoutineCameraCaptureButton(
-                    onImagePicked: updateRoutineSetStepDraftPhoto(image:),
-                    onInteraction: onInteraction
-                )
-
-                if draft.icon.type == .photo {
-                    Button(role: .destructive) {
-                        viewModel.resetRoutineSetStepDraftIconToDefault()
-                        selectedRoutineSetStepPhotoItem = nil
-                        onInteraction()
-                    } label: {
-                        secondaryPickerLabel("사진 삭제", foregroundColor: Color.steppieDanger)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityHint(Text("기본 아이콘으로 되돌립니다"))
-                }
-            }
-        }
-        .onChange(of: selectedRoutineSetStepPhotoItem) { _, item in
-            guard let item else { return }
-            loadSelectedRoutineSetStepPhoto(item)
-        }
-    }
-
     private func secondaryPickerLabel(
         _ title: LocalizedStringKey,
         foregroundColor: Color = Color.steppieTextPrimary
@@ -1415,29 +1076,10 @@ struct GuardianModeView: View {
         }
     }
 
-    private func loadSelectedRoutineSetStepPhoto(_ item: PhotosPickerItem) {
-        Task {
-            guard let data = try? await item.loadTransferable(type: Data.self) else {
-                selectedRoutineSetStepPhotoItem = nil
-                return
-            }
-            viewModel.updateRoutineSetStepDraftPhoto(data: data)
-            selectedRoutineSetStepPhotoItem = nil
-            onInteraction()
-        }
-    }
-
     private func updateDraftPhoto(image: UIImage) {
         guard let data = image.jpegData(compressionQuality: 0.9) else { return }
         viewModel.updateDraftPhoto(data: data)
         selectedRoutinePhotoItem = nil
-        onInteraction()
-    }
-
-    private func updateRoutineSetStepDraftPhoto(image: UIImage) {
-        guard let data = image.jpegData(compressionQuality: 0.9) else { return }
-        viewModel.updateRoutineSetStepDraftPhoto(data: data)
-        selectedRoutineSetStepPhotoItem = nil
         onInteraction()
     }
 
@@ -1606,74 +1248,8 @@ struct GuardianModeView: View {
         )
     }
 
-    private func routineSetStepDraftBinding(isWide: Bool) -> Binding<RoutineSetStepDraft?> {
-        Binding(
-            get: {
-                !isWide && viewModel.selectedDestination == .routineSetCreator
-                    ? viewModel.routineSetStepDraft
-                    : nil
-            },
-            set: {
-                if $0 == nil,
-                   !isWideLayout,
-                   viewModel.selectedDestination == .routineSetCreator {
-                    viewModel.cancelRoutineSetStepDraft()
-                }
-            }
-        )
-    }
-
-    private var routineSetNameBinding: Binding<String> {
-        Binding(
-            get: { viewModel.routineSetDraft?.name ?? "" },
-            set: {
-                viewModel.routineSetDraft?.name = $0
-                onInteraction()
-            }
-        )
-    }
-
-    private var routineSetStepTitleBinding: Binding<String> {
-        Binding(
-            get: { viewModel.routineSetStepDraft?.title ?? "" },
-            set: {
-                viewModel.routineSetStepDraft?.title = $0
-                onInteraction()
-            }
-        )
-    }
-
-    private var routineSetStepIconBinding: Binding<RoutineIconName> {
-        Binding(
-            get: { viewModel.routineSetStepDraft?.iconName ?? .star },
-            set: {
-                viewModel.routineSetStepDraft?.iconName = $0
-                selectedRoutineSetStepPhotoItem = nil
-                onInteraction()
-            }
-        )
-    }
-
     private var defaultScheduledTime: LocalTime {
         try! LocalTime(hour: 7, minute: 30)
-    }
-
-    private var routineSetStepScheduledDateBinding: Binding<Date> {
-        Binding(
-            get: {
-                let time = viewModel.routineSetStepDraft?.scheduledTime
-                return Calendar.current.date(
-                    from: DateComponents(hour: time?.hour ?? 7, minute: time?.minute ?? 30)
-                ) ?? .now
-            },
-            set: {
-                let components = Calendar.current.dateComponents([.hour, .minute], from: $0)
-                if let hour = components.hour, let minute = components.minute {
-                    viewModel.routineSetStepDraft?.scheduledTime = try? LocalTime(hour: hour, minute: minute)
-                }
-                onInteraction()
-            }
-        )
     }
 
     private var draftTitleBinding: Binding<String> {
@@ -1752,48 +1328,6 @@ struct GuardianModeView: View {
                 routineDragOrder = nil
                 dragStartIndex = nil
             }
-    }
-}
-
-private struct RoutineCameraCaptureButton: View {
-    @State private var isCameraPresented = false
-    @State private var isCameraUnavailableAlertPresented = false
-    let onImagePicked: (UIImage) -> Void
-    let onInteraction: () -> Void
-
-    var body: some View {
-        SteppieButton("사진 촬영", role: .secondary) {
-            if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                isCameraPresented = true
-            } else {
-                isCameraUnavailableAlertPresented = true
-            }
-            onInteraction()
-        }
-        .accessibilityHint(
-            Text(
-                UIImagePickerController.isSourceTypeAvailable(.camera)
-                    ? "카메라로 활동 사진을 촬영합니다"
-                    : "이 기기에서는 카메라를 사용할 수 없습니다"
-            )
-        )
-        .fullScreenCover(isPresented: $isCameraPresented) {
-            RoutineCameraPicker(
-                onImagePicked: { image in
-                    isCameraPresented = false
-                    onImagePicked(image)
-                },
-                onCancel: {
-                    isCameraPresented = false
-                }
-            )
-            .ignoresSafeArea()
-        }
-        .alert("카메라를 사용할 수 없어요", isPresented: $isCameraUnavailableAlertPresented) {
-            Button("확인", role: .cancel) {}
-        } message: {
-            Text("시뮬레이터 또는 카메라가 없는 기기에서는 사진 촬영을 사용할 수 없습니다.")
-        }
     }
 }
 
