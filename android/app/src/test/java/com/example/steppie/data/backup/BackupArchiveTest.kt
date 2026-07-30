@@ -13,8 +13,13 @@ import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -70,6 +75,51 @@ class BackupArchiveTest {
         assertEquals(3, read.assets.getValue(assetName).size)
     }
 
+    @Test
+    fun archive_semanticGolden_ignoresZipMetadataAndPreservesContractPayload() {
+        val assetName = "routine-photo-10000000-0000-4000-8000-000000000001.jpg"
+        val snapshot = testSnapshot()
+        val original = writeArchive(snapshot, mapOf(assetName to byteArrayOf(1, 2, 3)))
+        val archiveWithDifferentMetadata = rewriteZipEntryTimes(original, timeMillis = 0L)
+
+        val originalRead = BackupArchive.read(ByteArrayInputStream(original))
+        val rewrittenRead = BackupArchive.read(ByteArrayInputStream(archiveWithDifferentMetadata))
+
+        assertEquals(snapshot, originalRead.snapshot)
+        assertEquals(originalRead.manifest, rewrittenRead.manifest)
+        assertEquals(originalRead.snapshot, rewrittenRead.snapshot)
+        assertEquals(originalRead.assets.keys, rewrittenRead.assets.keys)
+        originalRead.assets.forEach { (name, bytes) ->
+            assertTrue(bytes.contentEquals(rewrittenRead.assets.getValue(name)))
+        }
+    }
+
+    @Test
+    fun dataJson_version1MissingOptionalFields_usesCompatibleDefaults() {
+        val version1Json = JSONObject(BackupJson.encodeData(testSnapshot())).apply {
+            put("schemaVersion", 1)
+            getJSONArray("routineSets").getJSONObject(0).remove("startTime")
+            getJSONObject("appSettings").apply {
+                remove("ttsRate")
+                remove("ttsVolume")
+                remove("notificationLeadTimes")
+                remove("quietHoursStart")
+                remove("quietHoursEnd")
+                remove("locale")
+            }
+        }
+
+        val restored = BackupJson.decodeData(version1Json.toString())
+
+        assertNull(restored.routineSets.single().startTime)
+        assertEquals(AppSettings().ttsRate, restored.appSettings.ttsRate, 0.0)
+        assertEquals(AppSettings().ttsVolume, restored.appSettings.ttsVolume, 0.0)
+        assertEquals(AppSettings().notificationLeadTimes, restored.appSettings.notificationLeadTimes)
+        assertNull(restored.appSettings.quietHoursStart)
+        assertNull(restored.appSettings.quietHoursEnd)
+        assertNull(restored.appSettings.locale)
+    }
+
     @Test(expected = BackupValidationException::class)
     fun archive_rejectsOversizedRoutinePhotoAsset() {
         val bytes = ByteArrayOutputStream()
@@ -108,6 +158,33 @@ class BackupArchiveTest {
         val duplicate = snapshot.copy(dailyLogs = snapshot.dailyLogs + duplicateLog)
 
         BackupJson.decodeData(BackupJson.encodeData(duplicate))
+    }
+
+    private fun writeArchive(
+        snapshot: BackupSnapshot,
+        assets: Map<String, ByteArray>,
+    ): ByteArray = ByteArrayOutputStream().also { output ->
+        BackupArchive.write(
+            snapshot = snapshot,
+            appVersion = "1.0",
+            output = output,
+            assets = assets,
+        )
+    }.toByteArray()
+
+    private fun rewriteZipEntryTimes(bytes: ByteArray, timeMillis: Long): ByteArray {
+        val output = ByteArrayOutputStream()
+        ZipInputStream(ByteArrayInputStream(bytes)).use { input ->
+            ZipOutputStream(output).use { zip ->
+                generateSequence { input.nextEntry }.forEach { source ->
+                    zip.putNextEntry(ZipEntry(source.name).apply { time = timeMillis })
+                    if (!source.isDirectory) input.copyTo(zip)
+                    zip.closeEntry()
+                    input.closeEntry()
+                }
+            }
+        }
+        return output.toByteArray()
     }
 
     private fun testSnapshot(): BackupSnapshot {

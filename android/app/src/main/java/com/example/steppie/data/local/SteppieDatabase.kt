@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DailyRoutineSelectionEntity::class,
     ],
     version = 4,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class SteppieDatabase : RoomDatabase() {
     abstract fun routineDao(): RoutineDao
