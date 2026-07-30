@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.steppie.data.backup.AndroidBackupRepository
@@ -44,6 +45,13 @@ import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.notifications.ACTION_OPEN_ROUTINE
 import com.example.steppie.notifications.AndroidRoutineNotificationScheduler
 import com.example.steppie.notifications.EXTRA_ROUTINE_ID
+import com.example.steppie.ui.app.AppMode
+import com.example.steppie.ui.app.PhotoTarget
+import com.example.steppie.ui.app.resolveAppMode
+import com.example.steppie.ui.app.resolveCameraResult
+import com.example.steppie.ui.app.resolveNotificationRoute
+import com.example.steppie.ui.app.resolveNotificationTarget
+import com.example.steppie.ui.app.resolvePhotoPickerResult
 import com.example.steppie.ui.child.ChildRoutineFeedbackEvent
 import com.example.steppie.ui.child.ChildRoutineScreen
 import com.example.steppie.ui.child.ChildRoutineViewModel
@@ -123,30 +131,31 @@ class MainActivity : ComponentActivity() {
                 val photoPickerLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.StartActivityForResult(),
                 ) { result ->
-                    val target = photoTargetName.toPhotoTarget()
+                    val request = resolvePhotoPickerResult(
+                        targetName = photoTargetName,
+                        uri = result.data?.data?.toString(),
+                    )
                     photoTargetName = null
-                    val uri = result.data?.data
-                    if (uri != null) {
-                        when (target) {
-                            PhotoTarget.RoutineDraft -> guardianViewModel.importDraftPhoto(uri)
-                            PhotoTarget.RoutineSetStep -> guardianViewModel.importRoutineSetStepPhoto(uri)
-                            null -> Unit
-                        }
+                    when (request?.target) {
+                        PhotoTarget.RoutineDraft -> guardianViewModel.importDraftPhoto(request.uri.toUri())
+                        PhotoTarget.RoutineSetStep -> guardianViewModel.importRoutineSetStepPhoto(request.uri.toUri())
+                        null -> Unit
                     }
                 }
                 val cameraLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.TakePicture(),
                 ) { success ->
-                    val target = cameraPhotoTargetName.toPhotoTarget()
-                    val uri = cameraPhotoUriString?.let(Uri::parse)
+                    val request = resolveCameraResult(
+                        targetName = cameraPhotoTargetName,
+                        uri = cameraPhotoUriString,
+                        succeeded = success,
+                    )
                     cameraPhotoTargetName = null
                     cameraPhotoUriString = null
-                    if (success && uri != null) {
-                        when (target) {
-                            PhotoTarget.RoutineDraft -> guardianViewModel.importDraftPhoto(uri)
-                            PhotoTarget.RoutineSetStep -> guardianViewModel.importRoutineSetStepPhoto(uri)
-                            null -> Unit
-                        }
+                    when (request?.target) {
+                        PhotoTarget.RoutineDraft -> guardianViewModel.importDraftPhoto(request.uri.toUri())
+                        PhotoTarget.RoutineSetStep -> guardianViewModel.importRoutineSetStepPhoto(request.uri.toUri())
+                        null -> Unit
                     }
                 }
                 val createBackupLauncher = rememberLauncherForActivityResult(
@@ -187,9 +196,12 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 LaunchedEffect(targetRoutineId, childState.routines) {
-                    val routineId = targetRoutineId ?: return@LaunchedEffect
-                    if (childState.routines.any { it.id == routineId }) {
-                        childViewModel.selectRoutine(routineId)
+                    val route = resolveNotificationRoute(
+                        targetRoutineId = targetRoutineId,
+                        visibleRoutineIds = childState.routines.mapTo(mutableSetOf()) { it.id },
+                    )
+                    route.routineIdToSelect?.let(childViewModel::selectRoutine)
+                    if (route.consumeRoute) {
                         notificationRoutineId.value = null
                     }
                 }
@@ -233,8 +245,12 @@ class MainActivity : ComponentActivity() {
                 }
 
                 CompositionLocalProvider(LocalTutorialAnchorRegistry provides tutorialAnchorRegistry) {
-                if (appBootstrapComplete) Box(Modifier.fillMaxSize()) {
-                if (guardianState.isActive) {
+                val appMode = resolveAppMode(
+                    bootstrapComplete = appBootstrapComplete,
+                    guardianActive = guardianState.isActive,
+                )
+                if (appMode != AppMode.Bootstrap) Box(Modifier.fillMaxSize()) {
+                if (appMode == AppMode.Guardian) {
                     GuardianModeScreen(
                         state = guardianState,
                         onDigit = guardianViewModel::inputPinDigit,
@@ -413,12 +429,11 @@ class MainActivity : ComponentActivity() {
 }
 
 private fun android.content.Intent?.notificationRoutineId(): String? =
-    this?.takeIf { it.action == ACTION_OPEN_ROUTINE }?.getStringExtra(EXTRA_ROUTINE_ID)
-
-private enum class PhotoTarget { RoutineDraft, RoutineSetStep }
-
-private fun String?.toPhotoTarget(): PhotoTarget? =
-    this?.let { name -> PhotoTarget.entries.firstOrNull { it.name == name } }
+    resolveNotificationTarget(
+        action = this?.action,
+        routineId = this?.getStringExtra(EXTRA_ROUTINE_ID),
+        expectedAction = ACTION_OPEN_ROUTINE,
+    )
 
 private class AndroidFeedbackController(
     private val activity: ComponentActivity,
