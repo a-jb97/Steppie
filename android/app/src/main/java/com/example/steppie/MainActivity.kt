@@ -37,6 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.steppie.data.backup.AndroidBackupRepository
 import com.example.steppie.data.backup.BackupDataSource
+import com.example.steppie.core.environment.SystemClockProvider
+import com.example.steppie.core.environment.SystemLocaleProvider
 import com.example.steppie.data.local.SteppieDatabase
 import com.example.steppie.data.photo.RoutinePhotoStore
 import com.example.steppie.data.repository.DataStoreAppSettingsRepository
@@ -101,12 +103,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             SteppieTheme {
                 val childViewModel: ChildRoutineViewModel = viewModel(
-                    factory = ChildRoutineViewModel.factory(routineRepository, appSettingsRepository),
+                    factory = ChildRoutineViewModel.factory(
+                        routineRepository,
+                        appSettingsRepository,
+                        SystemClockProvider,
+                        SystemLocaleProvider,
+                    ),
                 )
                 val guardianViewModel: GuardianModeViewModel = viewModel(
                     factory = GuardianModeViewModel.factory(
                         routineRepository,
                         appSettingsRepository,
+                        SystemClockProvider,
+                        SystemLocaleProvider,
                         backupRepository,
                         routinePhotoStore,
                     ),

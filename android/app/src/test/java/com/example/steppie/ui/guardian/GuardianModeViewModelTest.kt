@@ -8,6 +8,10 @@ import com.example.steppie.domain.model.FeedbackIntensity
 import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.testing.MainDispatcherRule
+import com.example.steppie.testing.TestClockProvider
+import com.example.steppie.testing.TestLocaleProvider
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
@@ -158,6 +162,9 @@ class GuardianModeViewModelTest {
             val state = viewModel.uiState.value
 
             assertEquals("새 활동", savedRoutine.title.values.values.single())
+            assertEquals(mapOf("ko" to "새 활동"), savedRoutine.title.values)
+            assertEquals(TestInstant, savedRoutine.createdAt)
+            assertEquals(TestInstant, savedRoutine.updatedAt)
             assertEquals("08:15", savedRoutine.scheduledTime.toString())
             assertEquals("book", (savedRoutine.icon as IconRef.Builtin).name)
             assertEquals(GuardianDestination.RoutineEdit, state.destination)
@@ -217,7 +224,12 @@ class GuardianModeViewModelTest {
         )
         val settingsRepository = FakeGuardianSettingsRepository(settings, currentPin)
         return GuardianFixture(
-            viewModel = GuardianModeViewModel(routineRepository, settingsRepository),
+            viewModel = GuardianModeViewModel(
+                routineRepository = routineRepository,
+                appSettingsRepository = settingsRepository,
+                clockProvider = TestClockProvider(TestInstant, ZoneOffset.UTC),
+                localeProvider = TestLocaleProvider("ko"),
+            ),
             routineRepository = routineRepository,
             settingsRepository = settingsRepository,
         )
@@ -227,6 +239,8 @@ class GuardianModeViewModelTest {
         pin.forEach { digit -> viewModel.inputPinDigit(digit.digitToInt()) }
     }
 }
+
+private val TestInstant = Instant.parse("2026-01-02T08:00:00Z")
 
 private data class GuardianFixture(
     val viewModel: GuardianModeViewModel,

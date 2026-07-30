@@ -4,6 +4,9 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.steppie.core.environment.ClockProvider
+import com.example.steppie.core.environment.LocaleProvider
+import com.example.steppie.core.environment.SystemClockProvider
 import com.example.steppie.data.backup.BackupImportPreview
 import com.example.steppie.data.backup.BackupProvider
 import com.example.steppie.data.backup.BackupValidationException
@@ -25,7 +28,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
-import java.util.Locale
+import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -122,15 +125,15 @@ data class GuardianModeUiState(
     val selectedTemplate: RoutineTemplate? = null,
     val templateReturnDestination: GuardianDestination = GuardianDestination.RoutineEdit,
     val routineSetListEditing: Boolean = false,
-    val selectedRecordsDate: LocalDate = LocalDate.now(),
+    val selectedRecordsDate: LocalDate = SystemClockProvider.today(),
     val recordDays: List<GuardianRecordDay> = emptyList(),
     val selectedRecordRoutines: List<GuardianRecordRoutine> = emptyList(),
-    val selectedRecordSummary: GuardianRecordDay = GuardianRecordDay(LocalDate.now(), 0, 0, false),
-    val recordsCalendarMonth: YearMonth = YearMonth.now(),
+    val selectedRecordSummary: GuardianRecordDay = GuardianRecordDay(SystemClockProvider.today(), 0, 0, false),
+    val recordsCalendarMonth: YearMonth = SystemClockProvider.currentYearMonth(),
     val selectedCalendarRecordsDate: LocalDate? = null,
     val calendarRecordDates: Set<LocalDate> = emptySet(),
     val selectedCalendarRecordRoutines: List<GuardianRecordRoutine> = emptyList(),
-    val selectedCalendarRecordSummary: GuardianRecordDay = GuardianRecordDay(LocalDate.now(), 0, 0, false),
+    val selectedCalendarRecordSummary: GuardianRecordDay = GuardianRecordDay(SystemClockProvider.today(), 0, 0, false),
     val editingRoutineSetId: String? = null,
     val editingRoutineSetName: String = "",
     val draftError: String? = null,
@@ -150,21 +153,20 @@ data class GuardianModeUiState(
     val notice: String? = null,
     val interactionToken: Long = 0L,
     val restoreCompletedToken: Long = 0L,
-) {
-    val title: String
-        get() = activeRoutineSet?.name?.resolve(null, Locale.getDefault().toLanguageTag()).orEmpty()
-}
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GuardianModeViewModel(
     private val routineRepository: RoutineRepository,
     private val appSettingsRepository: AppSettingsRepository,
+    private val clockProvider: ClockProvider,
+    private val localeProvider: LocaleProvider,
     private val backupProvider: BackupProvider? = null,
     private val routinePhotoStore: RoutinePhotoStore? = null,
 ) : ViewModel() {
-    private val recordsEndDate = MutableStateFlow(LocalDate.now())
-    private val currentDate = MutableStateFlow(LocalDate.now())
-    private val _uiState = MutableStateFlow(GuardianModeUiState())
+    private val recordsEndDate = MutableStateFlow(clockProvider.today())
+    private val currentDate = MutableStateFlow(clockProvider.today())
+    private val _uiState = MutableStateFlow(initialState())
     val uiState: StateFlow<GuardianModeUiState> = _uiState.asStateFlow()
     private var verifiedPinForChange: String? = null
     private var verifiedRecoveryCodeForReset: String? = null
@@ -172,6 +174,16 @@ class GuardianModeViewModel(
     private var recordRoutineSetsCache: List<RoutineSet> = emptyList()
     private var dailyLogsCache: List<DailyLog> = emptyList()
     private var allDailyLogsCache: List<DailyLog> = emptyList()
+
+    private fun initialState(): GuardianModeUiState {
+        val today = clockProvider.today()
+        return GuardianModeUiState(
+            selectedRecordsDate = today,
+            selectedRecordSummary = GuardianRecordDay(today, 0, 0, false),
+            recordsCalendarMonth = YearMonth.from(today),
+            selectedCalendarRecordSummary = GuardianRecordDay(today, 0, 0, false),
+        )
+    }
 
     init {
         val routineSetsWithTodaySelection = currentDate.flatMapLatest { date ->
@@ -225,6 +237,8 @@ class GuardianModeViewModel(
                         endDate = snapshot.recordsEndDate,
                         routineSets = snapshot.recordRoutineSets,
                         dailyLogs = snapshot.dailyLogs,
+                        localeTag = localeProvider.languageTag(),
+                        zoneId = clockProvider.zoneId,
                     )
                     val calendarRecordDates = snapshot.allDailyLogs.map(DailyLog::date).toSet()
                     val selectedCalendarDate = state.selectedCalendarRecordsDate
@@ -236,6 +250,9 @@ class GuardianModeViewModel(
                             .filter(RoutineSet::isActive)
                             .takeIf { selectedCalendarDate == snapshot.today }
                             .orEmpty(),
+                        fallbackDate = snapshot.today,
+                        localeTag = localeProvider.languageTag(),
+                        zoneId = clockProvider.zoneId,
                     )
                     val resolvedPinMode = if (
                         state.isActive &&
@@ -321,7 +338,7 @@ class GuardianModeViewModel(
         verifiedPinForChange = null
         verifiedRecoveryCodeForReset = null
         _uiState.update {
-            GuardianModeUiState(
+            initialState().copy(
                 hasGuardianPin = it.hasGuardianPin,
                 appSettings = it.appSettings,
                 routineSets = it.routineSets,
@@ -476,6 +493,9 @@ class GuardianModeViewModel(
             routineSets = recordRoutineSetsCache,
             dailyLogs = allDailyLogsCache,
             routineSetsForSelectedDate = current.routineSets.filter(RoutineSet::isActive),
+            fallbackDate = today,
+            localeTag = localeProvider.languageTag(),
+            zoneId = clockProvider.zoneId,
         )
         _uiState.update {
             it.copy(
@@ -509,6 +529,8 @@ class GuardianModeViewModel(
             endDate = recordsEndDate.value,
             routineSets = recordRoutineSetsCache,
             dailyLogs = dailyLogsCache,
+            localeTag = localeProvider.languageTag(),
+            zoneId = clockProvider.zoneId,
         )
         _uiState.update {
             it.copy(
@@ -534,6 +556,9 @@ class GuardianModeViewModel(
                 .filter(RoutineSet::isActive)
                 .takeIf { date == today }
                 .orEmpty(),
+            fallbackDate = today,
+            localeTag = localeProvider.languageTag(),
+            zoneId = clockProvider.zoneId,
         )
         _uiState.update {
             it.copy(
@@ -697,7 +722,7 @@ class GuardianModeViewModel(
         _uiState.update {
             if (it.pinMode == GuardianPinMode.SetupConfirm) {
                 pendingSetupPin = null
-                return@update GuardianModeUiState(
+                return@update initialState().copy(
                     hasGuardianPin = true,
                     appSettings = it.appSettings,
                     routineSets = it.routineSets,
@@ -788,7 +813,7 @@ class GuardianModeViewModel(
 
     fun openRoutineEditor(routineId: String) {
         val routine = _uiState.value.routines.firstOrNull { it.id == routineId } ?: return
-        val title = routine.title.resolve(null, Locale.getDefault().toLanguageTag())
+        val title = routine.title.resolve(null, localeProvider.languageTag())
         _uiState.update {
             it.copy(
                 destination = GuardianDestination.CardEdit,
@@ -881,7 +906,7 @@ class GuardianModeViewModel(
         val template = _uiState.value.selectedTemplate ?: return
         viewModelScope.launch {
             runCatching {
-                val created = template.instantiate(Instant.now())
+                val created = template.instantiate(clockProvider.now())
                 routineRepository.createRoutineSet(
                     created.copy(isActive = _uiState.value.routineSets.none(RoutineSet::isActive)),
                 )
@@ -971,7 +996,7 @@ class GuardianModeViewModel(
         }
         viewModelScope.launch {
             routineRepository.updateRoutineSet(
-                target.copy(isActive = !target.isActive, updatedAt = Instant.now()),
+                target.copy(isActive = !target.isActive, updatedAt = clockProvider.now()),
             )
             _uiState.update {
                 it.copy(
@@ -1004,7 +1029,7 @@ class GuardianModeViewModel(
         }
         viewModelScope.launch {
             routineRepository.updateRoutineSet(
-                target.copy(startTime = parsed, updatedAt = Instant.now()),
+                target.copy(startTime = parsed, updatedAt = clockProvider.now()),
             )
             _uiState.update {
                 it.copy(
@@ -1026,7 +1051,7 @@ class GuardianModeViewModel(
     }
 
     private fun refreshCurrentDate(): LocalDate {
-        val today = LocalDate.now()
+        val today = clockProvider.today()
         if (currentDate.value != today) {
             currentDate.value = today
         }
@@ -1038,7 +1063,7 @@ class GuardianModeViewModel(
         _uiState.update {
             it.copy(
                 editingRoutineSetId = routineSet.id,
-                editingRoutineSetName = routineSet.name.resolve(null, Locale.getDefault().toLanguageTag()),
+                editingRoutineSetName = routineSet.name.resolve(null, localeProvider.languageTag()),
                 draftError = null,
                 interactionToken = it.interactionToken + 1,
             )
@@ -1078,8 +1103,8 @@ class GuardianModeViewModel(
         viewModelScope.launch {
             routineRepository.updateRoutineSet(
                 routineSet.copy(
-                    name = LocalizedText(mapOf(Locale.getDefault().toLanguageTag() to trimmedName)),
-                    updatedAt = Instant.now(),
+                    name = LocalizedText(mapOf(localeProvider.languageTag() to trimmedName)),
+                    updatedAt = clockProvider.now(),
                 ),
             )
             cancelEditRoutineSetName()
@@ -1232,12 +1257,12 @@ class GuardianModeViewModel(
 
     fun saveRoutineSetDraft() {
         val draft = _uiState.value.routineSetDraft ?: return
-        val now = Instant.now()
+        val now = clockProvider.now()
         val routineSet = runCatching {
             buildRoutineSetFromDraft(
                 draft = draft,
                 now = now,
-                localeTag = Locale.getDefault().toLanguageTag(),
+                localeTag = localeProvider.languageTag(),
             )
         }.getOrElse { error ->
             _uiState.update { it.copy(draftError = error.message ?: "루틴 세트를 저장할 수 없습니다.") }
@@ -1272,8 +1297,8 @@ class GuardianModeViewModel(
         }
 
         viewModelScope.launch {
-            val now = Instant.now()
-            val localizedTitle = LocalizedText(mapOf(Locale.getDefault().toLanguageTag() to trimmedTitle))
+            val now = clockProvider.now()
+            val localizedTitle = LocalizedText(mapOf(localeProvider.languageTag() to trimmedTitle))
             if (draft.isNew) {
                 routineRepository.createRoutine(
                     Routine(
@@ -1385,11 +1410,11 @@ class GuardianModeViewModel(
                 if (state.routineSets.count(RoutineSet::isActive) <= 1) {
                     state.routineSets.firstOrNull { it.id != target.id }?.let { replacement ->
                         routineRepository.updateRoutineSet(
-                            replacement.copy(isActive = true, updatedAt = Instant.now()),
+                            replacement.copy(isActive = true, updatedAt = clockProvider.now()),
                         )
                     }
                 }
-                routineRepository.updateRoutineSet(target.copy(isActive = false, updatedAt = Instant.now()))
+                routineRepository.updateRoutineSet(target.copy(isActive = false, updatedAt = clockProvider.now()))
             }
             routineRepository.deleteRoutineSet(target.id)
             _uiState.update {
@@ -1593,7 +1618,7 @@ class GuardianModeViewModel(
             runCatching { provider.restoreReplace(uri) }
                 .onSuccess {
                     _uiState.update {
-                        GuardianModeUiState(
+                        initialState().copy(
                             backupMessage = "백업 파일에서 복원했습니다.",
                             interactionToken = it.interactionToken + 1,
                             restoreCompletedToken = it.restoreCompletedToken + 1,
@@ -1863,6 +1888,8 @@ class GuardianModeViewModel(
         fun factory(
             routineRepository: RoutineRepository,
             appSettingsRepository: AppSettingsRepository,
+            clockProvider: ClockProvider,
+            localeProvider: LocaleProvider,
             backupProvider: BackupProvider? = null,
             routinePhotoStore: RoutinePhotoStore? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
@@ -1872,6 +1899,8 @@ class GuardianModeViewModel(
                 return GuardianModeViewModel(
                     routineRepository,
                     appSettingsRepository,
+                    clockProvider,
+                    localeProvider,
                     backupProvider,
                     routinePhotoStore,
                 ) as T
@@ -1925,6 +1954,8 @@ private fun buildGuardianRecords(
     endDate: LocalDate,
     routineSets: List<RoutineSet>,
     dailyLogs: List<DailyLog>,
+    localeTag: String,
+    zoneId: ZoneId,
 ): GuardianRecordsResult {
     val startDate = endDate.minusDays(6)
     val logsByDate = dailyLogs.groupBy(DailyLog::date)
@@ -1941,6 +1972,8 @@ private fun buildGuardianRecords(
             logs = logsByDate[date].orEmpty(),
             routineSetsById = routineSetsById,
             routinesById = routinesById,
+            localeTag = localeTag,
+            zoneId = zoneId,
         )
     }
     val days = dates.map { date ->
@@ -1967,8 +2000,11 @@ private fun buildGuardianRecordDetail(
     routineSets: List<RoutineSet>,
     dailyLogs: List<DailyLog>,
     routineSetsForSelectedDate: List<RoutineSet> = emptyList(),
+    fallbackDate: LocalDate,
+    localeTag: String,
+    zoneId: ZoneId,
 ): GuardianRecordsResult {
-    val date = selectedDate ?: LocalDate.now()
+    val date = selectedDate ?: fallbackDate
     val logs = if (selectedDate == null) emptyList() else dailyLogs.filter { it.date == selectedDate }
     val routinesById = routineSets
         .flatMap(RoutineSet::routines)
@@ -1980,6 +2016,8 @@ private fun buildGuardianRecordDetail(
         routineSetsById = routineSetsById,
         routinesById = routinesById,
         fallbackRoutineSets = routineSetsForSelectedDate,
+        localeTag = localeTag,
+        zoneId = zoneId,
     )
     val summary = GuardianRecordDay(
         date = date,
@@ -1996,6 +2034,8 @@ private fun buildGuardianRecordRoutines(
     routineSetsById: Map<String, RoutineSet>,
     routinesById: Map<String, Routine>,
     fallbackRoutineSets: List<RoutineSet> = emptyList(),
+    localeTag: String,
+    zoneId: ZoneId,
 ): List<GuardianRecordRoutine> {
     if (logs.isEmpty()) {
         return fallbackRoutineSets
@@ -2005,12 +2045,12 @@ private fun buildGuardianRecordRoutines(
                     .thenBy { it.createdAt },
             )
             .flatMap(RoutineSet::routines)
-            .filter { it.existedOn(date) && it.deletedAt == null && it.isActive }
+            .filter { it.existedOn(date, zoneId) && it.deletedAt == null && it.isActive }
             .sortedWith(compareBy<Routine> { it.order }.thenBy { it.createdAt }.thenBy { it.id })
             .map { routine ->
                 GuardianRecordRoutine(
                     routineId = routine.id,
-                    title = routine.title.resolve(null, Locale.getDefault().toLanguageTag()),
+                    title = routine.title.resolve(null, localeTag),
                     isCompleted = false,
                     completedAt = null,
                     isDeleted = false,
@@ -2023,7 +2063,7 @@ private fun buildGuardianRecordRoutines(
     val loggedRoutineSetRoutines = logs
         .mapNotNull { routineSetsById[it.routineSetId] }
         .flatMap(RoutineSet::routines)
-        .filter { it.existedOn(date) }
+        .filter { it.existedOn(date, zoneId) }
     val loggedRoutines = logs.mapNotNull { routinesById[it.routineId] }
     val missingLogRows = logs
         .filter { it.routineId !in routinesById }
@@ -2045,7 +2085,7 @@ private fun buildGuardianRecordRoutines(
             val log = logsByRoutineId[routine.id]
             GuardianRecordRoutine(
                 routineId = routine.id,
-                title = routine.title.resolve(null, Locale.getDefault().toLanguageTag()),
+                title = routine.title.resolve(null, localeTag),
                 isCompleted = log?.status == LogStatus.Completed,
                 completedAt = log?.completedAt,
                 isDeleted = routine.deletedAt != null,
@@ -2056,10 +2096,8 @@ private fun buildGuardianRecordRoutines(
     return routineRows + missingLogRows
 }
 
-private fun Routine.existedOn(date: LocalDate): Boolean {
-    val zone = java.time.ZoneId.systemDefault()
-    return !createdAt.atZone(zone).toLocalDate().isAfter(date)
-}
+private fun Routine.existedOn(date: LocalDate, zoneId: ZoneId): Boolean =
+    !createdAt.atZone(zoneId).toLocalDate().isAfter(date)
 
 internal fun buildRoutineSetFromDraft(
     draft: RoutineSetDraft,

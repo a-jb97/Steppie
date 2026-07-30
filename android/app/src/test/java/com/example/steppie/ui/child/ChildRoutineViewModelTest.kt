@@ -10,9 +10,12 @@ import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.domain.repository.RoutineRepository
 import com.example.steppie.testing.MainDispatcherRule
+import com.example.steppie.testing.TestClockProvider
+import com.example.steppie.testing.TestLocaleProvider
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneOffset
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -327,10 +330,12 @@ class ChildRoutineViewModelTest {
             runCurrent()
 
             val state = viewModel.uiState.value
-            val log = repository.observeDailyLogs(LocalDate.now()).first().single()
+            val log = repository.observeDailyLogs(TestDate).first().single()
             val event = feedback.await()
 
             assertEquals(listOf(target.id), repository.completeCalls.map { it.routineId })
+            assertEquals(listOf(TestDate), repository.completeCalls.map { it.date })
+            assertEquals(listOf(TestInstant), repository.completeCalls.map { it.at })
             assertTrue(repository.undoCalls.isEmpty())
             assertEquals(LogStatus.Completed, log.status)
             assertEquals(target.id, state.feedbackRoutineId)
@@ -360,10 +365,11 @@ class ChildRoutineViewModelTest {
             runCurrent()
 
             val state = viewModel.uiState.value
-            val log = repository.observeDailyLogs(LocalDate.now()).first().single()
+            val log = repository.observeDailyLogs(TestDate).first().single()
 
             assertEquals(listOf(target.id), repository.completeCalls.map { it.routineId })
             assertEquals(listOf(target.id), repository.undoCalls.map { it.routineId })
+            assertEquals(listOf(TestInstant), repository.undoCalls.map { it.at })
             assertEquals(LogStatus.Undone, log.status)
             assertNull(log.completedAt)
             assertEquals(target.id, state.selectedRoutineId)
@@ -477,9 +483,14 @@ class ChildRoutineViewModelTest {
         return ChildRoutineViewModel(
             repository = repository,
             appSettingsRepository = FakeAppSettingsRepository(settings),
+            clockProvider = TestClockProvider(TestInstant, ZoneOffset.UTC),
+            localeProvider = TestLocaleProvider("ko"),
         ) to repository
     }
 }
+
+private val TestInstant = Instant.parse("2026-01-02T08:00:00Z")
+private val TestDate = LocalDate.parse("2026-01-02")
 
 private data class FeedbackCase(
     val settings: AppSettings,
@@ -491,6 +502,7 @@ private data class FeedbackCase(
 private data class RoutineWrite(
     val routineId: String,
     val date: LocalDate,
+    val at: Instant,
 )
 
 private class RecordingRoutineRepository(
@@ -504,7 +516,7 @@ private class RecordingRoutineRepository(
         date: LocalDate,
         completedAt: Instant,
     ): DailyLog {
-        completeCalls += RoutineWrite(routineId, date)
+        completeCalls += RoutineWrite(routineId, date, completedAt)
         return delegate.completeRoutine(routineId, date, completedAt)
     }
 
@@ -513,7 +525,7 @@ private class RecordingRoutineRepository(
         date: LocalDate,
         updatedAt: Instant,
     ): DailyLog {
-        undoCalls += RoutineWrite(routineId, date)
+        undoCalls += RoutineWrite(routineId, date, updatedAt)
         return delegate.undoRoutine(routineId, date, updatedAt)
     }
 }

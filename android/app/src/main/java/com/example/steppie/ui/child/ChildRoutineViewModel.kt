@@ -3,6 +3,8 @@ package com.example.steppie.ui.child
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.steppie.core.environment.ClockProvider
+import com.example.steppie.core.environment.LocaleProvider
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.DailyLog
 import com.example.steppie.domain.model.FeedbackIntensity
@@ -14,7 +16,6 @@ import com.example.steppie.domain.repository.RoutineRepository
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,14 +41,16 @@ data class ChildRoutineFeedbackEvent(
 class ChildRoutineViewModel(
     private val repository: RoutineRepository,
     private val appSettingsRepository: AppSettingsRepository,
+    private val clockProvider: ClockProvider,
+    private val localeProvider: LocaleProvider,
 ) : ViewModel() {
-    private val currentDate = MutableStateFlow(LocalDate.now())
+    private val currentDate = MutableStateFlow(clockProvider.today())
     private val _uiState = MutableStateFlow(ChildRoutineUiState())
     val uiState: StateFlow<ChildRoutineUiState> = _uiState.asStateFlow()
     private val _feedbackEvents = MutableSharedFlow<ChildRoutineFeedbackEvent>()
     val feedbackEvents: SharedFlow<ChildRoutineFeedbackEvent> = _feedbackEvents.asSharedFlow()
     private val settings = MutableStateFlow(AppSettings())
-    private val currentTime = MutableStateFlow(LocalTime.now().truncatedTo(ChronoUnit.MINUTES))
+    private val currentTime = MutableStateFlow(clockProvider.currentTime().truncatedTo(ChronoUnit.MINUTES))
     private var latestRoutineSets: List<RoutineSet> = emptyList()
     private var latestCompletedIds: Set<String> = emptySet()
     private var lastGuidedRoutineId: String? = null
@@ -92,7 +95,7 @@ class ChildRoutineViewModel(
             while (true) {
                 delay(30_000L)
                 refreshCurrentDate()
-                currentTime.value = LocalTime.now().truncatedTo(ChronoUnit.MINUTES)
+                currentTime.value = clockProvider.currentTime().truncatedTo(ChronoUnit.MINUTES)
             }
         }
     }
@@ -141,7 +144,7 @@ class ChildRoutineViewModel(
         latestCompletedIds = latestCompletedIds + routine.id
 
         viewModelScope.launch {
-            repository.completeRoutine(routine.id, actionDate)
+            repository.completeRoutine(routine.id, actionDate, clockProvider.now())
             val appSettings = settings.value
             _feedbackEvents.emit(
                 ChildRoutineFeedbackEvent(
@@ -188,13 +191,13 @@ class ChildRoutineViewModel(
             singlePane = ChildSinglePane.Focus,
         )
         viewModelScope.launch {
-            repository.undoRoutine(routineId, actionDate)
+            repository.undoRoutine(routineId, actionDate, clockProvider.now())
         }
     }
 
     fun onDataChanged() {
         refreshCurrentDate()
-        currentTime.value = LocalTime.now().truncatedTo(ChronoUnit.MINUTES)
+        currentTime.value = clockProvider.currentTime().truncatedTo(ChronoUnit.MINUTES)
         lastGuidedRoutineId = null
         _uiState.value = _uiState.value.copy(
             feedbackRoutineId = null,
@@ -224,10 +227,10 @@ class ChildRoutineViewModel(
     }
 
     private fun Routine.localizedTitleForDevice(settings: AppSettings): String =
-        title.resolve(appLocale = settings.locale, systemLocale = Locale.getDefault().toLanguageTag())
+        title.resolve(appLocale = settings.locale, systemLocale = localeProvider.languageTag())
 
     private fun refreshCurrentDate(): LocalDate {
-        val today = LocalDate.now()
+        val today = clockProvider.today()
         if (currentDate.value != today) {
             currentDate.value = today
             lastGuidedRoutineId = null
@@ -236,12 +239,22 @@ class ChildRoutineViewModel(
     }
 
     companion object {
-        fun factory(repository: RoutineRepository, appSettingsRepository: AppSettingsRepository): ViewModelProvider.Factory =
+        fun factory(
+            repository: RoutineRepository,
+            appSettingsRepository: AppSettingsRepository,
+            clockProvider: ClockProvider,
+            localeProvider: LocaleProvider,
+        ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     require(modelClass.isAssignableFrom(ChildRoutineViewModel::class.java))
-                    return ChildRoutineViewModel(repository, appSettingsRepository) as T
+                    return ChildRoutineViewModel(
+                        repository,
+                        appSettingsRepository,
+                        clockProvider,
+                        localeProvider,
+                    ) as T
                 }
             }
     }
