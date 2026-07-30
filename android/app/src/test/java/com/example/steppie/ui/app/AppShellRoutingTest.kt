@@ -1,6 +1,10 @@
 package com.example.steppie.ui.app
 
 import com.example.steppie.notifications.ACTION_OPEN_ROUTINE
+import com.example.steppie.ui.child.ChildSinglePane
+import com.example.steppie.ui.guardian.GuardianDestination
+import com.example.steppie.ui.guardian.GuardianPinMode
+import com.example.steppie.ui.tutorial.TutorialScreen
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -114,4 +118,93 @@ class AppShellRoutingTest {
         assertNull(resolveCameraResult(targetName = target, uri = null, succeeded = true))
         assertNull(resolveCameraResult(targetName = null, uri = uri, succeeded = true))
     }
+
+    @Test
+    fun `child tutorial waits for loading then follows the active child pane`() {
+        assertNull(
+            resolveTutorialScreen(
+                guardianActive = false,
+                guardianDestination = GuardianDestination.Home,
+                guardianPinMode = GuardianPinMode.Enter,
+                guardianOverlayBlocking = false,
+                childLoading = true,
+                childSinglePane = ChildSinglePane.Focus,
+            ),
+        )
+        assertEquals(
+            TutorialScreen.ChildFocus,
+            childTutorialScreen(ChildSinglePane.Focus),
+        )
+        assertEquals(
+            TutorialScreen.ChildList,
+            childTutorialScreen(ChildSinglePane.List),
+        )
+    }
+
+    @Test
+    fun `guardian tutorial is suppressed by blocking content and pin setup`() {
+        assertNull(
+            guardianTutorialScreen(
+                destination = GuardianDestination.Home,
+                overlayBlocking = true,
+            ),
+        )
+        assertNull(
+            guardianTutorialScreen(
+                destination = GuardianDestination.Pin,
+                pinMode = GuardianPinMode.Setup,
+            ),
+        )
+        assertEquals(
+            TutorialScreen.GuardianPin,
+            guardianTutorialScreen(
+                destination = GuardianDestination.Pin,
+                pinMode = GuardianPinMode.Enter,
+            ),
+        )
+    }
+
+    @Test
+    fun `guardian destinations resolve to their matching tutorial screens`() {
+        val expected = mapOf(
+            GuardianDestination.Home to TutorialScreen.GuardianHome,
+            GuardianDestination.RoutineEdit to TutorialScreen.RoutineManagement,
+            GuardianDestination.TemplateSelect to TutorialScreen.TemplateSelect,
+            GuardianDestination.CardEdit to TutorialScreen.CardEdit,
+            GuardianDestination.RoutineSetCreate to TutorialScreen.RoutineSetCreate,
+            GuardianDestination.EnvironmentSettings to TutorialScreen.EnvironmentSettings,
+            GuardianDestination.Records to TutorialScreen.Records,
+            GuardianDestination.RecordsCalendar to TutorialScreen.RecordsCalendar,
+            GuardianDestination.Security to TutorialScreen.Security,
+            GuardianDestination.RecoveryCode to TutorialScreen.RecoveryCode,
+            GuardianDestination.BackupRestore to TutorialScreen.BackupRestore,
+        )
+
+        expected.forEach { (destination, tutorial) ->
+            assertEquals(tutorial, guardianTutorialScreen(destination))
+        }
+    }
+
+    private fun childTutorialScreen(singlePane: ChildSinglePane): TutorialScreen? =
+        resolveTutorialScreen(
+            guardianActive = false,
+            guardianDestination = GuardianDestination.Home,
+            guardianPinMode = GuardianPinMode.Enter,
+            guardianOverlayBlocking = false,
+            childLoading = false,
+            childSinglePane = singlePane,
+        )
+
+    private fun guardianTutorialScreen(
+        destination: GuardianDestination,
+        pinMode: GuardianPinMode = GuardianPinMode.Enter,
+        overlayBlocking: Boolean = false,
+    ): TutorialScreen? = resolveTutorialScreen(
+        guardianActive = true,
+        guardianDestination = destination,
+        guardianPinMode = pinMode,
+        guardianOverlayBlocking = overlayBlocking,
+        childLoading = false,
+        childSinglePane = ChildSinglePane.Focus,
+    )
 }

@@ -46,12 +46,16 @@ import com.example.steppie.notifications.ACTION_OPEN_ROUTINE
 import com.example.steppie.notifications.AndroidRoutineNotificationScheduler
 import com.example.steppie.notifications.EXTRA_ROUTINE_ID
 import com.example.steppie.ui.app.AppMode
+import com.example.steppie.ui.app.NotificationReconcileEffect
+import com.example.steppie.ui.app.NotificationReconcileInput
 import com.example.steppie.ui.app.PhotoTarget
+import com.example.steppie.ui.app.TutorialResolutionEffect
 import com.example.steppie.ui.app.resolveAppMode
 import com.example.steppie.ui.app.resolveCameraResult
 import com.example.steppie.ui.app.resolveNotificationRoute
 import com.example.steppie.ui.app.resolveNotificationTarget
 import com.example.steppie.ui.app.resolvePhotoPickerResult
+import com.example.steppie.ui.app.resolveTutorialScreen
 import com.example.steppie.ui.child.ChildRoutineFeedbackEvent
 import com.example.steppie.ui.child.ChildRoutineScreen
 import com.example.steppie.ui.child.ChildRoutineViewModel
@@ -63,7 +67,6 @@ import com.example.steppie.ui.theme.SteppieTheme
 import com.example.steppie.ui.tutorial.TutorialCoordinatorViewModel
 import com.example.steppie.ui.tutorial.TutorialOverlay
 import com.example.steppie.ui.tutorial.TutorialProgressRepository
-import com.example.steppie.ui.tutorial.TutorialScreen
 import com.example.steppie.ui.tutorial.LocalTutorialAnchorRegistry
 import com.example.steppie.ui.tutorial.rememberTutorialAnchorRegistry
 import java.io.File
@@ -183,16 +186,18 @@ class MainActivity : ComponentActivity() {
                         notificationPermissionRefresh += 1
                     }
                 }
-                LaunchedEffect(
-                    childState.scheduledRoutines,
-                    childState.completedRoutineIds,
-                    settings,
-                    notificationPermissionRefresh,
-                ) {
-                    notificationScheduler.reconcileToday(
+                NotificationReconcileEffect(
+                    input = NotificationReconcileInput(
                         routines = childState.scheduledRoutines,
                         completedRoutineIds = childState.completedRoutineIds,
                         settings = settings,
+                        permissionRefresh = notificationPermissionRefresh,
+                    ),
+                ) { input ->
+                    notificationScheduler.reconcileToday(
+                        routines = input.routines,
+                        completedRoutineIds = input.completedRoutineIds,
+                        settings = input.settings,
                     )
                 }
                 LaunchedEffect(targetRoutineId, childState.routines) {
@@ -215,34 +220,20 @@ class MainActivity : ComponentActivity() {
                         guardianViewModel.closeToChild()
                     }
                 }
-                val tutorialScreen = if (guardianState.isActive) {
-                    if (guardianState.recoveryStep != null || guardianState.showDailyRoutineSelectionPrompt) {
-                        null
-                    } else when (guardianState.destination) {
-                        GuardianDestination.Pin -> if (guardianState.pinMode == GuardianPinMode.Enter) TutorialScreen.GuardianPin else null
-                        GuardianDestination.Home -> TutorialScreen.GuardianHome
-                        GuardianDestination.RoutineEdit -> TutorialScreen.RoutineManagement
-                        GuardianDestination.TemplateSelect -> TutorialScreen.TemplateSelect
-                        GuardianDestination.CardEdit -> TutorialScreen.CardEdit
-                        GuardianDestination.RoutineSetCreate -> TutorialScreen.RoutineSetCreate
-                        GuardianDestination.EnvironmentSettings -> TutorialScreen.EnvironmentSettings
-                        GuardianDestination.Records -> TutorialScreen.Records
-                        GuardianDestination.RecordsCalendar -> TutorialScreen.RecordsCalendar
-                        GuardianDestination.Security -> TutorialScreen.Security
-                        GuardianDestination.RecoveryCode -> TutorialScreen.RecoveryCode
-                        GuardianDestination.BackupRestore -> TutorialScreen.BackupRestore
-                    }
-                } else if (!childState.isLoading) {
-                    if (childState.singlePane == com.example.steppie.ui.child.ChildSinglePane.List) {
-                        TutorialScreen.ChildList
-                    } else {
-                        TutorialScreen.ChildFocus
-                    }
-                } else null
-                LaunchedEffect(tutorialScreen) {
-                    tutorialAnchorRegistry.clear()
-                    tutorialViewModel.showFor(tutorialScreen)
-                }
+                val tutorialScreen = resolveTutorialScreen(
+                    guardianActive = guardianState.isActive,
+                    guardianDestination = guardianState.destination,
+                    guardianPinMode = guardianState.pinMode,
+                    guardianOverlayBlocking =
+                        guardianState.recoveryStep != null || guardianState.showDailyRoutineSelectionPrompt,
+                    childLoading = childState.isLoading,
+                    childSinglePane = childState.singlePane,
+                )
+                TutorialResolutionEffect(
+                    screen = tutorialScreen,
+                    clearAnchors = tutorialAnchorRegistry::clear,
+                    showFor = tutorialViewModel::showFor,
+                )
 
                 CompositionLocalProvider(LocalTutorialAnchorRegistry provides tutorialAnchorRegistry) {
                 val appMode = resolveAppMode(

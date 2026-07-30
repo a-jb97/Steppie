@@ -1,5 +1,10 @@
 package com.example.steppie.ui.app
 
+import com.example.steppie.ui.child.ChildSinglePane
+import com.example.steppie.ui.guardian.GuardianDestination
+import com.example.steppie.ui.guardian.GuardianPinMode
+import com.example.steppie.ui.tutorial.TutorialScreen
+
 internal enum class AppMode {
     Bootstrap,
     Child,
@@ -38,6 +43,39 @@ internal fun resolveNotificationRoute(
     } else {
         NotificationRouteResolution()
     }
+
+internal fun resolveTutorialScreen(
+    guardianActive: Boolean,
+    guardianDestination: GuardianDestination,
+    guardianPinMode: GuardianPinMode,
+    guardianOverlayBlocking: Boolean,
+    childLoading: Boolean,
+    childSinglePane: ChildSinglePane,
+): TutorialScreen? {
+    if (guardianActive) {
+        if (guardianOverlayBlocking) return null
+        return when (guardianDestination) {
+            GuardianDestination.Pin ->
+                TutorialScreen.GuardianPin.takeIf { guardianPinMode == GuardianPinMode.Enter }
+            GuardianDestination.Home -> TutorialScreen.GuardianHome
+            GuardianDestination.RoutineEdit -> TutorialScreen.RoutineManagement
+            GuardianDestination.TemplateSelect -> TutorialScreen.TemplateSelect
+            GuardianDestination.CardEdit -> TutorialScreen.CardEdit
+            GuardianDestination.RoutineSetCreate -> TutorialScreen.RoutineSetCreate
+            GuardianDestination.EnvironmentSettings -> TutorialScreen.EnvironmentSettings
+            GuardianDestination.Records -> TutorialScreen.Records
+            GuardianDestination.RecordsCalendar -> TutorialScreen.RecordsCalendar
+            GuardianDestination.Security -> TutorialScreen.Security
+            GuardianDestination.RecoveryCode -> TutorialScreen.RecoveryCode
+            GuardianDestination.BackupRestore -> TutorialScreen.BackupRestore
+        }
+    }
+    if (childLoading) return null
+    return when (childSinglePane) {
+        ChildSinglePane.Focus -> TutorialScreen.ChildFocus
+        ChildSinglePane.List -> TutorialScreen.ChildList
+    }
+}
 
 internal enum class PhotoTarget {
     RoutineDraft,
