@@ -1,0 +1,306 @@
+package com.example.steppie.ui.guardian
+
+import androidx.lifecycle.viewModelScope
+import com.example.steppie.data.repository.InMemoryRoutineRepository
+import com.example.steppie.data.sample.RoutineSampleData
+import com.example.steppie.domain.model.AppSettings
+import com.example.steppie.domain.model.FeedbackIntensity
+import com.example.steppie.domain.model.IconRef
+import com.example.steppie.domain.repository.AppSettingsRepository
+import com.example.steppie.testing.MainDispatcherRule
+import com.example.steppie.testing.TestClockProvider
+import com.example.steppie.testing.TestLocaleProvider
+import java.time.Instant
+import java.time.ZoneOffset
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class GuardianModeViewModelTest {
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
+    @Test
+    fun `pin setup rejects a mismatched confirmation then shows the recovery code on success`() = runTest {
+        val fixture = guardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            viewModel.openInitialSetup()
+            inputPin(viewModel, "1234")
+            runCurrent()
+
+            assertEquals(GuardianPinMode.SetupConfirm, viewModel.uiState.value.pinMode)
+            assertEquals("", viewModel.uiState.value.pinDigits)
+
+            inputPin(viewModel, "1111")
+            runCurrent()
+
+            assertEquals(GuardianPinMode.Setup, viewModel.uiState.value.pinMode)
+            assertEquals("PIN이 일치하지 않아요. 처음부터 다시 입력해 주세요.", viewModel.uiState.value.pinError)
+            assertTrue(fixture.settingsRepository.setPinCalls.isEmpty())
+
+            inputPin(viewModel, "1234")
+            inputPin(viewModel, "1234")
+            runCurrent()
+
+            val state = viewModel.uiState.value
+            assertEquals(listOf("1234"), fixture.settingsRepository.setPinCalls)
+            assertTrue(state.isActive)
+            assertTrue(state.isAuthenticated)
+            assertTrue(state.hasGuardianPin)
+            assertEquals(GuardianDestination.Home, state.destination)
+            assertEquals(GuardianRecoveryStep.ShowCode, state.recoveryStep)
+            assertEquals(TestRecoveryCode, state.recoveryCodeToShow)
+            assertEquals(GuardianDestination.Home, state.recoveryReturnDestination)
+            assertEquals("", state.pinDigits)
+            assertNull(state.pinError)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `existing pin keeps guardian locked after failure and opens home after success`() = runTest {
+        val fixture = guardianFixture(
+            settings = configuredSettings(),
+            currentPin = "2468",
+        )
+        val viewModel = fixture.viewModel
+
+        try {
+            viewModel.openFromChild()
+            assertEquals(GuardianPinMode.Enter, viewModel.uiState.value.pinMode)
+
+            inputPin(viewModel, "1111")
+            runCurrent()
+
+            assertFalse(viewModel.uiState.value.isAuthenticated)
+            assertEquals(GuardianDestination.Pin, viewModel.uiState.value.destination)
+            assertEquals("PIN이 맞지 않아요. 다시 입력해 주세요.", viewModel.uiState.value.pinError)
+            assertEquals("", viewModel.uiState.value.pinDigits)
+
+            inputPin(viewModel, "2468")
+            runCurrent()
+
+            val state = viewModel.uiState.value
+            assertEquals(listOf("1111", "2468"), fixture.settingsRepository.verifyPinCalls)
+            assertTrue(state.isAuthenticated)
+            assertEquals(GuardianDestination.Home, state.destination)
+            assertTrue(state.destinationBackStack.isEmpty())
+            assertNull(state.pinError)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `guardian navigation returns through its back stack and clears transient drafts`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            viewModel.openRoutineEdit()
+            viewModel.openNewRoutineEditor()
+            viewModel.updateDraftTitle("새 활동")
+
+            assertEquals(GuardianDestination.CardEdit, viewModel.uiState.value.destination)
+            assertEquals(
+                listOf(GuardianDestination.Home, GuardianDestination.RoutineEdit),
+                viewModel.uiState.value.destinationBackStack,
+            )
+            assertEquals("새 활동", viewModel.uiState.value.draft?.title)
+
+            viewModel.navigateBack()
+
+            assertEquals(GuardianDestination.RoutineEdit, viewModel.uiState.value.destination)
+            assertEquals(listOf(GuardianDestination.Home), viewModel.uiState.value.destinationBackStack)
+            assertNull(viewModel.uiState.value.draft)
+
+            viewModel.navigateBack()
+
+            assertEquals(GuardianDestination.Home, viewModel.uiState.value.destination)
+            assertTrue(viewModel.uiState.value.destinationBackStack.isEmpty())
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `new routine validation keeps the editor open and valid input persists then returns`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val initialRoutineIds = viewModel.uiState.value.routines.map { it.id }.toSet()
+            viewModel.openRoutineEdit()
+            viewModel.openNewRoutineEditor()
+            viewModel.saveDraft()
+
+            assertEquals(GuardianDestination.CardEdit, viewModel.uiState.value.destination)
+            assertEquals("활동 이름을 입력해 주세요.", viewModel.uiState.value.draftError)
+
+            viewModel.updateDraftTitle("  새 활동  ")
+            viewModel.updateDraftScheduledTime("08:15")
+            viewModel.updateDraftIcon("book")
+            viewModel.saveDraft()
+            runCurrent()
+
+            val savedSet = fixture.routineRepository.observeRoutineSets().first().single()
+            val savedRoutine = savedSet.routines.single { it.id !in initialRoutineIds }
+            val state = viewModel.uiState.value
+
+            assertEquals("새 활동", savedRoutine.title.values.values.single())
+            assertEquals(mapOf("ko" to "새 활동"), savedRoutine.title.values)
+            assertEquals(TestInstant, savedRoutine.createdAt)
+            assertEquals(TestInstant, savedRoutine.updatedAt)
+            assertEquals("08:15", savedRoutine.scheduledTime.toString())
+            assertEquals("book", (savedRoutine.icon as IconRef.Builtin).name)
+            assertEquals(GuardianDestination.RoutineEdit, state.destination)
+            assertNull(state.draft)
+            assertNull(state.draftError)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `environment changes update optimistic state and persist each resulting settings snapshot`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            viewModel.openEnvironmentSettings()
+            viewModel.updateFeedbackIntensity(FeedbackIntensity.Strong)
+            viewModel.updateTtsEnabled(false)
+            viewModel.updateNotificationLeadTime(10, enabled = false)
+            viewModel.updateQuietHoursEnabled(true)
+            viewModel.updateQuietHoursStart("22:30")
+            runCurrent()
+
+            val state = viewModel.uiState.value
+            val persisted = fixture.settingsRepository.updateCalls.last()
+
+            assertEquals(GuardianDestination.EnvironmentSettings, state.destination)
+            assertEquals(FeedbackIntensity.Strong, state.appSettings.feedbackIntensity)
+            assertFalse(state.appSettings.ttsEnabled)
+            assertEquals(listOf(5), state.appSettings.notificationLeadTimes)
+            assertEquals("22:30", state.appSettings.quietHoursStart.toString())
+            assertEquals("07:00", state.appSettings.quietHoursEnd.toString())
+            assertEquals(5, fixture.settingsRepository.updateCalls.size)
+            assertEquals(state.appSettings, persisted)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    private suspend fun authenticatedGuardianFixture(): GuardianFixture {
+        val fixture = guardianFixture(
+            settings = configuredSettings(),
+            currentPin = "2468",
+        )
+        fixture.viewModel.openFromChild()
+        inputPin(fixture.viewModel, "2468")
+        return fixture
+    }
+
+    private fun guardianFixture(
+        settings: AppSettings = AppSettings(),
+        currentPin: String? = null,
+    ): GuardianFixture {
+        val routineRepository = InMemoryRoutineRepository(
+            initialData = listOf(RoutineSampleData.morning.copy(isActive = true, startTime = null)),
+        )
+        val settingsRepository = FakeGuardianSettingsRepository(settings, currentPin)
+        return GuardianFixture(
+            viewModel = GuardianModeViewModel(
+                routineRepository = routineRepository,
+                appSettingsRepository = settingsRepository,
+                clockProvider = TestClockProvider(TestInstant, ZoneOffset.UTC),
+                localeProvider = TestLocaleProvider("ko"),
+            ),
+            routineRepository = routineRepository,
+            settingsRepository = settingsRepository,
+        )
+    }
+
+    private fun inputPin(viewModel: GuardianModeViewModel, pin: String) {
+        pin.forEach { digit -> viewModel.inputPinDigit(digit.digitToInt()) }
+    }
+}
+
+private val TestInstant = Instant.parse("2026-01-02T08:00:00Z")
+
+private data class GuardianFixture(
+    val viewModel: GuardianModeViewModel,
+    val routineRepository: InMemoryRoutineRepository,
+    val settingsRepository: FakeGuardianSettingsRepository,
+)
+
+private class FakeGuardianSettingsRepository(
+    initialSettings: AppSettings,
+    currentPin: String?,
+) : AppSettingsRepository {
+    private val settings = MutableStateFlow(initialSettings)
+    private var currentPin = currentPin
+    val setPinCalls = mutableListOf<String>()
+    val verifyPinCalls = mutableListOf<String>()
+    val updateCalls = mutableListOf<AppSettings>()
+
+    override fun observeAppSettings(): Flow<AppSettings> = settings
+
+    override suspend fun updateAppSettings(settings: AppSettings) {
+        updateCalls += settings
+        this.settings.value = settings
+    }
+
+    override suspend fun setGuardianPin(pin: String): String {
+        setPinCalls += pin
+        currentPin = pin
+        settings.value = settings.value.copy(
+            guardianPinHash = "configured-pin",
+            recoveryCodeHash = "configured-recovery",
+        )
+        return TestRecoveryCode
+    }
+
+    override suspend fun verifyGuardianPin(pin: String): Boolean {
+        verifyPinCalls += pin
+        return pin == currentPin
+    }
+
+    override suspend fun verifyRecoveryCode(recoveryCode: String): Boolean = recoveryCode == TestRecoveryCode
+
+    override suspend fun changeGuardianPin(currentPin: String, newPin: String): String? {
+        if (currentPin != this.currentPin) return null
+        this.currentPin = newPin
+        return TestRecoveryCode
+    }
+
+    override suspend fun regenerateRecoveryCode(currentPin: String): String? =
+        TestRecoveryCode.takeIf { currentPin == this.currentPin }
+
+    override suspend fun resetGuardianPinWithRecoveryCode(recoveryCode: String, newPin: String): String? {
+        if (recoveryCode != TestRecoveryCode) return null
+        currentPin = newPin
+        return TestRecoveryCode
+    }
+}
+
+private fun configuredSettings(): AppSettings = AppSettings(
+    guardianPinHash = "configured-pin",
+    recoveryCodeHash = "configured-recovery",
+)
+
+private const val TestRecoveryCode = "654321"

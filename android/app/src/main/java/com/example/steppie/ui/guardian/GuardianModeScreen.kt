@@ -1218,7 +1218,12 @@ private fun GuardianRoutineEditScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = stringResource(R.string.guardian_active_routine_steps_title, state.title),
+                        text = stringResource(
+                            R.string.guardian_active_routine_steps_title,
+                            state.activeRoutineSet?.name
+                                ?.resolve(null, Locale.getDefault().toLanguageTag())
+                                .orEmpty(),
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = SteppieTheme.typography.guardianTitle,
                     )
