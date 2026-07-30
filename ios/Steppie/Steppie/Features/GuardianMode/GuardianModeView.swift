@@ -176,7 +176,23 @@ struct GuardianModeView: View {
         case .routineSetCreator:
             AnyView(routineSetCreator(isWide: isWide))
         case .routineTemplates:
-            AnyView(routineTemplateSelector(isWide: isWide))
+            AnyView(GuardianRoutineTemplateSelectionView(
+                isWide: isWide,
+                templates: viewModel.routineTemplates,
+                selectedTemplate: viewModel.selectedTemplate,
+                prepareSelection: {
+                    if viewModel.selectedTemplateID == nil {
+                        viewModel.beginTemplateSelection(
+                            returnDestination: viewModel.templateReturnDestination
+                        )
+                    }
+                },
+                onTemplateSelected: viewModel.selectTemplate,
+                onClose: viewModel.closeTemplateSelection,
+                onSave: viewModel.saveSelectedTemplate,
+                onDone: onDone,
+                onInteraction: onInteraction
+            ))
         case .routineEditor:
             AnyView(routineEditor(isWide: isWide))
         case .feedbackSettings:
@@ -643,201 +659,6 @@ struct GuardianModeView: View {
                 }
             }
         }
-    }
-
-    private func routineTemplateSelector(isWide: Bool) -> some View {
-        Group {
-            if isWide {
-                HStack(spacing: 0) {
-                    routineTemplateListPane(isWide: true)
-                        .frame(width: SteppieLayout.splitListWidth)
-                    Rectangle()
-                        .fill(Color.steppieBorderSubtle)
-                        .frame(width: SteppieStroke.divider)
-                    routineTemplatePreviewPane
-                        .frame(maxWidth: .infinity)
-                }
-            } else {
-                routineTemplateListPane(isWide: false)
-            }
-        }
-        .onAppear {
-            if viewModel.selectedTemplateID == nil {
-                viewModel.beginTemplateSelection(returnDestination: viewModel.templateReturnDestination)
-            }
-        }
-    }
-
-    private func routineTemplateListPane(isWide: Bool) -> some View {
-        List {
-            Section {
-                header(
-                    title: "템플릿에서 시작하기",
-                    subtitle: "템플릿을 고른 뒤 새 루틴 세트로 저장합니다"
-                )
-                .padding(.top, SteppieSpacing.medium)
-                .padding(.horizontal, SteppieLayout.guardianScreenPadding)
-                .listRowInsets(headerListRowInsets)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-
-                ForEach(viewModel.routineTemplates) { template in
-                    routineTemplateRow(template)
-                        .listRowInsets(routineListRowInsets)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                }
-            }
-
-            if !isWide {
-                Section {
-                    routineTemplatePreviewCard
-                        .listRowInsets(routineListRowInsets)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                }
-            }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(Color.steppieBackgroundSecondary)
-        .navigationTitle("")
-        .toolbar {
-            if !isWide {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("완료", action: onDone)
-                }
-            }
-        }
-    }
-
-    private func routineTemplateRow(_ template: BuiltInRoutineTemplate) -> some View {
-        let isSelected = template.id == viewModel.selectedTemplate?.id
-        return Button {
-            viewModel.selectTemplate(template)
-            onInteraction()
-        } label: {
-            adaptiveCardStack(spacing: SteppieSpacing.small) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(isSelected ? Color.steppieFocusRing : Color.steppieTextSecondary)
-                    .frame(
-                        width: SteppieLayout.guardianMinimumTouchTarget,
-                        height: SteppieLayout.guardianMinimumTouchTarget
-                    )
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
-                    Text(localizedText(template.name))
-                        .steppieTextStyle(.button)
-                        .foregroundStyle(Color.steppieTextPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(template.routineCountText)
-                        .steppieTextStyle(.guardianCaption)
-                        .foregroundStyle(Color.steppieTextSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if !dynamicTypeSize.isAccessibilitySize {
-                    Spacer()
-                }
-            }
-            .padding(SteppieSpacing.small)
-            .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
-            .background(Color.steppieBackgroundPrimary)
-            .overlay {
-                RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
-                    .stroke(
-                        isSelected ? Color.steppieFocusRing : Color.steppieBorderSubtle,
-                        lineWidth: isSelected ? SteppieStroke.focus : SteppieStroke.divider
-                    )
-            }
-            .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(localizedText(template.name)))
-        .accessibilityValue(Text("\(template.routineCountText), \(isSelected ? "선택됨" : "선택 안 됨")"))
-        .accessibilityHint(Text("템플릿 미리보기를 표시합니다"))
-    }
-
-    private var routineTemplatePreviewPane: some View {
-        ScrollView {
-            routineTemplatePreviewCard
-                .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(SteppieLayout.guardianScreenPadding)
-        }
-        .background(Color.steppieBackgroundSecondary)
-    }
-
-    @ViewBuilder
-    private var routineTemplatePreviewCard: some View {
-        if let template = viewModel.selectedTemplate {
-            VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
-                header(
-                    title: localizedText(template.name),
-                    subtitle: "\(template.steps.count)개 활동이 새 루틴 세트로 저장됩니다"
-                )
-
-                VStack(spacing: SteppieSpacing.small) {
-                    ForEach(Array(template.steps.enumerated()), id: \.element.id) { order, step in
-                        routineTemplateStepRow(step, order: order)
-                    }
-                }
-
-                HStack(spacing: SteppieSpacing.medium) {
-                    SteppieButton("뒤로", role: .secondary) {
-                        viewModel.closeTemplateSelection()
-                        onInteraction()
-                    }
-                    SteppieButton("새 루틴 세트로 저장") {
-                        viewModel.saveSelectedTemplate()
-                        onInteraction()
-                    }
-                }
-                .padding(.top, SteppieSpacing.extraSmall)
-            }
-        } else {
-            messageState(title: "템플릿이 없어요", message: "저장할 템플릿을 찾지 못했어요.")
-        }
-    }
-
-    private func routineTemplateStepRow(_ step: BuiltInRoutineTemplateStep, order: Int) -> some View {
-        adaptiveCardStack(spacing: SteppieSpacing.small) {
-            Text("\(order + 1)")
-                .steppieTextStyle(.guardianCaption)
-                .foregroundStyle(Color.steppieTextSecondary)
-                .frame(
-                    width: SteppieLayout.guardianMinimumTouchTarget,
-                    height: SteppieLayout.guardianMinimumTouchTarget
-                )
-                .background(Color.steppieBackgroundSecondary)
-                .clipShape(Circle())
-            RoutineVisualView(icon: step.icon, size: .list)
-                .frame(width: 52, height: 52)
-            VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
-                Text(localizedText(step.title))
-                    .steppieTextStyle(.button)
-                    .foregroundStyle(Color.steppieTextPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(step.scheduledTime?.description ?? "시간 없음")
-                    .steppieTextStyle(.guardianCaption)
-                    .foregroundStyle(Color.steppieTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if !dynamicTypeSize.isAccessibilitySize {
-                Spacer()
-            }
-        }
-        .padding(SteppieSpacing.small)
-        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
-        .background(Color.steppieBackgroundPrimary)
-        .overlay {
-            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
-                .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
-        }
-        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("\(order + 1)번째, \(localizedText(step.title))"))
-        .accessibilityValue(Text(step.scheduledTime?.description ?? "시간 없음"))
     }
 
     private func routineSetRow(_ routineSet: RoutineSet) -> some View {
@@ -1676,13 +1497,6 @@ struct GuardianModeView: View {
 
     private func routineSetTitle(_ routineSet: RoutineSet) -> String {
         routineSet.name.resolved(
-            appLocale: locale.identifier,
-            systemLanguages: [locale.identifier]
-        )
-    }
-
-    private func localizedText(_ text: LocalizedText) -> String {
-        text.resolved(
             appLocale: locale.identifier,
             systemLanguages: [locale.identifier]
         )
