@@ -291,6 +291,7 @@ final class GuardianModeViewModel {
     private let calendar: Calendar
     private let onDataChanged: () -> Void
     private let recordsState: GuardianRecordsState
+    private let backupState: GuardianBackupState
 
     private(set) var loadState: GuardianLoadState = .idle
     private(set) var routineSets: [RoutineSet] = []
@@ -315,18 +316,9 @@ final class GuardianModeViewModel {
     var pendingDeleteRoutineSet: RoutineSet?
     var selectedTemplateID: String?
     var templateReturnDestination: GuardianDestination?
-    private(set) var backupPackage: BackupPackage?
-    private(set) var validatedRestorePayload: BackupRestorePayload?
-    private(set) var backupStatusMessage: String?
     private(set) var oneTimeRecoveryCode: String?
     private(set) var recoveryCodeStatusMessage: String?
     private(set) var recoveryCodeErrorMessage: String?
-    var restorePIN = ""
-
-    var validatedRestoreSnapshot: RoutineRepositorySnapshot? {
-        validatedRestorePayload?.snapshot
-    }
-
     init(
         repository: any RoutineRepository,
         photoStore: (any RoutinePhotoStoring)? = nil,
@@ -344,6 +336,10 @@ final class GuardianModeViewModel {
             now: now,
             calendar: calendar
         )
+        self.backupState = GuardianBackupState(
+            repository: repository,
+            now: now
+        )
     }
 
     var recordSummaries: [GuardianRecordSummary] { recordsState.summaries }
@@ -352,6 +348,13 @@ final class GuardianModeViewModel {
     var selectedRecordDetail: GuardianRecordDetail? { recordsState.selectedDetail }
     var selectedCalendarRecordDate: String? { recordsState.selectedCalendarDate }
     var selectedCalendarRecordDetail: GuardianRecordDetail? { recordsState.selectedCalendarDetail }
+    var backupPackage: BackupPackage? { backupState.package }
+    var validatedRestoreSnapshot: RoutineRepositorySnapshot? { backupState.validatedRestoreSnapshot }
+    var backupStatusMessage: String? { backupState.statusMessage }
+    var restorePIN: String {
+        get { backupState.restorePIN }
+        set { backupState.restorePIN = newValue }
+    }
 
     var selectedRoutine: Routine? {
         guard let selectedRoutineID else { return routines.first }
@@ -1123,47 +1126,37 @@ final class GuardianModeViewModel {
 
     func createBackupPackage() {
         do {
-            backupPackage = try BackupService(repository: repository, now: now).exportPackage()
-            backupStatusMessage = "백업 파일을 만들었어요."
+            try backupState.createPackage()
             errorMessage = nil
         } catch {
-            backupPackage = nil
             errorMessage = "백업 파일을 만들지 못했어요."
         }
     }
 
     func validateRestorePackage(_ data: Data) {
         do {
-            validatedRestorePayload = try BackupService(repository: repository, now: now).validatePackagePayload(data)
-            restorePIN = ""
-            backupStatusMessage = "백업 파일을 확인했어요. 복원하려면 보호자 PIN을 입력해 주세요."
+            try backupState.validateRestorePackage(data)
             errorMessage = nil
         } catch {
-            validatedRestorePayload = nil
-            restorePIN = ""
-            errorMessage = backupErrorMessage(for: error)
+            errorMessage = backupState.validationErrorMessage(for: error)
         }
     }
 
     var canConfirmRestore: Bool {
-        validatedRestorePayload != nil && verifyPIN(restorePIN)
+        backupState.canConfirmRestore(verifyPIN: verifyPIN)
     }
 
     func cancelRestore() {
-        validatedRestorePayload = nil
-        restorePIN = ""
+        backupState.cancelRestore()
     }
 
     func confirmRestore() {
-        guard let validatedRestorePayload, verifyPIN(restorePIN) else {
+        guard canConfirmRestore else {
             errorMessage = "PIN을 확인해 주세요."
             return
         }
         do {
-            try BackupService(repository: repository, now: now).restorePayload(validatedRestorePayload)
-            self.validatedRestorePayload = nil
-            restorePIN = ""
-            backupStatusMessage = "백업을 복원했어요."
+            try backupState.restore()
             load()
             onDataChanged()
         } catch {
@@ -1218,21 +1211,4 @@ final class GuardianModeViewModel {
         )
     }
 
-    private func backupErrorMessage(for error: Error) -> String {
-        guard let backupError = error as? BackupError else {
-            return "백업 파일을 읽지 못했어요."
-        }
-        switch backupError {
-        case .invalidChecksum:
-            return "백업 파일이 손상되었어요."
-        case .unsupportedSchemaVersion:
-            return "지원하지 않는 백업 버전이에요."
-        case .unsupportedPlatform:
-            return "이 iOS 버전에서 복원할 수 없는 백업이에요."
-        case .missingFile, .invalidPackage, .invalidManifest, .invalidData:
-            return "올바른 Steppie 백업 파일이 아니에요."
-        case .duplicateID, .invalidReference:
-            return "백업 데이터 관계가 올바르지 않아요."
-        }
-    }
 }
