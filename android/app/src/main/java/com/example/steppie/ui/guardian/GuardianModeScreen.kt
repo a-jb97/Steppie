@@ -87,6 +87,13 @@ import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineColorTokens
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.presentation.formatting.formatCalendarMonth
+import com.example.steppie.presentation.formatting.formatCompletedTime
+import com.example.steppie.presentation.formatting.formatFullRecordDate
+import com.example.steppie.presentation.formatting.formatLocalizedTime
+import com.example.steppie.presentation.formatting.formatRecordDate
+import com.example.steppie.presentation.formatting.formatWeekday
+import com.example.steppie.presentation.formatting.orderedWeekdays
 import com.example.steppie.ui.child.RoutineIcon
 import com.example.steppie.ui.components.SteppieButton
 import com.example.steppie.ui.components.SteppieButtonState
@@ -102,11 +109,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
-import java.time.temporal.WeekFields
 import java.util.Locale
 
 private val GuardianSplitMinimumWidth = 905.dp
@@ -1301,7 +1304,8 @@ private fun RoutineSetRow(
     val meta = if (routineSet.isActive) {
         stringResource(
             R.string.guardian_routine_set_schedule_meta,
-            routineSet.startTime?.formatLocalizedTime() ?: stringResource(R.string.guardian_time_none),
+            routineSet.startTime?.let { formatLocalizedTime(it, Locale.getDefault()) }
+                ?: stringResource(R.string.guardian_time_none),
             routineSet.routines.size,
         )
     } else {
@@ -2123,7 +2127,7 @@ private fun ScheduledTimePicker(
     val fallbackTime = selectedTime ?: LocalTime.NOON
     val normalizedTime = selectedTime?.toStorageString().orEmpty()
     val selectedText = normalizedTime.ifBlank { stringResource(R.string.guardian_time_none) }
-    val displayText = selectedTime?.formatLocalizedTime()
+    val displayText = selectedTime?.let { formatLocalizedTime(it, Locale.getDefault()) }
         ?: scheduledTime.ifBlank { stringResource(R.string.guardian_time_none) }
 
     fun showTimePicker() {
@@ -2250,11 +2254,6 @@ private fun String.toLocalTimeOrNull(): LocalTime? =
 private fun LocalTime.toStorageString(): String =
     String.format(Locale.US, "%02d:%02d", hour, minute)
 
-private fun LocalTime.formatLocalizedTime(): String =
-    DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
-        .withLocale(Locale.getDefault())
-        .format(this)
-
 @Composable
 private fun GuardianRecordsScreen(
     state: GuardianModeUiState,
@@ -2326,7 +2325,7 @@ private fun GuardianRecordDayRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val dateText = recordDateText(day.date)
+    val dateText = formatRecordDate(day.date)
     val statusText = recordDayStatusText(day)
     val description = stringResource(
         R.string.a11y_guardian_record_day,
@@ -2367,12 +2366,12 @@ private fun GuardianRecordDayRow(
             verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
         ) {
             Text(
-                text = weekdayText(day.date),
+                text = formatWeekday(day.date, Locale.getDefault()),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = SteppieTheme.typography.guardianSection,
             )
             Text(
-                text = recordDateText(day.date),
+                text = formatRecordDate(day.date),
                 color = MaterialTheme.colorScheme.onSurface,
                 style = SteppieTheme.typography.guardianBody,
             )
@@ -2597,7 +2596,7 @@ private fun GuardianRecordsCalendarHeader(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = calendarMonthText(month),
+                text = formatCalendarMonth(month, Locale.getDefault()),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = SteppieTheme.typography.guardianSection,
                 textAlign = TextAlign.Center,
@@ -2709,10 +2708,8 @@ private fun GuardianRecordsCalendarGrid(
     selectedDate: LocalDate?,
     onSelectDate: (LocalDate) -> Unit,
 ) {
-    val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
-    val weekdays = generateSequence(firstDayOfWeek) { previous -> previous.plus(1) }
-        .take(7)
-        .toList()
+    val locale = Locale.getDefault()
+    val weekdays = orderedWeekdays(locale)
     val firstOfMonth = month.atDay(1)
     val leadingBlankCount = weekdays.indexOf(firstOfMonth.dayOfWeek).coerceAtLeast(0)
     val dates = List(leadingBlankCount) { null } + (1..month.lengthOfMonth()).map(month::atDay)
@@ -2721,7 +2718,7 @@ private fun GuardianRecordsCalendarGrid(
         Row(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
             weekdays.forEach { weekday ->
                 Text(
-                    text = weekday.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                    text = formatWeekday(weekday, locale),
                     modifier = Modifier.weight(1f),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = SteppieTheme.typography.guardianCaption,
@@ -2823,7 +2820,7 @@ private fun GuardianRecordsDetail(
         verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
     ) {
         Text(
-            text = fullRecordDateText(summary.date),
+            text = formatFullRecordDate(summary.date, Locale.getDefault()),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = SteppieTheme.typography.guardianTitle,
         )
@@ -2924,7 +2921,9 @@ private fun GuardianRecordStatCard(
 private fun GuardianRecordRoutineRow(routine: GuardianRecordRoutine) {
     val title = routine.title ?: stringResource(R.string.guardian_records_deleted_routine)
     val status = stringResource(if (routine.isCompleted) R.string.guardian_records_completed else R.string.guardian_records_not_completed)
-    val completedTime = routine.completedAt?.let(::recordCompletedTimeText)
+    val completedTime = routine.completedAt?.let {
+        formatCompletedTime(it, Locale.getDefault(), ZoneId.systemDefault())
+    }
     val statusDetail = if (routine.isCompleted && completedTime != null) {
         stringResource(R.string.guardian_records_completed_at, completedTime)
     } else {
@@ -3001,25 +3000,6 @@ private fun recordDayStatusText(day: GuardianRecordDay): String = when {
     day.remainingCount == 0 -> stringResource(R.string.guardian_records_all_done)
     else -> stringResource(R.string.guardian_records_remaining_count, day.remainingCount)
 }
-
-private fun weekdayText(date: LocalDate): String = date.dayOfWeek
-    .getDisplayName(TextStyle.SHORT, Locale.getDefault())
-
-private fun recordDateText(date: LocalDate): String = "${date.monthValue}/${date.dayOfMonth}"
-
-private fun fullRecordDateText(date: LocalDate): String =
-    date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.getDefault()))
-
-private fun calendarMonthText(month: YearMonth): String {
-    val locale = Locale.getDefault()
-    val pattern = if (locale.language == "ko") "yyyy년 M월" else "MMMM yyyy"
-    return month.format(DateTimeFormatter.ofPattern(pattern, locale))
-}
-
-private fun recordCompletedTimeText(completedAt: java.time.Instant): String =
-    completedAt.atZone(ZoneId.systemDefault()).format(
-        DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(Locale.getDefault()),
-    )
 
 @Composable
 private fun GuardianSecurityScreen(
