@@ -86,7 +86,10 @@ final class ChildRoutineViewModel {
     }
 
     var currentRoutine: Routine? {
-        routines.first { !completedRoutineIDs.contains($0.id) }
+        ChildRoutinePolicy.currentRoutine(
+            in: routines,
+            completedRoutineIDs: completedRoutineIDs
+        )
     }
 
     var selectedRoutine: Routine? {
@@ -100,8 +103,10 @@ final class ChildRoutineViewModel {
     var completedCount: Int { routines.filter { completedRoutineIDs.contains($0.id) }.count }
     var totalCount: Int { routines.count }
     var isAllCompleted: Bool {
-        !plannedRoutines.isEmpty
-            && plannedRoutines.allSatisfy { completedRoutineIDs.contains($0.id) }
+        ChildRoutinePolicy.isAllCompleted(
+            plannedRoutines: plannedRoutines,
+            completedRoutineIDs: completedRoutineIDs
+        )
     }
     var isWaitingForNextRoutineSet: Bool {
         activeRoutineSet == nil && nextScheduledRoutineSet != nil
@@ -111,36 +116,31 @@ final class ChildRoutineViewModel {
     var undoDurationSeconds: Int { settings?.undoDurationSeconds ?? 5 }
 
     var nextRoutineAfterFeedback: Routine? {
-        guard let completionFeedbackRoutineID,
-              let completedRoutine = routines.first(where: { $0.id == completionFeedbackRoutineID }) else {
-            return nil
-        }
-        return routines.first {
-            $0.order > completedRoutine.order && !completedRoutineIDs.contains($0.id)
-        }
+        ChildRoutinePolicy.nextRoutineAfterFeedback(
+            completionFeedbackRoutineID: completionFeedbackRoutineID,
+            routines: routines,
+            completedRoutineIDs: completedRoutineIDs
+        )
     }
 
     var nextRoutineSetAfterFeedback: (routineSet: RoutineSet, firstRoutine: Routine)? {
-        guard let activeRoutineSet,
-              routines.allSatisfy({ completedRoutineIDs.contains($0.id) }),
-              let currentIndex = plannedRoutineSets.firstIndex(where: { $0.id == activeRoutineSet.id })
-        else {
-            return nil
-        }
-        for routineSet in plannedRoutineSets.dropFirst(currentIndex + 1) {
-            if let firstRoutine = plannedRoutines.first(where: {
-                $0.routineSetID == routineSet.id && !completedRoutineIDs.contains($0.id)
-            }) {
-                return (routineSet, firstRoutine)
-            }
-        }
-        return nil
+        ChildRoutinePolicy.nextRoutineSetAfterFeedback(
+            activeRoutineSet: activeRoutineSet,
+            routines: routines,
+            plannedRoutineSets: plannedRoutineSets,
+            plannedRoutines: plannedRoutines,
+            completedRoutineIDs: completedRoutineIDs
+        )
     }
 
     var canStartNextRoutineSetAfterFeedback: Bool {
         guard let next = nextRoutineSetAfterFeedback,
               let startTime = next.routineSet.dailyStartTime,
-              let startDate = scheduledDate(for: startTime) else {
+              let startDate = ChildRoutinePolicy.scheduledDate(
+                for: startTime,
+                on: now(),
+                calendar: calendar
+              ) else {
             return nextRoutineSetAfterFeedback != nil
         }
         return startDate <= now()
@@ -195,7 +195,7 @@ final class ChildRoutineViewModel {
     private func routineSetsForToday() throws -> [RoutineSet] {
         let scheduledSets = try repository.routineSets()
             .filter { $0.dailyStartTime != nil }
-            .sorted(by: routineSetScheduleSort)
+            .sorted(by: ChildRoutinePolicy.routineSetScheduleSort)
         if !scheduledSets.isEmpty {
             return scheduledSets
         }
@@ -209,41 +209,19 @@ final class ChildRoutineViewModel {
     }
 
     private func resolveCurrentRoutineSet(at date: Date) {
-        activeRoutineSet = nil
-        routines = []
-        nextScheduledRoutineSet = nil
-        nextScheduledStartDate = nil
-
-        for routineSet in plannedRoutineSets {
-            let setRoutines = plannedRoutines.filter { $0.routineSetID == routineSet.id }
-            guard !setRoutines.isEmpty,
-                  setRoutines.contains(where: { !completedRoutineIDs.contains($0.id) }) else {
-                continue
-            }
-
-            if let startTime = routineSet.dailyStartTime,
-               let startDate = scheduledDate(for: startTime),
-               startDate > date {
-                nextScheduledRoutineSet = routineSet
-                nextScheduledStartDate = startDate
-                selectedRoutineID = nil
-                return
-            }
-
-            activeRoutineSet = routineSet
-            routines = setRoutines
-            if !setRoutines.contains(where: { $0.id == selectedRoutineID })
-                || selectedRoutineID.map(completedRoutineIDs.contains) == true {
-                selectedRoutineID = currentRoutine?.id
-            }
-            return
-        }
-
-        if let lastSet = plannedRoutineSets.last {
-            activeRoutineSet = lastSet
-            routines = plannedRoutines.filter { $0.routineSetID == lastSet.id }
-        }
-        selectedRoutineID = nil
+        let resolution = ChildRoutinePolicy.resolvePlan(
+            routineSets: plannedRoutineSets,
+            routines: plannedRoutines,
+            completedRoutineIDs: completedRoutineIDs,
+            selectedRoutineID: selectedRoutineID,
+            at: date,
+            calendar: calendar
+        )
+        activeRoutineSet = resolution.activeRoutineSet
+        routines = resolution.routines
+        nextScheduledRoutineSet = resolution.nextScheduledRoutineSet
+        nextScheduledStartDate = resolution.nextScheduledStartDate
+        selectedRoutineID = resolution.selectedRoutineID
     }
 
     func selectRoutine(_ routine: Routine, showFocus: Bool) {
@@ -276,13 +254,12 @@ final class ChildRoutineViewModel {
     }
 
     func cardState(for routine: Routine) -> RoutineCardState {
-        if routine.id == completionFeedbackRoutineID || completedRoutineIDs.contains(routine.id) {
-            return .completed
-        }
-        if isShowingCompletionFeedback {
-            return .upcoming
-        }
-        return routine.id == currentRoutine?.id ? .current : .upcoming
+        ChildRoutinePolicy.cardState(
+            for: routine,
+            currentRoutineID: currentRoutine?.id,
+            completionFeedbackRoutineID: completionFeedbackRoutineID,
+            completedRoutineIDs: completedRoutineIDs
+        )
     }
 
     func completeSelectedRoutine() {
@@ -493,22 +470,6 @@ final class ChildRoutineViewModel {
             guard !Task.isCancelled else { return }
             self?.proceedAfterCompletionFeedback()
         }
-    }
-
-    private func scheduledDate(for time: LocalTime) -> Date? {
-        var components = calendar.dateComponents([.year, .month, .day], from: now())
-        components.hour = time.hour
-        components.minute = time.minute
-        components.second = 0
-        return calendar.date(from: components)
-    }
-
-    private func routineSetScheduleSort(_ lhs: RoutineSet, _ rhs: RoutineSet) -> Bool {
-        guard let lhsTime = lhs.dailyStartTime, let rhsTime = rhs.dailyStartTime else {
-            return lhs.dailyStartTime != nil
-        }
-        if lhsTime == rhsTime { return lhs.createdAt < rhs.createdAt }
-        return (lhsTime.hour, lhsTime.minute) < (rhsTime.hour, rhsTime.minute)
     }
 
     private func localizedTitle(for routine: Routine) -> String {

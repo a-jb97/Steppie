@@ -80,194 +80,6 @@ struct RoutineDraft: Equatable, Identifiable {
     }
 }
 
-extension AppSettings {
-    func replacing(
-        feedbackIntensity: FeedbackIntensity? = nil,
-        soundEnabled: Bool? = nil,
-        ttsEnabled: Bool? = nil,
-        ttsRate: Double? = nil,
-        ttsVolume: Double? = nil,
-        hapticEnabled: Bool? = nil,
-        notificationLeadTimes: [Int]? = nil,
-        quietHours: (LocalTime?, LocalTime?)? = nil,
-        updatedAt: Date = .now
-    ) throws -> AppSettings {
-        let resolvedQuietHoursStart: LocalTime?
-        let resolvedQuietHoursEnd: LocalTime?
-        if let quietHours {
-            resolvedQuietHoursStart = quietHours.0
-            resolvedQuietHoursEnd = quietHours.1
-        } else {
-            resolvedQuietHoursStart = quietHoursStart
-            resolvedQuietHoursEnd = quietHoursEnd
-        }
-
-        return try AppSettings(
-            id: id,
-            guardianPinHash: guardianPinHash,
-            recoveryCodeHash: recoveryCodeHash,
-            feedbackIntensity: feedbackIntensity ?? self.feedbackIntensity,
-            soundEnabled: soundEnabled ?? self.soundEnabled,
-            ttsEnabled: ttsEnabled ?? self.ttsEnabled,
-            ttsRate: ttsRate ?? self.ttsRate,
-            ttsVolume: ttsVolume ?? self.ttsVolume,
-            hapticEnabled: hapticEnabled ?? self.hapticEnabled,
-            undoDurationSeconds: undoDurationSeconds,
-            notificationLeadTimes: notificationLeadTimes ?? self.notificationLeadTimes,
-            quietHoursStart: resolvedQuietHoursStart,
-            quietHoursEnd: resolvedQuietHoursEnd,
-            locale: locale,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}
-
-struct RoutineSetStepDraft: Equatable, Identifiable {
-    let id: UUID
-    var title: String
-    var icon: IconRef
-    var colorToken: String
-    var scheduledTime: LocalTime?
-
-    init(
-        id: UUID = UUID(),
-        title: String = "",
-        iconName: RoutineIconName = .star,
-        colorToken: String = Routine.defaultColorToken,
-        scheduledTime: LocalTime? = nil
-    ) {
-        self.id = id
-        self.title = title
-        self.icon = try! IconRef.builtin(name: iconName.rawValue)
-        self.colorToken = colorToken
-        self.scheduledTime = scheduledTime
-    }
-
-    init(
-        id: UUID = UUID(),
-        title: String = "",
-        icon: IconRef,
-        colorToken: String = Routine.defaultColorToken,
-        scheduledTime: LocalTime? = nil
-    ) {
-        self.id = id
-        self.title = title
-        self.icon = icon
-        self.colorToken = colorToken
-        self.scheduledTime = scheduledTime
-    }
-
-    var isValid: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && Routine.allowedColorTokens.contains(colorToken)
-    }
-
-    var iconName: RoutineIconName {
-        get {
-            guard icon.type == .builtin,
-                  let name = icon.name.flatMap(RoutineIconName.init(rawValue:)) else {
-                return .star
-            }
-            return name
-        }
-        set {
-            icon = try! IconRef.builtin(name: newValue.rawValue)
-        }
-    }
-}
-
-struct RoutineSetDraft: Equatable {
-    var name: String
-    var steps: [RoutineSetStepDraft]
-
-    var isValid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !steps.isEmpty
-            && steps.allSatisfy(\.isValid)
-    }
-}
-
-struct BuiltInRoutineTemplateStep: Equatable, Identifiable {
-    let id: String
-    let titleKey: String
-    let title: LocalizedText
-    let iconName: RoutineIconName
-    let colorToken: String
-    let scheduledTime: LocalTime?
-
-    var icon: IconRef {
-        try! IconRef.builtin(name: iconName.rawValue)
-    }
-}
-
-struct BuiltInRoutineTemplate: Equatable, Identifiable {
-    let id: String
-    let name: LocalizedText
-    let steps: [BuiltInRoutineTemplateStep]
-
-    var routineCountText: String {
-        "\(steps.count)개 활동"
-    }
-}
-
-enum BuiltInRoutineTemplates {
-    static let all: [BuiltInRoutineTemplate] = [
-        template(
-            id: "morning",
-            name: ["ko": "아침 루틴", "en": "Morning routine"],
-            steps: [
-                ("routine.wakeUp", ["ko": "일어나기", "en": "Wake up"], .wakeUp, "color.card.sky"),
-                ("routine.washFace", ["ko": "세수하기", "en": "Wash face"], .washFace, "color.card.mint"),
-                ("routine.brushTeeth", ["ko": "양치하기", "en": "Brush teeth"], .brushTeeth, "color.card.lemon"),
-                ("routine.getDressed", ["ko": "옷 입기", "en": "Get dressed"], .getDressed, "color.card.peach"),
-                ("routine.breakfast", ["ko": "아침 먹기", "en": "Eat breakfast"], .breakfast, "color.card.lavender"),
-                ("routine.packBag", ["ko": "가방 챙기기", "en": "Pack bag"], .packBag, "color.card.rose"),
-            ]
-        ),
-        template(
-            id: "school",
-            name: ["ko": "학교 루틴", "en": "School routine"],
-            steps: [
-                ("routine.goSchool", ["ko": "학교 가기", "en": "Go to school"], .bus, "color.card.sky"),
-                ("routine.readBook", ["ko": "책 읽기", "en": "Read book"], .book, "color.card.mint"),
-                ("routine.lunch", ["ko": "점심 먹기", "en": "Eat lunch"], .lunch, "color.card.lemon"),
-                ("routine.play", ["ko": "놀이하기", "en": "Play"], .playground, "color.card.peach"),
-            ]
-        ),
-        template(
-            id: "bedtime",
-            name: ["ko": "취침 루틴", "en": "Bedtime routine"],
-            steps: [
-                ("routine.bath", ["ko": "목욕하기", "en": "Take a bath"], .bath, "color.card.sky"),
-                ("routine.pajamas", ["ko": "잠옷 입기", "en": "Put on pajamas"], .pajamas, "color.card.mint"),
-                ("routine.sleep", ["ko": "잠자기", "en": "Sleep"], .sleep, "color.card.lavender"),
-            ]
-        ),
-    ]
-
-    private static func template(
-        id: String,
-        name: [String: String],
-        steps: [(String, [String: String], RoutineIconName, String)]
-    ) -> BuiltInRoutineTemplate {
-        BuiltInRoutineTemplate(
-            id: id,
-            name: try! LocalizedText(name),
-            steps: steps.map { titleKey, title, iconName, colorToken in
-                BuiltInRoutineTemplateStep(
-                    id: titleKey,
-                    titleKey: titleKey,
-                    title: try! LocalizedText(title),
-                    iconName: iconName,
-                    colorToken: colorToken,
-                    scheduledTime: nil
-                )
-            }
-        )
-    }
-}
-
 struct RoutineSetNameDraft: Equatable, Identifiable {
     let id: UUID
     var name: String
@@ -282,75 +94,6 @@ struct RoutineSetScheduleDraft: Equatable, Identifiable {
     var startTime: LocalTime
 }
 
-struct GuardianRecordSummary: Equatable, Identifiable {
-    let id: String
-    let date: String
-    let weekdaySymbol: String
-    let completedCount: Int
-    let totalCount: Int
-
-    var remainingCount: Int {
-        max(totalCount - completedCount, 0)
-    }
-
-    var completionRatio: Double {
-        guard totalCount > 0 else { return 0 }
-        return Double(completedCount) / Double(totalCount)
-    }
-
-    var percentage: Int {
-        Int((completionRatio * 100).rounded())
-    }
-
-    var statusText: String {
-        guard totalCount > 0 else { return "기록 없음" }
-        return remainingCount == 0 ? "완료" : "\(remainingCount)개 남음"
-    }
-}
-
-struct GuardianRecordRoutineRow: Equatable, Identifiable {
-    let id: UUID
-    let title: String
-    let status: LogStatus
-    let completedAt: Date?
-    let isDeleted: Bool
-    let isInactive: Bool
-
-    var isCompleted: Bool {
-        status == .completed
-    }
-
-    var statusText: String {
-        isCompleted ? "완료" : "미완료"
-    }
-
-    var availabilityText: String? {
-        if isDeleted { return "삭제된 활동" }
-        if isInactive { return "비활성 활동" }
-        return nil
-    }
-}
-
-struct GuardianRecordDetail: Equatable {
-    let date: String
-    let completedCount: Int
-    let totalCount: Int
-    let rows: [GuardianRecordRoutineRow]
-
-    var isEmpty: Bool {
-        totalCount == 0 && rows.isEmpty
-    }
-
-    var completionRatio: Double {
-        guard totalCount > 0 else { return 0 }
-        return Double(completedCount) / Double(totalCount)
-    }
-
-    var percentage: Int {
-        Int((completionRatio * 100).rounded())
-    }
-}
-
 @MainActor
 @Observable
 final class GuardianModeViewModel {
@@ -359,6 +102,11 @@ final class GuardianModeViewModel {
     private let now: () -> Date
     private let calendar: Calendar
     private let onDataChanged: () -> Void
+    private let recordsState: GuardianRecordsState
+    private let backupState: GuardianBackupState
+    private let settingsState: GuardianSettingsState
+    private let routineSetCreationState: GuardianRoutineSetCreationState
+    private let routineTemplateState: GuardianRoutineTemplateState
 
     private(set) var loadState: GuardianLoadState = .idle
     private(set) var routineSets: [RoutineSet] = []
@@ -366,41 +114,18 @@ final class GuardianModeViewModel {
     private(set) var todayRoutineAssignment: DailyRoutineAssignment?
     private(set) var todayAssignedRoutineSetID: UUID?
     private(set) var routines: [Routine] = []
-    private(set) var settings: AppSettings?
     private(set) var errorMessage: String?
 
     var selectedDestination: GuardianDestination?
     var selectedRoutineSetID: UUID?
     var selectedRoutineID: UUID?
     var draft: RoutineDraft?
-    var routineSetDraft: RoutineSetDraft?
-    var selectedRoutineSetStepID: UUID?
-    var routineSetStepDraft: RoutineSetStepDraft?
     var isEditingRoutineSets = false
     var routineSetNameDraft: RoutineSetNameDraft?
     var routineSetScheduleDraft: RoutineSetScheduleDraft?
     var pendingDeleteRoutine: Routine?
     var pendingDeleteRoutineSet: RoutineSet?
-    var selectedTemplateID: String?
     var templateReturnDestination: GuardianDestination?
-    private(set) var recordSummaries: [GuardianRecordSummary] = []
-    private(set) var recordCalendarDates: Set<String> = []
-    private(set) var selectedRecordDate: String?
-    private(set) var selectedRecordDetail: GuardianRecordDetail?
-    private(set) var selectedCalendarRecordDate: String?
-    private(set) var selectedCalendarRecordDetail: GuardianRecordDetail?
-    private(set) var backupPackage: BackupPackage?
-    private(set) var validatedRestorePayload: BackupRestorePayload?
-    private(set) var backupStatusMessage: String?
-    private(set) var oneTimeRecoveryCode: String?
-    private(set) var recoveryCodeStatusMessage: String?
-    private(set) var recoveryCodeErrorMessage: String?
-    var restorePIN = ""
-
-    var validatedRestoreSnapshot: RoutineRepositorySnapshot? {
-        validatedRestorePayload?.snapshot
-    }
-
     init(
         repository: any RoutineRepository,
         photoStore: (any RoutinePhotoStoring)? = nil,
@@ -408,11 +133,69 @@ final class GuardianModeViewModel {
         calendar: Calendar = .current,
         onDataChanged: @escaping () -> Void
     ) {
+        let resolvedPhotoStore = photoStore ?? FileRoutinePhotoStore()
         self.repository = repository
-        self.photoStore = photoStore ?? FileRoutinePhotoStore()
+        self.photoStore = resolvedPhotoStore
         self.now = now
         self.calendar = calendar
         self.onDataChanged = onDataChanged
+        self.recordsState = GuardianRecordsState(
+            repository: repository,
+            now: now,
+            calendar: calendar
+        )
+        self.backupState = GuardianBackupState(
+            repository: repository,
+            now: now
+        )
+        self.settingsState = GuardianSettingsState(
+            repository: repository,
+            now: now,
+            onDataChanged: onDataChanged
+        )
+        self.routineSetCreationState = GuardianRoutineSetCreationState(
+            repository: repository,
+            photoStore: resolvedPhotoStore,
+            now: now
+        )
+        self.routineTemplateState = GuardianRoutineTemplateState(
+            repository: repository,
+            now: now
+        )
+    }
+
+    var recordSummaries: [GuardianRecordSummary] { recordsState.summaries }
+    var recordCalendarDates: Set<String> { recordsState.calendarDates }
+    var selectedRecordDate: String? { recordsState.selectedDate }
+    var selectedRecordDetail: GuardianRecordDetail? { recordsState.selectedDetail }
+    var selectedCalendarRecordDate: String? { recordsState.selectedCalendarDate }
+    var selectedCalendarRecordDetail: GuardianRecordDetail? { recordsState.selectedCalendarDetail }
+    var backupPackage: BackupPackage? { backupState.package }
+    var validatedRestoreSnapshot: RoutineRepositorySnapshot? { backupState.validatedRestoreSnapshot }
+    var backupStatusMessage: String? { backupState.statusMessage }
+    var restorePIN: String {
+        get { backupState.restorePIN }
+        set { backupState.restorePIN = newValue }
+    }
+    var settings: AppSettings? { settingsState.settings }
+    var oneTimeRecoveryCode: String? { settingsState.oneTimeRecoveryCode }
+    var recoveryCodeStatusMessage: String? { settingsState.recoveryCodeStatusMessage }
+    var recoveryCodeErrorMessage: String? { settingsState.recoveryCodeErrorMessage }
+    var routineSetDraft: RoutineSetDraft? {
+        get { routineSetCreationState.draft }
+        set { routineSetCreationState.draft = newValue }
+    }
+    var selectedRoutineSetStepID: UUID? {
+        get { routineSetCreationState.selectedStepID }
+        set { routineSetCreationState.selectedStepID = newValue }
+    }
+    var routineSetStepDraft: RoutineSetStepDraft? {
+        get { routineSetCreationState.stepDraft }
+        set { routineSetCreationState.stepDraft = newValue }
+    }
+    var selectedTemplateID: String? {
+        get { routineTemplateState.selectedTemplateID }
+        set { routineTemplateState.selectedTemplateID = newValue }
     }
 
     var selectedRoutine: Routine? {
@@ -458,29 +241,23 @@ final class GuardianModeViewModel {
     }
 
     var canSaveRoutineSetDraft: Bool {
-        routineSetDraft?.isValid == true
+        routineSetCreationState.canSave
     }
 
     var selectedRoutineSetStep: RoutineSetStepDraft? {
-        guard let routineSetDraft else { return nil }
-        guard let selectedRoutineSetStepID else { return routineSetDraft.steps.first }
-        return routineSetDraft.steps.first { $0.id == selectedRoutineSetStepID } ?? routineSetDraft.steps.first
+        routineSetCreationState.selectedStep
     }
 
     var routineTemplates: [BuiltInRoutineTemplate] {
-        BuiltInRoutineTemplates.all
+        routineTemplateState.templates
     }
 
     var selectedTemplate: BuiltInRoutineTemplate? {
-        guard let selectedTemplateID else { return routineTemplates.first }
-        return routineTemplates.first { $0.id == selectedTemplateID } ?? routineTemplates.first
+        routineTemplateState.selectedTemplate
     }
 
     var hasUnsavedRoutineSetDraft: Bool {
-        guard let routineSetDraft else { return false }
-        return !routineSetDraft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || !routineSetDraft.steps.isEmpty
-            || routineSetStepDraft?.isValid == true
+        routineSetCreationState.hasUnsavedDraft
     }
 
     func loadIfNeeded() {
@@ -490,7 +267,7 @@ final class GuardianModeViewModel {
 
     func load() {
         do {
-            settings = try repository.appSettings()
+            try settingsState.load()
             let fetchedRoutineSets = try repository.routineSets()
             routineSets = fetchedRoutineSets
             activeRoutineSet = fetchedRoutineSets.first(where: \.isActive)
@@ -502,7 +279,7 @@ final class GuardianModeViewModel {
             } else {
                 todayAssignedRoutineSetID = nil
             }
-            refreshRecords()
+            recordsState.refresh()
 
             guard !fetchedRoutineSets.isEmpty else {
                 activeRoutineSet = nil
@@ -529,7 +306,7 @@ final class GuardianModeViewModel {
                 selectedRoutineID = routines.first?.id
             }
             loadState = .loaded
-            refreshRecords()
+            recordsState.refresh()
         } catch {
             errorMessage = "정보를 불러오지 못했어요."
             loadState = .failed
@@ -537,39 +314,29 @@ final class GuardianModeViewModel {
     }
 
     func selectRecordDate(_ date: String) {
-        guard recordSummaries.contains(where: { $0.date == date }) else { return }
-        selectedRecordDate = date
-        refreshSelectedRecordDetail()
+        recordsState.selectDate(date)
     }
 
     func prepareRecordCalendar() {
-        refreshRecordCalendarDates()
-        selectedCalendarRecordDate = DailyLog.localDateString(for: now(), calendar: calendar)
-        refreshSelectedCalendarRecordDetail()
+        recordsState.prepareCalendar()
     }
 
     func selectCalendarRecordDate(_ date: String) {
-        guard recordCalendarDates.contains(date) else { return }
-        selectedCalendarRecordDate = date
-        refreshSelectedCalendarRecordDetail()
+        recordsState.selectCalendarDate(date)
     }
 
     func beginCreateRoutineSet() {
-        routineSetDraft = RoutineSetDraft(name: "", steps: [])
-        selectedRoutineSetStepID = nil
-        routineSetStepDraft = nil
-        selectedTemplateID = nil
+        routineSetCreationState.begin()
+        routineTemplateState.clearSelection()
         isEditingRoutineSets = false
         selectedDestination = .routineSetCreator
     }
 
     func beginTemplateSelection(returnDestination: GuardianDestination? = nil) {
-        routineSetDraft = nil
-        selectedRoutineSetStepID = nil
-        routineSetStepDraft = nil
+        routineSetCreationState.cancel()
         draft = nil
         templateReturnDestination = returnDestination
-        selectedTemplateID = selectedTemplateID ?? routineTemplates.first?.id
+        routineTemplateState.beginSelection()
         selectedDestination = .routineTemplates
     }
 
@@ -579,39 +346,14 @@ final class GuardianModeViewModel {
     }
 
     func selectTemplate(_ template: BuiltInRoutineTemplate) {
-        selectedTemplateID = template.id
+        routineTemplateState.select(template)
     }
 
     func saveSelectedTemplate() {
-        guard let selectedTemplate else { return }
         do {
-            let createdAt = now()
-            let routineSet = try RoutineSet(
-                name: selectedTemplate.name,
-                isActive: false,
-                createdAt: createdAt,
-                updatedAt: createdAt
-            )
-            try repository.createRoutineSet(routineSet)
-
-            for (order, step) in selectedTemplate.steps.enumerated() {
-                let routine = try Routine(
-                    routineSetID: routineSet.id,
-                    titleKey: step.titleKey,
-                    title: step.title,
-                    icon: step.icon,
-                    colorToken: step.colorToken,
-                    order: order,
-                    scheduledTime: step.scheduledTime,
-                    createdAt: createdAt,
-                    updatedAt: createdAt
-                )
-                try repository.createRoutine(routine)
-            }
-
-            selectedTemplateID = selectedTemplate.id
+            guard let routineSetID = try routineTemplateState.saveSelectedTemplate() else { return }
             templateReturnDestination = nil
-            selectedRoutineSetID = routineSet.id
+            selectedRoutineSetID = routineSetID
             selectedDestination = .routineEditor
             load()
             onDataChanged()
@@ -621,85 +363,39 @@ final class GuardianModeViewModel {
     }
 
     func cancelRoutineSetDraft() {
-        routineSetDraft = nil
-        selectedRoutineSetStepID = nil
-        routineSetStepDraft = nil
+        routineSetCreationState.cancel()
     }
 
     func beginAddRoutineSetStep() {
-        routineSetStepDraft = RoutineSetStepDraft()
-        selectedRoutineSetStepID = nil
+        routineSetCreationState.beginAddStep()
     }
 
     func beginEditRoutineSetStep(_ step: RoutineSetStepDraft) {
-        selectedRoutineSetStepID = step.id
-        routineSetStepDraft = step
+        routineSetCreationState.beginEditStep(step)
     }
 
     func cancelRoutineSetStepDraft() {
-        routineSetStepDraft = nil
+        routineSetCreationState.cancelStepDraft()
     }
 
     func saveRoutineSetStepDraft() {
-        guard let routineSetStepDraft, routineSetStepDraft.isValid else { return }
-        if let index = routineSetDraft?.steps.firstIndex(where: { $0.id == routineSetStepDraft.id }) {
-            routineSetDraft?.steps[index] = routineSetStepDraft
-        } else {
-            routineSetDraft?.steps.append(routineSetStepDraft)
-        }
-        selectedRoutineSetStepID = routineSetStepDraft.id
-        self.routineSetStepDraft = nil
+        routineSetCreationState.saveStepDraft()
     }
 
     func deleteRoutineSetStep(_ step: RoutineSetStepDraft) {
-        routineSetDraft?.steps.removeAll { $0.id == step.id }
-        if selectedRoutineSetStepID == step.id {
-            selectedRoutineSetStepID = routineSetDraft?.steps.first?.id
-        }
-        if routineSetStepDraft?.id == step.id {
-            routineSetStepDraft = nil
-        }
+        routineSetCreationState.deleteStep(step)
     }
 
     func moveRoutineSetStep(_ step: RoutineSetStepDraft, direction: Int) {
-        guard var steps = routineSetDraft?.steps,
-              let index = steps.firstIndex(where: { $0.id == step.id }) else { return }
-        let destination = index + direction
-        guard steps.indices.contains(destination) else { return }
-        steps.swapAt(index, destination)
-        routineSetDraft?.steps = steps
+        routineSetCreationState.moveStep(step, direction: direction)
     }
 
     func saveRoutineSetDraft(localeIdentifier: String) {
-        guard let routineSetDraft, routineSetDraft.isValid else { return }
         do {
-            let createdAt = now()
-            let routineSet = try RoutineSet(
-                name: LocalizedText([localeIdentifier: routineSetDraft.name]),
-                isActive: false,
-                createdAt: createdAt,
-                updatedAt: createdAt
-            )
-            try repository.createRoutineSet(routineSet)
-
-            for (order, step) in routineSetDraft.steps.enumerated() {
-                let routine = try Routine(
-                    routineSetID: routineSet.id,
-                    title: LocalizedText([localeIdentifier: step.title]),
-                    icon: step.icon,
-                    colorToken: step.colorToken,
-                    order: order,
-                    scheduledTime: step.scheduledTime,
-                    createdAt: createdAt,
-                    updatedAt: createdAt
-                )
-                try repository.createRoutine(routine)
-            }
-
-            self.routineSetDraft = nil
-            selectedRoutineSetStepID = nil
-            routineSetStepDraft = nil
-            selectedRoutineSetID = routineSet.id
+            guard let routineSetID = try routineSetCreationState.save(
+                localeIdentifier: localeIdentifier
+            ) else { return }
+            selectedRoutineSetID = routineSetID
             selectedDestination = .routineEditor
             load()
             onDataChanged()
@@ -792,16 +488,15 @@ final class GuardianModeViewModel {
     }
 
     func updateRoutineSetStepDraftPhoto(data: Data) {
-        guard routineSetStepDraft != nil else { return }
         do {
-            routineSetStepDraft?.icon = try photoStore.savePhotoData(data)
+            try routineSetCreationState.updateStepPhoto(data: data)
         } catch {
             errorMessage = "사진을 저장하지 못했어요."
         }
     }
 
     func resetRoutineSetStepDraftIconToDefault() {
-        routineSetStepDraft?.icon = try! IconRef.builtin(name: RoutineIconName.star.rawValue)
+        routineSetCreationState.resetStepIconToDefault()
     }
 
     func requestDelete(_ routine: Routine) {
@@ -1078,112 +773,44 @@ final class GuardianModeViewModel {
     }
 
     func setPIN(_ pin: String) -> Bool {
-        do {
-            let current = try repository.appSettings()
-            let updated = try copySettings(current, guardianPinHash: GuardianPinService.makeHash(for: pin))
-            try repository.updateAppSettings(updated)
-            settings = updated
-            onDataChanged()
-            return true
-        } catch {
-            return false
-        }
+        settingsState.setPIN(pin)
     }
 
     func setPINAndGenerateRecoveryCode(_ pin: String) -> Bool {
-        do {
-            let current = try repository.appSettings()
-            let recoveryCode = GuardianPinService.generateRecoveryCode()
-            let updated = try copySettings(
-                current,
-                guardianPinHash: GuardianPinService.makeHash(for: pin),
-                recoveryCodeHash: GuardianPinService.makeRecoveryCodeHash(for: recoveryCode)
-            )
-            try repository.updateAppSettings(updated)
-            settings = updated
-            oneTimeRecoveryCode = recoveryCode
-            recoveryCodeStatusMessage = "복구 코드를 만들었어요. 이 코드는 한 번만 표시됩니다."
-            recoveryCodeErrorMessage = nil
-            onDataChanged()
-            return true
-        } catch {
-            recoveryCodeErrorMessage = "복구 코드를 만들지 못했어요."
-            return false
-        }
+        settingsState.setPINAndGenerateRecoveryCode(pin)
     }
 
     func hasGuardianPIN() -> Bool {
-        guard let settings = try? repository.appSettings() else { return false }
-        return settings.guardianPinHash != nil
+        settingsState.hasGuardianPIN()
     }
 
     func verifyPIN(_ pin: String) -> Bool {
-        (try? repository.appSettings()).map { GuardianPinService.verify(pin, against: $0.guardianPinHash) } ?? false
+        settingsState.verifyPIN(pin)
     }
 
     func updatePIN(oldPIN: String, newPIN: String) -> Bool {
-        guard verifyPIN(oldPIN) else { return false }
-        return setPIN(newPIN)
+        settingsState.updatePIN(oldPIN: oldPIN, newPIN: newPIN)
     }
 
     func verifyRecoveryCode(_ code: String) -> Bool {
-        let sanitizedCode = String(code.filter(\.isNumber).prefix(6))
-        let isValid = (try? repository.appSettings())
-            .map { GuardianPinService.verifyRecoveryCode(sanitizedCode, against: $0.recoveryCodeHash) } ?? false
-        if isValid {
-            recoveryCodeErrorMessage = nil
-        } else {
-            recoveryCodeErrorMessage = "복구 코드가 맞지 않아요. 6자리 숫자를 확인해 주세요."
-        }
-        return isValid
+        settingsState.verifyRecoveryCode(code)
     }
 
     func regenerateRecoveryCode() -> Bool {
-        do {
-            let current = try repository.appSettings()
-            let recoveryCode = makeNewRecoveryCode(excluding: current.recoveryCodeHash)
-            let updated = try copySettings(
-                current,
-                recoveryCodeHash: GuardianPinService.makeRecoveryCodeHash(for: recoveryCode)
-            )
-            try repository.updateAppSettings(updated)
-            settings = updated
-            oneTimeRecoveryCode = recoveryCode
-            recoveryCodeStatusMessage = "새 복구 코드를 만들었어요. 이전 복구 코드는 사용할 수 없습니다."
-            recoveryCodeErrorMessage = nil
-            onDataChanged()
-            return true
-        } catch {
-            recoveryCodeErrorMessage = "복구 코드를 다시 만들지 못했어요."
-            return false
-        }
+        settingsState.regenerateRecoveryCode()
     }
 
     func clearOneTimeRecoveryCode() {
-        oneTimeRecoveryCode = nil
+        settingsState.clearOneTimeRecoveryCode()
     }
 
     func clearRecoveryCodeError() {
-        recoveryCodeErrorMessage = nil
-    }
-
-    private func makeNewRecoveryCode(excluding storedHash: String?) -> String {
-        for _ in 0..<10 {
-            let candidate = GuardianPinService.generateRecoveryCode()
-            if !GuardianPinService.verifyRecoveryCode(candidate, against: storedHash) {
-                return candidate
-            }
-        }
-        return GuardianPinService.generateRecoveryCode()
+        settingsState.clearRecoveryCodeError()
     }
 
     func updateFeedbackSettings(_ transform: (AppSettings) throws -> AppSettings) {
         do {
-            let current = try repository.appSettings()
-            let updated = try transform(current)
-            try repository.updateAppSettings(updated)
-            settings = updated
-            onDataChanged()
+            try settingsState.update(transform)
         } catch {
             errorMessage = "설정을 저장하지 못했어요."
         }
@@ -1191,47 +818,37 @@ final class GuardianModeViewModel {
 
     func createBackupPackage() {
         do {
-            backupPackage = try BackupService(repository: repository, now: now).exportPackage()
-            backupStatusMessage = "백업 파일을 만들었어요."
+            try backupState.createPackage()
             errorMessage = nil
         } catch {
-            backupPackage = nil
             errorMessage = "백업 파일을 만들지 못했어요."
         }
     }
 
     func validateRestorePackage(_ data: Data) {
         do {
-            validatedRestorePayload = try BackupService(repository: repository, now: now).validatePackagePayload(data)
-            restorePIN = ""
-            backupStatusMessage = "백업 파일을 확인했어요. 복원하려면 보호자 PIN을 입력해 주세요."
+            try backupState.validateRestorePackage(data)
             errorMessage = nil
         } catch {
-            validatedRestorePayload = nil
-            restorePIN = ""
-            errorMessage = backupErrorMessage(for: error)
+            errorMessage = backupState.validationErrorMessage(for: error)
         }
     }
 
     var canConfirmRestore: Bool {
-        validatedRestorePayload != nil && verifyPIN(restorePIN)
+        backupState.canConfirmRestore(verifyPIN: verifyPIN)
     }
 
     func cancelRestore() {
-        validatedRestorePayload = nil
-        restorePIN = ""
+        backupState.cancelRestore()
     }
 
     func confirmRestore() {
-        guard let validatedRestorePayload, verifyPIN(restorePIN) else {
+        guard canConfirmRestore else {
             errorMessage = "PIN을 확인해 주세요."
             return
         }
         do {
-            try BackupService(repository: repository, now: now).restorePayload(validatedRestorePayload)
-            self.validatedRestorePayload = nil
-            restorePIN = ""
-            backupStatusMessage = "백업을 복원했어요."
+            try backupState.restore()
             load()
             onDataChanged()
         } catch {
@@ -1261,253 +878,4 @@ final class GuardianModeViewModel {
         )
     }
 
-    private func refreshRecords() {
-        refreshRecordCalendarDates()
-        let dates = recentRecordDates()
-        if selectedRecordDate.map({ !dates.contains($0) }) != false {
-            selectedRecordDate = dates.first
-        }
-        recordSummaries = dates.map { date in
-            (try? makeRecordSummary(for: date)) ?? GuardianRecordSummary(
-                id: date,
-                date: date,
-                weekdaySymbol: weekdaySymbol(for: date),
-                completedCount: 0,
-                totalCount: 0
-            )
-        }
-        refreshSelectedRecordDetail()
-        if selectedCalendarRecordDate.map({ !recordCalendarDates.contains($0) }) == true {
-            selectedCalendarRecordDate = recordCalendarDates.sorted(by: >).first
-        }
-        refreshSelectedCalendarRecordDetail()
-    }
-
-    private func refreshSelectedRecordDetail() {
-        guard let selectedRecordDate else {
-            selectedRecordDetail = nil
-            return
-        }
-        selectedRecordDetail = try? makeRecordDetail(for: selectedRecordDate)
-    }
-
-    private func refreshRecordCalendarDates() {
-        var dates = Set((try? repository.dailyLogDates()) ?? [])
-        let today = DailyLog.localDateString(for: now(), calendar: calendar)
-        if (try? routineSetsRepresented(on: today).isEmpty) == false {
-            dates.insert(today)
-        }
-        recordCalendarDates = dates
-    }
-
-    private func refreshSelectedCalendarRecordDetail() {
-        guard let selectedCalendarRecordDate else {
-            selectedCalendarRecordDetail = nil
-            return
-        }
-        guard recordCalendarDates.contains(selectedCalendarRecordDate) else {
-            selectedCalendarRecordDetail = nil
-            return
-        }
-        selectedCalendarRecordDetail = try? makeRecordDetail(for: selectedCalendarRecordDate)
-    }
-
-    private func recentRecordDates() -> [String] {
-        let start = calendar.startOfDay(for: now())
-        return (0..<7).compactMap { offset in
-            guard let date = calendar.date(byAdding: .day, value: -offset, to: start) else {
-                return nil
-            }
-            return DailyLog.localDateString(for: date, calendar: calendar)
-        }
-    }
-
-    private func makeRecordSummary(for date: String) throws -> GuardianRecordSummary {
-        let detail = try makeRecordDetail(for: date)
-        return GuardianRecordSummary(
-            id: date,
-            date: date,
-            weekdaySymbol: weekdaySymbol(for: date),
-            completedCount: detail.completedCount,
-            totalCount: detail.totalCount
-        )
-    }
-
-    private func makeRecordDetail(for date: String) throws -> GuardianRecordDetail {
-        let logs = try repository.dailyLogs(on: date, routineSetID: nil)
-        let routinesForDate = try routinesRepresented(on: date, logs: logs)
-        let logsByRoutineID = Dictionary(uniqueKeysWithValues: logs.map { ($0.routineID, $0) })
-        let rows = routinesForDate.map { routine in
-            let log = logsByRoutineID[routine.id]
-            return GuardianRecordRoutineRow(
-                id: routine.id,
-                title: localizedTitle(for: routine),
-                status: log?.status ?? .undone,
-                completedAt: log?.completedAt,
-                isDeleted: routine.deletedAt != nil,
-                isInactive: !routine.isActive
-            )
-        }
-        let completedCount = rows.filter(\.isCompleted).count
-        return GuardianRecordDetail(
-            date: date,
-            completedCount: completedCount,
-            totalCount: rows.count,
-            rows: rows
-        )
-    }
-
-    private func routinesRepresented(on date: String, logs: [DailyLog]) throws -> [Routine] {
-        if logs.isEmpty {
-            let routineSets = try routineSetsRepresented(on: date)
-            return try routineSets.flatMap { try repository.routines(in: $0.id) }
-                .filter { routineExisted($0, on: date) }
-                .sorted(by: routineRecordSort)
-        }
-
-        var routineSetIDs = Set(logs.map(\.routineSetID))
-        let today = DailyLog.localDateString(for: now(), calendar: calendar)
-        if date == today {
-            routineSetIDs.formUnion(try routineSetsRepresented(on: date).map(\.id))
-        }
-        let representedRoutines = try routineSetIDs.flatMap { routineSetID in
-            try repository.routines(
-                in: routineSetID,
-                includeInactive: true,
-                includeDeleted: true
-            )
-        }
-
-        var routinesByID = Dictionary(uniqueKeysWithValues: representedRoutines.map { ($0.id, $0) })
-        for log in logs where routinesByID[log.routineID] == nil {
-            if let routine = try repository.routine(id: log.routineID) {
-                routinesByID[routine.id] = routine
-            }
-        }
-
-        let logRoutineIDs = Set(logs.map(\.routineID))
-        return routinesByID.values
-            .filter { routine in
-                if logRoutineIDs.contains(routine.id) { return true }
-                guard routineExisted(routine, on: date) else { return false }
-                return routine.isActive || routine.deletedAt != nil
-            }
-            .sorted(by: routineRecordSort)
-    }
-
-    private func routineSetsRepresented(on date: String) throws -> [RoutineSet] {
-        let today = DailyLog.localDateString(for: now(), calendar: calendar)
-        if date == today {
-            let scheduledSets = try repository.routineSets()
-                .filter { $0.dailyStartTime != nil }
-                .sorted {
-                    guard let lhs = $0.dailyStartTime, let rhs = $1.dailyStartTime else {
-                        return $0.dailyStartTime != nil
-                    }
-                    if lhs == rhs { return $0.createdAt < $1.createdAt }
-                    return (lhs.hour, lhs.minute) < (rhs.hour, rhs.minute)
-                }
-            if !scheduledSets.isEmpty {
-                return scheduledSets
-            }
-        }
-
-        if let assignment = try repository.dailyRoutineAssignment(on: date),
-           let assignedSet = try repository.routineSet(id: assignment.routineSetID),
-           assignedSet.deletedAt == nil {
-            return [assignedSet]
-        }
-
-        return []
-    }
-
-    private func routineRecordSort(_ lhs: Routine, _ rhs: Routine) -> Bool {
-        if lhs.routineSetID == rhs.routineSetID {
-            if lhs.order == rhs.order { return lhs.createdAt < rhs.createdAt }
-            return lhs.order < rhs.order
-        }
-        return lhs.createdAt < rhs.createdAt
-    }
-
-    private func routineExisted(_ routine: Routine, on localDate: String) -> Bool {
-        guard let dayRange = dayRange(for: localDate) else { return false }
-        guard routine.createdAt < dayRange.end else { return false }
-        if let deletedAt = routine.deletedAt {
-            return deletedAt >= dayRange.start
-        }
-        return true
-    }
-
-    private func dayRange(for localDate: String) -> (start: Date, end: Date)? {
-        guard let parsedDate = Self.localDateFormatter.date(from: localDate) else {
-            return nil
-        }
-        let components = Self.localDateFormatter.calendar.dateComponents([.year, .month, .day], from: parsedDate)
-        guard let start = calendar.date(from: components),
-              let end = calendar.date(byAdding: .day, value: 1, to: start) else {
-            return nil
-        }
-        return (start, end)
-    }
-
-    private func weekdaySymbol(for localDate: String) -> String {
-        guard let date = Self.localDateFormatter.date(from: localDate) else {
-            return localDate
-        }
-        let weekday = calendar.component(.weekday, from: date)
-        let symbols = ["일", "월", "화", "수", "목", "금", "토"]
-        return symbols[max(0, min(symbols.count - 1, weekday - 1))]
-    }
-
-    private static let localDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
-
-    private func copySettings(
-        _ settings: AppSettings,
-        guardianPinHash: String? = nil,
-        recoveryCodeHash: String? = nil
-    ) throws -> AppSettings {
-        try AppSettings(
-            id: settings.id,
-            guardianPinHash: guardianPinHash ?? settings.guardianPinHash,
-            recoveryCodeHash: recoveryCodeHash ?? settings.recoveryCodeHash,
-            feedbackIntensity: settings.feedbackIntensity,
-            soundEnabled: settings.soundEnabled,
-            ttsEnabled: settings.ttsEnabled,
-            ttsRate: settings.ttsRate,
-            ttsVolume: settings.ttsVolume,
-            hapticEnabled: settings.hapticEnabled,
-            undoDurationSeconds: settings.undoDurationSeconds,
-            notificationLeadTimes: settings.notificationLeadTimes,
-            quietHoursStart: settings.quietHoursStart,
-            quietHoursEnd: settings.quietHoursEnd,
-            locale: settings.locale,
-            createdAt: settings.createdAt,
-            updatedAt: now()
-        )
-    }
-
-    private func backupErrorMessage(for error: Error) -> String {
-        guard let backupError = error as? BackupError else {
-            return "백업 파일을 읽지 못했어요."
-        }
-        switch backupError {
-        case .invalidChecksum:
-            return "백업 파일이 손상되었어요."
-        case .unsupportedSchemaVersion:
-            return "지원하지 않는 백업 버전이에요."
-        case .unsupportedPlatform:
-            return "이 iOS 버전에서 복원할 수 없는 백업이에요."
-        case .missingFile, .invalidPackage, .invalidManifest, .invalidData:
-            return "올바른 Steppie 백업 파일이 아니에요."
-        case .duplicateID, .invalidReference:
-            return "백업 데이터 관계가 올바르지 않아요."
-        }
-    }
 }

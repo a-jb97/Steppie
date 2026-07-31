@@ -1,11 +1,6 @@
 import SwiftUI
 
 struct GuardianModeView: View {
-    @Environment(\.locale) private var locale
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var draggedRoutineID: UUID?
-    @State private var routineDragOrder: [UUID]?
-    @State private var dragStartIndex: Int?
     @State private var phoneNavigationPath: [GuardianDestination] = []
     @State private var isTodayRoutineSelectionDismissed = false
     @State private var isWideLayout = false
@@ -74,19 +69,28 @@ struct GuardianModeView: View {
         }
         .sheet(item: routineSetNameDraftBinding) { _ in
             NavigationStack {
-                routineSetNameEditor
+                GuardianRoutineSetNameEditorView(
+                    viewModel: viewModel,
+                    onInteraction: onInteraction
+                )
             }
             .presentationDetents([.medium])
         }
         .sheet(item: routineSetScheduleDraftBinding) { _ in
             NavigationStack {
-                routineSetScheduleEditor
+                GuardianRoutineSetScheduleEditorView(
+                    viewModel: viewModel,
+                    onInteraction: onInteraction
+                )
             }
             .presentationDetents([.medium])
         }
         .sheet(isPresented: todayRoutineSelectionBinding) {
             NavigationStack {
-                todayRoutineSelectionSheet
+                GuardianTodayRoutineSelectionView(
+                    viewModel: viewModel,
+                    onInteraction: onInteraction
+                )
             }
             .presentationDetents([.medium, .large])
         }
@@ -284,7 +288,12 @@ struct GuardianModeView: View {
 
     private func routineEditor(isWide: Bool) -> some View {
         HStack(spacing: 0) {
-            AnyView(routineListPane(isWide: isWide))
+            GuardianRoutineManagementListView(
+                isWide: isWide,
+                viewModel: viewModel,
+                onDone: onDone,
+                onInteraction: onInteraction
+            )
             if isWide {
                 Rectangle()
                     .fill(Color.steppieBorderSubtle)
@@ -296,456 +305,6 @@ struct GuardianModeView: View {
                     .frame(maxWidth: .infinity)
             }
         }
-    }
-
-    private func routineListPane(isWide: Bool) -> some View {
-        List {
-            Section {
-                routineSetListHeader
-                    .listRowInsets(headerListRowInsets)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-
-                ForEach(viewModel.routineSets) { routineSet in
-                    routineSetRow(routineSet)
-                        .listRowInsets(routineListRowInsets)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                }
-            }
-
-            Section {
-                header(
-                    title: routineEditorTitle,
-                    subtitle: "각 루틴을 선택하면 해당 루틴을 수정할 수 있습니다."
-                )
-                .padding(.top, SteppieSpacing.large)
-                .padding(.horizontal, SteppieLayout.guardianScreenPadding)
-                .listRowInsets(headerListRowInsets)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-
-                if viewModel.routines.isEmpty {
-                    messageState(title: "활동이 없어요", message: "활동 추가로 첫 루틴을 만들어 주세요.")
-                        .listRowInsets(routineListRowInsets)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                } else {
-                    ForEach(displayedRoutines) { routine in
-                        editableRoutineRow(routine, isWide: isWide)
-                            .listRowInsets(routineListRowInsets)
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .transaction { transaction in
-                                transaction.animation = nil
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    viewModel.requestDelete(routine)
-                                    onInteraction()
-                                } label: {
-                                    Label("삭제", systemImage: "trash")
-                                }
-                            }
-                    }
-                }
-            }
-            Section {
-                SteppieButton("+ 활동 추가") {
-                    viewModel.beginAddRoutine()
-                    onInteraction()
-                }
-                .listRowInsets(routineListRowInsets)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-            }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(Color.steppieBackgroundSecondary)
-        .frame(maxWidth: isWide ? SteppieLayout.splitListWidth : .infinity)
-        .navigationTitle("")
-        .toolbar {
-            if !isWide {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("완료", action: onDone)
-                }
-            }
-        }
-    }
-
-    private func routineSetRow(_ routineSet: RoutineSet) -> some View {
-        let isSelected = routineSet.id == viewModel.selectedRoutineSet?.id
-        return HStack(spacing: SteppieSpacing.small) {
-            Button {
-                viewModel.selectRoutineSet(routineSet)
-                onInteraction()
-            } label: {
-                HStack(spacing: SteppieSpacing.small) {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(isSelected ? Color.steppieFocusRing : Color.steppieTextSecondary)
-                        .frame(
-                            width: SteppieLayout.guardianMinimumTouchTarget,
-                            height: SteppieLayout.guardianMinimumTouchTarget
-                        )
-                        .accessibilityHidden(true)
-                    Text(routineSetTitle(routineSet))
-                        .steppieTextStyle(.button)
-                        .foregroundStyle(Color.steppieTextPrimary)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text(routineSetTitle(routineSet)))
-            .accessibilityValue(Text(isSelected ? "선택됨" : "선택 안 됨"))
-            .accessibilityHint(Text("이 루틴 세트를 편집합니다"))
-
-            if viewModel.isEditingRoutineSets {
-                routineSetEditActions(for: routineSet)
-            } else {
-                dailyRoutineSetAction(for: routineSet)
-            }
-        }
-        .padding(SteppieSpacing.small)
-        .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
-        .background(Color.steppieBackgroundPrimary)
-        .overlay {
-            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
-                .stroke(
-                    isSelected ? Color.steppieFocusRing : Color.steppieBorderSubtle,
-                    lineWidth: isSelected ? SteppieStroke.focus : SteppieStroke.divider
-                )
-        }
-        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
-    }
-
-    @ViewBuilder
-    private func dailyRoutineSetAction(for routineSet: RoutineSet) -> some View {
-        if let startTime = routineSet.dailyStartTime {
-            VStack(spacing: SteppieSpacing.twoExtraSmall) {
-                Button {
-                    viewModel.beginScheduleRoutineSet(routineSet)
-                    onInteraction()
-                } label: {
-                    Text(startTime.description)
-                        .steppieTextStyle(.button)
-                        .foregroundStyle(Color.steppieFocusRing)
-                        .frame(
-                            minWidth: SteppieLayout.guardianMinimumTouchTarget,
-                            minHeight: SteppieLayout.guardianMinimumTouchTarget
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 매일 \(startTime.description) 시작, 시간 변경"))
-
-                Button {
-                    viewModel.removeRoutineSetFromDailySchedule(routineSet)
-                    onInteraction()
-                } label: {
-                    Text("제외")
-                        .steppieTextStyle(.guardianCaption)
-                        .foregroundStyle(Color.steppieDanger)
-                        .frame(
-                            minWidth: SteppieLayout.guardianMinimumTouchTarget,
-                            minHeight: SteppieLayout.guardianMinimumTouchTarget
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 매일 루틴에서 제외"))
-            }
-        } else {
-            Button {
-                viewModel.beginScheduleRoutineSet(routineSet)
-                onInteraction()
-            } label: {
-                Text("매일 사용")
-                    .steppieTextStyle(.button)
-                    .foregroundStyle(Color.steppieBackgroundPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, SteppieSpacing.small)
-                    .frame(minWidth: SteppieLayout.guardianMinimumTouchTarget, minHeight: SteppieLayout.guardianMinimumTouchTarget)
-                    .background(Color.steppieFocusRing)
-                    .clipShape(.rect(cornerRadius: SteppieCornerRadius.control))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 매일 루틴에 추가"))
-        }
-    }
-
-    private var routineSetListHeader: some View {
-        HStack(alignment: .top, spacing: SteppieSpacing.medium) {
-            header(
-                title: "루틴 관리",
-                subtitle: "여러 세트를 매일 사용할 시간과 함께 선택합니다"
-            )
-            Button(viewModel.isEditingRoutineSets ? "완료" : "편집") {
-                viewModel.toggleRoutineSetEditing()
-                onInteraction()
-            }
-            .buttonStyle(.borderless)
-            .steppieTextStyle(.button)
-            .foregroundStyle(Color.steppieFocusRing)
-            .frame(minWidth: SteppieLayout.guardianMinimumTouchTarget, minHeight: SteppieLayout.guardianMinimumTouchTarget)
-            .accessibilityLabel(Text(viewModel.isEditingRoutineSets ? "루틴 세트 편집 완료" : "루틴 세트 편집"))
-        }
-        .padding(.top, SteppieSpacing.medium)
-        .padding(.horizontal, SteppieLayout.guardianScreenPadding)
-        .textCase(nil)
-    }
-
-    private func routineSetEditActions(for routineSet: RoutineSet) -> some View {
-        HStack(spacing: SteppieSpacing.extraSmall) {
-            Button {
-                viewModel.beginRenameRoutineSet(routineSet)
-                onInteraction()
-            } label: {
-                Image(systemName: "pencil")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.steppieFocusRing)
-                    .frame(
-                        width: SteppieLayout.guardianMinimumTouchTarget,
-                        height: SteppieLayout.guardianMinimumTouchTarget
-                    )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 이름 변경"))
-
-            Button {
-                viewModel.requestDeleteRoutineSet(routineSet)
-                onInteraction()
-            } label: {
-                Image(systemName: "minus")
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(Color.steppieBackgroundPrimary)
-                    .frame(
-                        width: SteppieLayout.guardianMinimumTouchTarget,
-                        height: SteppieLayout.guardianMinimumTouchTarget
-                    )
-                    .background(Color.steppieDanger)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .disabled(viewModel.routineSets.count <= 1)
-            .opacity(viewModel.routineSets.count <= 1 ? 0.4 : 1)
-            .accessibilityLabel(Text("\(routineSetTitle(routineSet)) 삭제"))
-        }
-    }
-
-    private var routineSetNameEditor: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
-                header(title: "루틴 세트 이름 변경", subtitle: "보호자 모드에 표시되는 이름입니다")
-                labeledCard("루틴 세트 이름") {
-                    TextField("루틴 세트 이름", text: routineSetNameDraftNameBinding)
-                        .steppieTextStyle(.guardianBody)
-                        .textFieldStyle(.plain)
-                }
-                HStack(spacing: SteppieSpacing.medium) {
-                    SteppieButton("취소", role: .secondary) {
-                        viewModel.cancelRoutineSetRename()
-                        onInteraction()
-                    }
-                    SteppieButton(
-                        "저장",
-                        state: viewModel.routineSetNameDraft?.isValid == true ? .enabled : .disabled
-                    ) {
-                        viewModel.saveRoutineSetName(localeIdentifier: localeIdentifier)
-                        onInteraction()
-                    }
-                }
-            }
-            .padding(SteppieLayout.guardianScreenPadding)
-        }
-        .background(Color.steppieBackgroundSecondary)
-    }
-
-    private var routineSetScheduleEditor: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
-                header(
-                    title: "매일 루틴 시간",
-                    subtitle: "현재 세트를 마친 뒤 이 시간이 되면 자동으로 시작합니다"
-                )
-                labeledCard("시작 시각") {
-                    DatePicker(
-                        "시작 시각",
-                        selection: routineSetScheduleDateBinding,
-                        displayedComponents: .hourAndMinute
-                    )
-                    .datePickerStyle(.wheel)
-                    .labelsHidden()
-                    .frame(maxWidth: .infinity)
-                    .accessibilityLabel(Text("루틴 세트 시작 시각"))
-                }
-                HStack(spacing: SteppieSpacing.medium) {
-                    SteppieButton("취소", role: .secondary) {
-                        viewModel.cancelRoutineSetSchedule()
-                        onInteraction()
-                    }
-                    SteppieButton("저장") {
-                        viewModel.saveRoutineSetSchedule()
-                        onInteraction()
-                    }
-                }
-            }
-            .padding(SteppieLayout.guardianScreenPadding)
-        }
-        .background(Color.steppieBackgroundSecondary)
-    }
-
-    private var routineListRowInsets: EdgeInsets {
-        EdgeInsets(
-            top: SteppieSpacing.extraSmall,
-            leading: SteppieLayout.guardianScreenPadding,
-            bottom: SteppieSpacing.extraSmall,
-            trailing: SteppieLayout.guardianScreenPadding
-        )
-    }
-
-    private var displayedRoutines: [Routine] {
-        guard let routineDragOrder else { return viewModel.routines }
-        let routinesByID = Dictionary(uniqueKeysWithValues: viewModel.routines.map { ($0.id, $0) })
-        let orderedRoutines = routineDragOrder.compactMap { routinesByID[$0] }
-        return orderedRoutines.count == viewModel.routines.count ? orderedRoutines : viewModel.routines
-    }
-
-    private var headerListRowInsets: EdgeInsets {
-        EdgeInsets(top: 0, leading: 0, bottom: SteppieSpacing.extraSmall, trailing: 0)
-    }
-
-    private func editableRoutineRow(_ routine: Routine, isWide: Bool) -> some View {
-        adaptiveCardStack(spacing: SteppieSpacing.small) {
-            Button {
-                viewModel.beginEditRoutine(routine)
-                onInteraction()
-            } label: {
-                adaptiveCardStack(spacing: SteppieSpacing.small) {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(SteppieCardColor(colorToken: routine.colorToken).color)
-                        .frame(width: dynamicTypeSize.isAccessibilitySize ? 68 : 20, height: dynamicTypeSize.isAccessibilitySize ? 20 : 68)
-                        .accessibilityHidden(true)
-                    RoutineVisualView(icon: routine.icon, size: .list)
-                        .frame(width: 52, height: 52)
-                    VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
-                        Text(viewModel.localizedTitle(for: routine))
-                            .steppieTextStyle(.button)
-                            .foregroundStyle(Color.steppieTextPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(routine.scheduledTime?.description ?? "시간 없음")
-                            .steppieTextStyle(.guardianCaption)
-                            .foregroundStyle(Color.steppieTextSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Spacer()
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text(viewModel.localizedTitle(for: routine)))
-            .accessibilityValue(Text(routine.scheduledTime?.description ?? "시간 없음"))
-            .accessibilityHint(Text("이 루틴을 수정합니다"))
-            Image(systemName: "line.3.horizontal")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Color.steppieTextSecondary)
-                .frame(width: 52, height: 68)
-                .contentShape(.rect)
-                .gesture(reorderGesture(for: routine))
-                .accessibilityLabel(Text("\(viewModel.localizedTitle(for: routine)) 순서 변경 핸들"))
-                .accessibilityHint(Text("누른 상태로 위아래로 움직여 순서를 바꿉니다"))
-                .accessibilityAction(named: Text("\(viewModel.localizedTitle(for: routine)) 위로 이동")) {
-                    viewModel.moveRoutine(routine, direction: -1)
-                    onInteraction()
-                }
-                .accessibilityAction(named: Text("\(viewModel.localizedTitle(for: routine)) 아래로 이동")) {
-                    viewModel.moveRoutine(routine, direction: 1)
-                    onInteraction()
-                }
-        }
-        .padding(SteppieSpacing.small)
-        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
-        .background(Color.steppieBackgroundPrimary)
-        .overlay {
-            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
-                .stroke(
-                    draggedRoutineID == routine.id ? Color.steppieFocusRing : Color.steppieBorderSubtle,
-                    lineWidth: draggedRoutineID == routine.id ? SteppieStroke.focus : SteppieStroke.divider
-                )
-        }
-        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
-        .contextMenu {
-            Button("수정") { viewModel.beginEditRoutine(routine) }
-            Button("삭제", role: .destructive) { viewModel.requestDelete(routine) }
-        }
-    }
-
-    private var todayRoutineSelectionSheet: some View {
-        List {
-            Section {
-                header(
-                    title: "오늘의 루틴 선택",
-                    subtitle: "오늘 사용할 루틴 세트를 선택해 주세요"
-                )
-                .padding(.top, SteppieSpacing.medium)
-                .padding(.horizontal, SteppieLayout.guardianScreenPadding)
-                .listRowInsets(headerListRowInsets)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-
-                ForEach(viewModel.routineSets) { routineSet in
-                    Button {
-                        viewModel.assignRoutineSetForToday(routineSet)
-                        onInteraction()
-                    } label: {
-                        adaptiveCardStack(spacing: SteppieSpacing.small) {
-                            Image(systemName: viewModel.isRoutineSetAssignedToday(routineSet) ? "checkmark.circle.fill" : "circle")
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(viewModel.isRoutineSetAssignedToday(routineSet) ? Color.steppieFocusRing : Color.steppieTextSecondary)
-                                .frame(
-                                    width: SteppieLayout.guardianMinimumTouchTarget,
-                                    height: SteppieLayout.guardianMinimumTouchTarget
-                                )
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
-                                Text(routineSetTitle(routineSet))
-                                    .steppieTextStyle(.button)
-                                    .foregroundStyle(Color.steppieTextPrimary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                Text(viewModel.isRoutineSetAssignedToday(routineSet) ? "현재 사용 중" : "오늘 루틴으로 설정")
-                                    .steppieTextStyle(.guardianCaption)
-                                    .foregroundStyle(Color.steppieTextSecondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            if !dynamicTypeSize.isAccessibilitySize {
-                                Spacer()
-                            }
-                        }
-                        .padding(SteppieSpacing.small)
-                        .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
-                        .background(Color.steppieBackgroundPrimary)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
-                                .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
-                        }
-                        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text(routineSetTitle(routineSet)))
-                    .accessibilityValue(Text(viewModel.isRoutineSetAssignedToday(routineSet) ? "현재 사용 중" : "오늘 루틴으로 설정 가능"))
-                    .listRowInsets(routineListRowInsets)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                }
-            }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(Color.steppieBackgroundSecondary)
     }
 
     private func unavailableScreen(title: String, subtitle: String) -> some View {
@@ -785,38 +344,6 @@ struct GuardianModeView: View {
         .padding(.bottom, SteppieSpacing.small)
     }
 
-    private func labeledCard<Content: View>(
-        _ title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: SteppieSpacing.extraSmall) {
-            Text(title)
-                .steppieTextStyle(.button)
-                .foregroundStyle(Color.steppieTextSecondary)
-            content()
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.steppieBackgroundPrimary)
-        .overlay {
-            RoundedRectangle(cornerRadius: SteppieCornerRadius.card)
-                .stroke(Color.steppieBorderSubtle, lineWidth: SteppieStroke.divider)
-        }
-        .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
-    }
-
-    @ViewBuilder
-    private func adaptiveCardStack<Content: View>(
-        spacing: CGFloat,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: spacing, content: content)
-        } else {
-            HStack(spacing: spacing, content: content)
-        }
-    }
-
     private func messageState(title: String, message: String) -> some View {
         VStack(spacing: SteppieSpacing.medium) {
             Text(title)
@@ -828,24 +355,6 @@ struct GuardianModeView: View {
         }
         .multilineTextAlignment(.center)
         .padding(SteppieLayout.guardianScreenPadding)
-    }
-
-    private var routineEditorTitle: String {
-        guard let routineSet = viewModel.selectedRoutineSet else {
-            return "루틴"
-        }
-        return routineSetTitle(routineSet)
-    }
-
-    private func routineSetTitle(_ routineSet: RoutineSet) -> String {
-        routineSet.name.resolved(
-            appLocale: locale.identifier,
-            systemLanguages: [locale.identifier]
-        )
-    }
-
-    private var localeIdentifier: String {
-        locale.language.languageCode?.identifier ?? "ko"
     }
 
     private var deleteBinding: Binding<Bool> {
@@ -897,40 +406,6 @@ struct GuardianModeView: View {
         )
     }
 
-    private var routineSetScheduleDateBinding: Binding<Date> {
-        Binding(
-            get: {
-                guard let time = viewModel.routineSetScheduleDraft?.startTime else {
-                    return Date()
-                }
-                return Calendar.current.date(
-                    bySettingHour: time.hour,
-                    minute: time.minute,
-                    second: 0,
-                    of: Date()
-                ) ?? Date()
-            },
-            set: { date in
-                let components = Calendar.current.dateComponents([.hour, .minute], from: date)
-                guard let hour = components.hour,
-                      let minute = components.minute,
-                      let time = try? LocalTime(hour: hour, minute: minute) else { return }
-                viewModel.routineSetScheduleDraft?.startTime = time
-                onInteraction()
-            }
-        )
-    }
-
-    private var routineSetNameDraftNameBinding: Binding<String> {
-        Binding(
-            get: { viewModel.routineSetNameDraft?.name ?? "" },
-            set: {
-                viewModel.routineSetNameDraft?.name = $0
-                onInteraction()
-            }
-        )
-    }
-
     private func draftBinding(isWide: Bool) -> Binding<RoutineDraft?> {
         Binding(
             get: {
@@ -948,44 +423,6 @@ struct GuardianModeView: View {
         )
     }
 
-    private func reorderGesture(for routine: Routine) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.18)
-            .sequenced(before: DragGesture(minimumDistance: 8))
-            .onChanged { value in
-                switch value {
-                case .first(true):
-                    draggedRoutineID = routine.id
-                    let currentOrder = viewModel.routines.map(\.id)
-                    routineDragOrder = currentOrder
-                    dragStartIndex = currentOrder.firstIndex(of: routine.id)
-                    onInteraction()
-                case .second(true, let drag?):
-                    guard let startIndex = dragStartIndex,
-                          var order = routineDragOrder,
-                          let currentIndex = order.firstIndex(of: routine.id)
-                    else { return }
-                    let step = Int((drag.translation.height / 104).rounded())
-                    let destination = min(max(startIndex + step, 0), order.count - 1)
-                    guard currentIndex != destination else { return }
-
-                    let movedID = order.remove(at: currentIndex)
-                    order.insert(movedID, at: destination)
-                    routineDragOrder = order
-                default:
-                    break
-                }
-            }
-            .onEnded { _ in
-                if let routineDragOrder,
-                   routineDragOrder != viewModel.routines.map(\.id) {
-                    viewModel.saveRoutineOrder(orderedIDs: routineDragOrder)
-                    onInteraction()
-                }
-                draggedRoutineID = nil
-                routineDragOrder = nil
-                dragStartIndex = nil
-            }
-    }
 }
 
 extension SteppieCardColor {
