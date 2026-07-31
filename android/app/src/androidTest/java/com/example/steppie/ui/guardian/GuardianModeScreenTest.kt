@@ -1,5 +1,6 @@
 package com.example.steppie.ui.guardian
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
@@ -17,6 +18,29 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
+@Composable
+private fun TestGuardianModeScreen(
+    state: GuardianModeUiState,
+    modeActions: GuardianModeActions = GuardianModeActionCallbacks(),
+    routineActions: GuardianRoutineActions = GuardianRoutineActionCallbacks(),
+    routineSetActions: GuardianRoutineSetActions = GuardianRoutineSetActionCallbacks(),
+    templateActions: GuardianTemplateActions = GuardianTemplateActionCallbacks(),
+    recordActions: GuardianRecordActions = GuardianRecordActionCallbacks(),
+    environmentActions: GuardianEnvironmentActions = GuardianEnvironmentActionCallbacks(),
+    securityActions: GuardianSecurityActions = GuardianSecurityActionCallbacks(),
+) {
+    GuardianModeScreen(
+        state = state,
+        modeActions = modeActions,
+        routineActions = routineActions,
+        routineSetActions = routineSetActions,
+        templateActions = templateActions,
+        recordActions = recordActions,
+        environmentActions = environmentActions,
+        securityActions = securityActions,
+    )
+}
+
 class GuardianModeScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -28,47 +52,12 @@ class GuardianModeScreenTest {
 
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(isActive = true, destination = GuardianDestination.Pin),
-                    onDigit = { digits += it },
-                    onDeletePinDigit = { deleted += 1 },
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
+                    modeActions = GuardianModeActionCallbacks(
+                        onDigit = { digits += it },
+                        onDeletePinDigit = { deleted += 1 },
+                    ),
                 )
             }
         }
@@ -92,53 +81,24 @@ class GuardianModeScreenTest {
 
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
                         destination = GuardianDestination.Home,
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = { routineClicks += 1 },
-                    onOpenEnvironmentSettings = { environmentClicks += 1 },
-                    onOpenRecords = { recordsClicks += 1 },
-                    onOpenSecurity = { securityClicks += 1 },
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
+                    routineActions = GuardianRoutineActionCallbacks(
+                        onOpenRoutineEdit = { routineClicks += 1 },
+                    ),
+                    environmentActions = GuardianEnvironmentActionCallbacks(
+                        onOpenEnvironmentSettings = { environmentClicks += 1 },
+                    ),
+                    recordActions = GuardianRecordActionCallbacks(
+                        onOpenRecords = { recordsClicks += 1 },
+                    ),
+                    securityActions = GuardianSecurityActionCallbacks(
+                        onOpenSecurity = { securityClicks += 1 },
+                    ),
                 )
             }
         }
@@ -162,52 +122,15 @@ class GuardianModeScreenTest {
 
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
                         destination = GuardianDestination.Security,
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRecoveryCode = { recoveryClicks += 1 },
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
+                    securityActions = GuardianSecurityActionCallbacks(
+                        onOpenRecoveryCode = { recoveryClicks += 1 },
+                    ),
                 )
             }
         }
@@ -225,7 +148,7 @@ class GuardianModeScreenTest {
 
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
@@ -233,46 +156,9 @@ class GuardianModeScreenTest {
                         recoveryStep = GuardianRecoveryStep.ShowCode,
                         recoveryCodeToShow = "654321",
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onCloseRecoveryCode = { closeClicks += 1 },
-                    onClearNotice = {},
+                    securityActions = GuardianSecurityActionCallbacks(
+                        onCloseRecoveryCode = { closeClicks += 1 },
+                    ),
                 )
             }
         }
@@ -298,7 +184,7 @@ class GuardianModeScreenTest {
 
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
@@ -327,45 +213,6 @@ class GuardianModeScreenTest {
                             ),
                         ),
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
                 )
             }
         }
@@ -383,52 +230,15 @@ class GuardianModeScreenTest {
 
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
                         destination = GuardianDestination.Records,
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenRecordsCalendar = { calendarClicks += 1 },
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
+                    recordActions = GuardianRecordActionCallbacks(
+                        onOpenRecordsCalendar = { calendarClicks += 1 },
+                    ),
                 )
             }
         }
@@ -448,7 +258,7 @@ class GuardianModeScreenTest {
 
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
@@ -469,46 +279,9 @@ class GuardianModeScreenTest {
                             ),
                         ),
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onSelectRecordsCalendarDate = { selectedDate = it },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
+                    recordActions = GuardianRecordActionCallbacks(
+                        onSelectRecordsCalendarDate = { selectedDate = it },
+                    ),
                 )
             }
         }
@@ -529,51 +302,12 @@ class GuardianModeScreenTest {
     fun environmentSettingsShowsFigmaAndSprintControls() {
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
                         destination = GuardianDestination.EnvironmentSettings,
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
                 )
             }
         }
@@ -594,51 +328,15 @@ class GuardianModeScreenTest {
 
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
                         destination = GuardianDestination.Home,
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = { createClicks += 1 },
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
+                    routineSetActions = GuardianRoutineSetActionCallbacks(
+                        onOpenRoutineSetCreate = { createClicks += 1 },
+                    ),
                 )
             }
         }
@@ -654,51 +352,12 @@ class GuardianModeScreenTest {
     fun routineEditWithoutActiveSetShowsCreateRoutineSetEmptyState() {
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
                         destination = GuardianDestination.RoutineEdit,
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
                 )
             }
         }
@@ -713,7 +372,7 @@ class GuardianModeScreenTest {
 
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
@@ -724,45 +383,9 @@ class GuardianModeScreenTest {
                         selectedRoutineSetId = RoutineSampleData.morning.id,
                         todayRoutineSetId = RoutineSampleData.morning.id,
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = { selectedRoutineSetId = it },
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
+                    routineSetActions = GuardianRoutineSetActionCallbacks(
+                        onSelectRoutineSet = { selectedRoutineSetId = it },
+                    ),
                 )
             }
         }
@@ -786,7 +409,7 @@ class GuardianModeScreenTest {
 
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
@@ -796,45 +419,10 @@ class GuardianModeScreenTest {
                         routines = RoutineSampleData.morning.routines,
                         routineSetListEditing = true,
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = { editClicks += 1 },
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = { deleteClicks += 1 },
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
+                    routineSetActions = GuardianRoutineSetActionCallbacks(
+                        onRequestEditRoutineSetName = { editClicks += 1 },
+                        onRequestDeleteRoutineSet = { deleteClicks += 1 },
+                    ),
                 )
             }
         }
@@ -852,52 +440,13 @@ class GuardianModeScreenTest {
     fun routineSetCreateDisablesSaveUntilAtLeastOneStepExists() {
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
                         destination = GuardianDestination.RoutineSetCreate,
                         routineSetDraft = RoutineSetDraft(name = "주말 루틴"),
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
                 )
             }
         }
@@ -910,7 +459,7 @@ class GuardianModeScreenTest {
     fun routineEditUsesDragHandleInsteadOfArrowButtons() {
         composeRule.setContent {
             SteppieTheme {
-                GuardianModeScreen(
+                TestGuardianModeScreen(
                     state = GuardianModeUiState(
                         isActive = true,
                         isAuthenticated = true,
@@ -918,45 +467,6 @@ class GuardianModeScreenTest {
                         activeRoutineSet = RoutineSampleData.morning,
                         routines = RoutineSampleData.morning.routines,
                     ),
-                    onDigit = {},
-                    onDeletePinDigit = {},
-                    onCloseToChild = {},
-                    onInteraction = {},
-                    onOpenHome = {},
-                    onOpenRoutineEdit = {},
-                    onOpenSecurity = {},
-                    onOpenPinChange = {},
-                    onOpenRoutineSetCreate = {},
-                    onOpenNewRoutineEditor = {},
-                    onOpenRoutineEditor = {},
-                    onToggleRoutineSetListEditing = {},
-                    onSelectRoutineSet = {},
-                    onRequestEditRoutineSetName = {},
-                    onEditingRoutineSetNameChange = {},
-                    onCancelEditRoutineSetName = {},
-                    onSaveEditingRoutineSetName = {},
-                    onDraftTitleChange = {},
-                    onDraftIconChange = {},
-                    onDraftColorChange = {},
-                    onDraftScheduledTimeChange = {},
-                    onSaveDraft = {},
-                    onRoutineSetNameChange = {},
-                    onRoutineSetStepTitleChange = {},
-                    onRoutineSetStepIconChange = {},
-                    onRoutineSetStepColorChange = {},
-                    onRoutineSetStepScheduledTimeChange = {},
-                    onAddRoutineSetStep = {},
-                    onEditRoutineSetStep = {},
-                    onRemoveRoutineSetStep = {},
-                    onSaveRoutineSetDraft = {},
-                    onRequestDelete = {},
-                    onRequestDeleteRoutineSet = {},
-                    onCancelDelete = {},
-                    onConfirmDelete = {},
-                    onConfirmDeleteRoutineSet = {},
-                    onMoveRoutine = { _, _ -> },
-                    onShowOutOfScopeNotice = {},
-                    onClearNotice = {},
                 )
             }
         }
