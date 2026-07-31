@@ -36,16 +36,9 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.steppie.data.backup.AndroidBackupRepository
-import com.example.steppie.data.backup.BackupDataSource
-import com.example.steppie.core.environment.SystemClockProvider
-import com.example.steppie.core.environment.SystemLocaleProvider
-import com.example.steppie.data.local.SteppieDatabase
-import com.example.steppie.data.photo.RoutinePhotoStore
-import com.example.steppie.data.repository.DataStoreAppSettingsRepository
-import com.example.steppie.data.repository.RoomRoutineRepository
+import com.example.steppie.di.AppContainer
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.notifications.ACTION_OPEN_ROUTINE
-import com.example.steppie.notifications.AndroidRoutineNotificationScheduler
 import com.example.steppie.notifications.EXTRA_ROUTINE_ID
 import com.example.steppie.ui.app.AppMode
 import com.example.steppie.ui.app.NotificationReconcileEffect
@@ -62,13 +55,19 @@ import com.example.steppie.ui.child.ChildRoutineFeedbackEvent
 import com.example.steppie.ui.child.ChildRoutineScreen
 import com.example.steppie.ui.child.ChildRoutineViewModel
 import com.example.steppie.ui.guardian.GuardianModeScreen
+import com.example.steppie.ui.guardian.GuardianEnvironmentActionCallbacks
+import com.example.steppie.ui.guardian.GuardianModeActionCallbacks
+import com.example.steppie.ui.guardian.GuardianRecordActionCallbacks
+import com.example.steppie.ui.guardian.GuardianRoutineActionCallbacks
+import com.example.steppie.ui.guardian.GuardianRoutineSetActionCallbacks
+import com.example.steppie.ui.guardian.GuardianSecurityActionCallbacks
+import com.example.steppie.ui.guardian.GuardianTemplateActionCallbacks
 import com.example.steppie.ui.guardian.GuardianModeViewModel
 import com.example.steppie.ui.guardian.GuardianDestination
 import com.example.steppie.ui.guardian.GuardianPinMode
 import com.example.steppie.ui.theme.SteppieTheme
 import com.example.steppie.ui.tutorial.TutorialCoordinatorViewModel
 import com.example.steppie.ui.tutorial.TutorialOverlay
-import com.example.steppie.ui.tutorial.TutorialProgressRepository
 import com.example.steppie.ui.tutorial.LocalTutorialAnchorRegistry
 import com.example.steppie.ui.tutorial.rememberTutorialAnchorRegistry
 import java.io.File
@@ -78,19 +77,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 
 class MainActivity : ComponentActivity() {
-    private val routineRepository by lazy {
-        RoomRoutineRepository(SteppieDatabase.getInstance(this))
-    }
-    private val appSettingsRepository by lazy { DataStoreAppSettingsRepository(this) }
-    private val tutorialProgressRepository by lazy { TutorialProgressRepository(this) }
-    private val routinePhotoStore by lazy { RoutinePhotoStore(this) }
-    private val backupRepository by lazy {
-        AndroidBackupRepository(
-            context = this,
-            dataSource = BackupDataSource(SteppieDatabase.getInstance(this), appSettingsRepository, routinePhotoStore),
-        )
-    }
-    private val notificationScheduler by lazy { AndroidRoutineNotificationScheduler(this) }
+    private val appContainer by lazy { AppContainer(applicationContext) }
     private val notificationRoutineId = MutableStateFlow<String?>(null)
     private lateinit var feedbackController: AndroidFeedbackController
 
@@ -104,30 +91,30 @@ class MainActivity : ComponentActivity() {
             SteppieTheme {
                 val childViewModel: ChildRoutineViewModel = viewModel(
                     factory = ChildRoutineViewModel.factory(
-                        routineRepository,
-                        appSettingsRepository,
-                        SystemClockProvider,
-                        SystemLocaleProvider,
+                        appContainer.routineRepository,
+                        appContainer.appSettingsRepository,
+                        appContainer.clockProvider,
+                        appContainer.localeProvider,
                     ),
                 )
                 val guardianViewModel: GuardianModeViewModel = viewModel(
                     factory = GuardianModeViewModel.factory(
-                        routineRepository,
-                        appSettingsRepository,
-                        SystemClockProvider,
-                        SystemLocaleProvider,
-                        backupRepository,
-                        routinePhotoStore,
+                        appContainer.routineRepository,
+                        appContainer.appSettingsRepository,
+                        appContainer.clockProvider,
+                        appContainer.localeProvider,
+                        appContainer.backupProvider,
+                        appContainer.routinePhotoStore,
                     ),
                 )
                 val tutorialViewModel: TutorialCoordinatorViewModel = viewModel(
-                    factory = TutorialCoordinatorViewModel.factory(tutorialProgressRepository),
+                    factory = TutorialCoordinatorViewModel.factory(appContainer.tutorialProgressRepository),
                 )
                 val childState by childViewModel.uiState.collectAsStateWithLifecycle()
                 val guardianState by guardianViewModel.uiState.collectAsStateWithLifecycle()
                 val tutorialState by tutorialViewModel.uiState.collectAsStateWithLifecycle()
                 val tutorialAnchorRegistry = rememberTutorialAnchorRegistry()
-                val settings by appSettingsRepository.observeAppSettings()
+                val settings by appContainer.appSettingsRepository.observeAppSettings()
                     .collectAsStateWithLifecycle(initialValue = AppSettings())
                 val targetRoutineId by notificationRoutineId.collectAsStateWithLifecycle()
                 var notificationPermissionRefresh by remember { mutableIntStateOf(0) }
@@ -185,7 +172,7 @@ class MainActivity : ComponentActivity() {
                     childViewModel.feedbackEvents.collect(feedbackController::play)
                 }
                 LaunchedEffect(Unit) {
-                    val persistedSettings = appSettingsRepository.observeAppSettings().first()
+                    val persistedSettings = appContainer.appSettingsRepository.observeAppSettings().first()
                     if (!persistedSettings.hasGuardianPin) guardianViewModel.openInitialSetup()
                     appBootstrapComplete = true
                 }
@@ -203,7 +190,7 @@ class MainActivity : ComponentActivity() {
                         permissionRefresh = notificationPermissionRefresh,
                     ),
                 ) { input ->
-                    notificationScheduler.reconcileToday(
+                    appContainer.notificationScheduler.reconcileToday(
                         routines = input.routines,
                         completedRoutineIds = input.completedRoutineIds,
                         settings = input.settings,
@@ -253,123 +240,137 @@ class MainActivity : ComponentActivity() {
                 if (appMode == AppMode.Guardian) {
                     GuardianModeScreen(
                         state = guardianState,
-                        onDigit = guardianViewModel::inputPinDigit,
-                        onDeletePinDigit = guardianViewModel::deletePinDigit,
-                        onCloseToChild = guardianViewModel::closeToChild,
-                        onInteraction = guardianViewModel::markInteraction,
-                        onNavigateBack = guardianViewModel::navigateBack,
-                        onOpenHome = guardianViewModel::openHome,
-                        onOpenRoutineEdit = guardianViewModel::openRoutineEdit,
-                        onOpenEnvironmentSettings = guardianViewModel::openEnvironmentSettings,
-                        onOpenRecords = guardianViewModel::openRecords,
-                        onOpenRecordsCalendar = guardianViewModel::openRecordsCalendar,
-                        onOpenSecurity = guardianViewModel::openSecurity,
-                        onOpenBackupRestore = guardianViewModel::openBackupRestore,
-                        onOpenPinChange = guardianViewModel::openPinChange,
-                        onOpenRecoveryCode = guardianViewModel::openRecoveryCodeRegeneration,
-                        onOpenRecoveryPinReset = guardianViewModel::openRecoveryPinReset,
-                        onOpenRoutineSetCreate = guardianViewModel::openRoutineSetCreate,
-                        onOpenTemplateSelect = guardianViewModel::openTemplateSelect,
-                        onOpenTemplateSelectFromHome = guardianViewModel::openTemplateSelectFromHome,
-                        onCloseTemplateSelect = guardianViewModel::closeTemplateSelect,
-                        onPreviewTemplate = guardianViewModel::previewTemplate,
-                        onSaveTemplatePreview = {
-                            guardianViewModel.saveTemplatePreview(childViewModel::onDataChanged)
-                        },
-                        onOpenNewRoutineEditor = guardianViewModel::openNewRoutineEditor,
-                        onOpenRoutineEditor = guardianViewModel::openRoutineEditor,
-                        onToggleRoutineSetListEditing = guardianViewModel::toggleRoutineSetListEditing,
-                        onSelectRoutineSet = guardianViewModel::selectRoutineSet,
-                        onSetRoutineSetForToday = guardianViewModel::setRoutineSetForToday,
-                        onRoutineSetStartTimeChange = guardianViewModel::updateRoutineSetStartTime,
-                        onDismissDailyRoutineSelectionPrompt = guardianViewModel::dismissDailyRoutineSelectionPrompt,
-                        onRequestEditRoutineSetName = guardianViewModel::requestEditRoutineSetName,
-                        onEditingRoutineSetNameChange = guardianViewModel::updateEditingRoutineSetName,
-                        onCancelEditRoutineSetName = guardianViewModel::cancelEditRoutineSetName,
-                        onSaveEditingRoutineSetName = guardianViewModel::saveEditingRoutineSetName,
-                        onDraftTitleChange = guardianViewModel::updateDraftTitle,
-                        onDraftIconChange = guardianViewModel::updateDraftIcon,
-                        onDraftPhotoPick = {
-                            photoTargetName = PhotoTarget.RoutineDraft.name
-                            photoPickerLauncher.launch(imageGalleryIntent())
-                        },
-                        onDraftCameraCapture = {
-                            val uri = createCameraImageUri()
-                            cameraPhotoTargetName = PhotoTarget.RoutineDraft.name
-                            cameraPhotoUriString = uri.toString()
-                            cameraLauncher.launch(uri)
-                        },
-                        onDraftPhotoRemove = guardianViewModel::removeDraftPhoto,
-                        onDraftColorChange = guardianViewModel::updateDraftColor,
-                        onDraftScheduledTimeChange = guardianViewModel::updateDraftScheduledTime,
-                        onSaveDraft = guardianViewModel::saveDraft,
-                        onRoutineSetNameChange = guardianViewModel::updateRoutineSetName,
-                        onRoutineSetStepTitleChange = guardianViewModel::updateRoutineSetStepTitle,
-                        onRoutineSetStepIconChange = guardianViewModel::updateRoutineSetStepIcon,
-                        onRoutineSetStepPhotoPick = {
-                            photoTargetName = PhotoTarget.RoutineSetStep.name
-                            photoPickerLauncher.launch(imageGalleryIntent())
-                        },
-                        onRoutineSetStepCameraCapture = {
-                            val uri = createCameraImageUri()
-                            cameraPhotoTargetName = PhotoTarget.RoutineSetStep.name
-                            cameraPhotoUriString = uri.toString()
-                            cameraLauncher.launch(uri)
-                        },
-                        onRoutineSetStepPhotoRemove = guardianViewModel::removeRoutineSetStepPhoto,
-                        onRoutineSetStepColorChange = guardianViewModel::updateRoutineSetStepColor,
-                        onRoutineSetStepScheduledTimeChange = guardianViewModel::updateRoutineSetStepScheduledTime,
-                        onAddRoutineSetStep = guardianViewModel::addRoutineSetStep,
-                        onEditRoutineSetStep = guardianViewModel::editRoutineSetStep,
-                        onRemoveRoutineSetStep = guardianViewModel::removeRoutineSetStep,
-                        onSaveRoutineSetDraft = guardianViewModel::saveRoutineSetDraft,
-                        onRequestDelete = guardianViewModel::requestDelete,
-                        onRequestDeleteRoutineSet = guardianViewModel::requestDeleteRoutineSet,
-                        onCancelDelete = guardianViewModel::cancelDelete,
-                        onConfirmDelete = guardianViewModel::confirmDelete,
-                        onConfirmDeleteRoutineSet = guardianViewModel::confirmDeleteRoutineSet,
-                        onMoveRoutine = guardianViewModel::moveRoutine,
-                        onSelectRecordsDate = guardianViewModel::selectRecordsDate,
-                        onSelectRecordsCalendarDate = guardianViewModel::selectRecordsCalendarDate,
-                        onMoveRecordsCalendarMonth = guardianViewModel::moveRecordsCalendarMonth,
-                        onShowOutOfScopeNotice = guardianViewModel::showOutOfScopeNotice,
-                        onFeedbackIntensityChange = guardianViewModel::updateFeedbackIntensity,
-                        onTtsEnabledChange = guardianViewModel::updateTtsEnabled,
-                        onTtsRateChange = guardianViewModel::updateTtsRate,
-                        onTtsVolumeChange = guardianViewModel::updateTtsVolume,
-                        onSoundEnabledChange = guardianViewModel::updateSoundEnabled,
-                        onHapticEnabledChange = guardianViewModel::updateHapticEnabled,
-                        onNotificationLeadTimeChange = { leadMinutes, enabled ->
-                            guardianViewModel.updateNotificationLeadTime(leadMinutes, enabled)
-                            if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                ContextCompat.checkSelfPermission(
-                                    this@MainActivity,
-                                    Manifest.permission.POST_NOTIFICATIONS,
-                                ) != PackageManager.PERMISSION_GRANTED
-                            ) {
-                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            }
-                        },
-                        onQuietHoursEnabledChange = guardianViewModel::updateQuietHoursEnabled,
-                        onQuietHoursStartChange = guardianViewModel::updateQuietHoursStart,
-                        onQuietHoursEndChange = guardianViewModel::updateQuietHoursEnd,
-                        onReplayTutorials = tutorialViewModel::resetAll,
-                        onCreateBackupFile = {
-                            createBackupLauncher.launch(AndroidBackupRepository.defaultFileName())
-                        },
-                        onOpenRestoreFile = {
-                            openBackupLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
-                        },
-                        onRestorePinDigit = guardianViewModel::inputRestorePinDigit,
-                        onDeleteRestorePinDigit = guardianViewModel::deleteRestorePinDigit,
-                        onCancelRestore = guardianViewModel::cancelRestore,
-                        onRecoveryDigit = guardianViewModel::inputRecoveryDigit,
-                        onDeleteRecoveryDigit = guardianViewModel::deleteRecoveryDigit,
-                        onRecoveryCodeChange = guardianViewModel::updateRecoveryCodeInput,
-                        onConfirmRecoveryCode = guardianViewModel::confirmRecoveryCodeForPinReset,
-                        onCancelRecoveryPinReset = guardianViewModel::cancelRecoveryPinReset,
-                        onCloseRecoveryCode = guardianViewModel::closeRecoveryCode,
-                        onClearNotice = guardianViewModel::clearNotice,
+                        modeActions = GuardianModeActionCallbacks(
+                            onDigit = guardianViewModel::inputPinDigit,
+                            onDeletePinDigit = guardianViewModel::deletePinDigit,
+                            onCloseToChild = guardianViewModel::closeToChild,
+                            onInteraction = guardianViewModel::markInteraction,
+                            onNavigateBack = guardianViewModel::navigateBack,
+                            onOpenHome = guardianViewModel::openHome,
+                            onShowOutOfScopeNotice = guardianViewModel::showOutOfScopeNotice,
+                            onClearNotice = guardianViewModel::clearNotice,
+                        ),
+                        routineActions = GuardianRoutineActionCallbacks(
+                            onOpenRoutineEdit = guardianViewModel::openRoutineEdit,
+                            onOpenNewRoutineEditor = guardianViewModel::openNewRoutineEditor,
+                            onOpenRoutineEditor = guardianViewModel::openRoutineEditor,
+                            onDraftTitleChange = guardianViewModel::updateDraftTitle,
+                            onDraftIconChange = guardianViewModel::updateDraftIcon,
+                            onDraftPhotoPick = {
+                                photoTargetName = PhotoTarget.RoutineDraft.name
+                                photoPickerLauncher.launch(imageGalleryIntent())
+                            },
+                            onDraftCameraCapture = {
+                                val uri = createCameraImageUri()
+                                cameraPhotoTargetName = PhotoTarget.RoutineDraft.name
+                                cameraPhotoUriString = uri.toString()
+                                cameraLauncher.launch(uri)
+                            },
+                            onDraftPhotoRemove = guardianViewModel::removeDraftPhoto,
+                            onDraftColorChange = guardianViewModel::updateDraftColor,
+                            onDraftScheduledTimeChange = guardianViewModel::updateDraftScheduledTime,
+                            onSaveDraft = guardianViewModel::saveDraft,
+                            onRequestDelete = guardianViewModel::requestDelete,
+                            onCancelDelete = guardianViewModel::cancelDelete,
+                            onConfirmDelete = guardianViewModel::confirmDelete,
+                            onMoveRoutine = guardianViewModel::moveRoutine,
+                        ),
+                        routineSetActions = GuardianRoutineSetActionCallbacks(
+                            onOpenRoutineSetCreate = guardianViewModel::openRoutineSetCreate,
+                            onToggleRoutineSetListEditing = guardianViewModel::toggleRoutineSetListEditing,
+                            onSelectRoutineSet = guardianViewModel::selectRoutineSet,
+                            onSetRoutineSetForToday = guardianViewModel::setRoutineSetForToday,
+                            onRoutineSetStartTimeChange = guardianViewModel::updateRoutineSetStartTime,
+                            onDismissDailyRoutineSelectionPrompt = guardianViewModel::dismissDailyRoutineSelectionPrompt,
+                            onRequestEditRoutineSetName = guardianViewModel::requestEditRoutineSetName,
+                            onEditingRoutineSetNameChange = guardianViewModel::updateEditingRoutineSetName,
+                            onCancelEditRoutineSetName = guardianViewModel::cancelEditRoutineSetName,
+                            onSaveEditingRoutineSetName = guardianViewModel::saveEditingRoutineSetName,
+                            onRoutineSetNameChange = guardianViewModel::updateRoutineSetName,
+                            onRoutineSetStepTitleChange = guardianViewModel::updateRoutineSetStepTitle,
+                            onRoutineSetStepIconChange = guardianViewModel::updateRoutineSetStepIcon,
+                            onRoutineSetStepPhotoPick = {
+                                photoTargetName = PhotoTarget.RoutineSetStep.name
+                                photoPickerLauncher.launch(imageGalleryIntent())
+                            },
+                            onRoutineSetStepCameraCapture = {
+                                val uri = createCameraImageUri()
+                                cameraPhotoTargetName = PhotoTarget.RoutineSetStep.name
+                                cameraPhotoUriString = uri.toString()
+                                cameraLauncher.launch(uri)
+                            },
+                            onRoutineSetStepPhotoRemove = guardianViewModel::removeRoutineSetStepPhoto,
+                            onRoutineSetStepColorChange = guardianViewModel::updateRoutineSetStepColor,
+                            onRoutineSetStepScheduledTimeChange = guardianViewModel::updateRoutineSetStepScheduledTime,
+                            onAddRoutineSetStep = guardianViewModel::addRoutineSetStep,
+                            onEditRoutineSetStep = guardianViewModel::editRoutineSetStep,
+                            onRemoveRoutineSetStep = guardianViewModel::removeRoutineSetStep,
+                            onSaveRoutineSetDraft = guardianViewModel::saveRoutineSetDraft,
+                            onRequestDeleteRoutineSet = guardianViewModel::requestDeleteRoutineSet,
+                            onConfirmDeleteRoutineSet = guardianViewModel::confirmDeleteRoutineSet,
+                        ),
+                        templateActions = GuardianTemplateActionCallbacks(
+                            onOpenTemplateSelect = guardianViewModel::openTemplateSelect,
+                            onOpenTemplateSelectFromHome = guardianViewModel::openTemplateSelectFromHome,
+                            onCloseTemplateSelect = guardianViewModel::closeTemplateSelect,
+                            onPreviewTemplate = guardianViewModel::previewTemplate,
+                            onSaveTemplatePreview = {
+                                guardianViewModel.saveTemplatePreview(childViewModel::onDataChanged)
+                            },
+                        ),
+                        recordActions = GuardianRecordActionCallbacks(
+                            onOpenRecords = guardianViewModel::openRecords,
+                            onOpenRecordsCalendar = guardianViewModel::openRecordsCalendar,
+                            onSelectRecordsDate = guardianViewModel::selectRecordsDate,
+                            onSelectRecordsCalendarDate = guardianViewModel::selectRecordsCalendarDate,
+                            onMoveRecordsCalendarMonth = guardianViewModel::moveRecordsCalendarMonth,
+                        ),
+                        environmentActions = GuardianEnvironmentActionCallbacks(
+                            onOpenEnvironmentSettings = guardianViewModel::openEnvironmentSettings,
+                            onFeedbackIntensityChange = guardianViewModel::updateFeedbackIntensity,
+                            onTtsEnabledChange = guardianViewModel::updateTtsEnabled,
+                            onTtsRateChange = guardianViewModel::updateTtsRate,
+                            onTtsVolumeChange = guardianViewModel::updateTtsVolume,
+                            onSoundEnabledChange = guardianViewModel::updateSoundEnabled,
+                            onHapticEnabledChange = guardianViewModel::updateHapticEnabled,
+                            onNotificationLeadTimeChange = { leadMinutes, enabled ->
+                                guardianViewModel.updateNotificationLeadTime(leadMinutes, enabled)
+                                if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                    ContextCompat.checkSelfPermission(
+                                        this@MainActivity,
+                                        Manifest.permission.POST_NOTIFICATIONS,
+                                    ) != PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                            },
+                            onQuietHoursEnabledChange = guardianViewModel::updateQuietHoursEnabled,
+                            onQuietHoursStartChange = guardianViewModel::updateQuietHoursStart,
+                            onQuietHoursEndChange = guardianViewModel::updateQuietHoursEnd,
+                            onReplayTutorials = tutorialViewModel::resetAll,
+                        ),
+                        securityActions = GuardianSecurityActionCallbacks(
+                            onOpenSecurity = guardianViewModel::openSecurity,
+                            onOpenBackupRestore = guardianViewModel::openBackupRestore,
+                            onOpenPinChange = guardianViewModel::openPinChange,
+                            onOpenRecoveryCode = guardianViewModel::openRecoveryCodeRegeneration,
+                            onOpenRecoveryPinReset = guardianViewModel::openRecoveryPinReset,
+                            onCreateBackupFile = {
+                                createBackupLauncher.launch(AndroidBackupRepository.defaultFileName())
+                            },
+                            onOpenRestoreFile = {
+                                openBackupLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
+                            },
+                            onRestorePinDigit = guardianViewModel::inputRestorePinDigit,
+                            onDeleteRestorePinDigit = guardianViewModel::deleteRestorePinDigit,
+                            onCancelRestore = guardianViewModel::cancelRestore,
+                            onRecoveryDigit = guardianViewModel::inputRecoveryDigit,
+                            onDeleteRecoveryDigit = guardianViewModel::deleteRecoveryDigit,
+                            onRecoveryCodeChange = guardianViewModel::updateRecoveryCodeInput,
+                            onConfirmRecoveryCode = guardianViewModel::confirmRecoveryCodeForPinReset,
+                            onCancelRecoveryPinReset = guardianViewModel::cancelRecoveryPinReset,
+                            onCloseRecoveryCode = guardianViewModel::closeRecoveryCode,
+                        ),
                     )
                 } else {
                     ChildRoutineScreen(
