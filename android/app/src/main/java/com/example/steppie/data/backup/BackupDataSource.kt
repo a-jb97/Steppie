@@ -6,13 +6,14 @@ import com.example.steppie.data.local.RoutineDao
 import com.example.steppie.data.local.RoutineEntity
 import com.example.steppie.data.local.RoutineSetEntity
 import com.example.steppie.data.local.SteppieDatabase
-import com.example.steppie.data.repository.DataStoreAppSettingsRepository
 import com.example.steppie.data.photo.RoutinePhotoStore
+import com.example.steppie.domain.repository.AppSettingsRepository
 import java.time.Instant
+import kotlinx.coroutines.flow.first
 
 class BackupDataSource(
     private val database: SteppieDatabase,
-    private val appSettingsRepository: DataStoreAppSettingsRepository,
+    private val appSettingsRepository: AppSettingsRepository,
     private val routinePhotoStore: RoutinePhotoStore? = null,
     private val dao: RoutineDao = database.routineDao(),
 ) {
@@ -21,7 +22,7 @@ class BackupDataSource(
         routineSets = dao.getAllRoutineSetEntities(),
         routines = dao.getAllRoutineEntities(),
         dailyLogs = dao.getAllDailyLogEntities(),
-        appSettings = appSettingsRepository.getAppSettings(),
+        appSettings = appSettingsRepository.observeAppSettings().first(),
     )
 
     fun photoBackupAssets(snapshot: BackupSnapshot): Map<String, ByteArray> {
@@ -44,12 +45,12 @@ class BackupDataSource(
                 routines = newSnapshot.routines,
                 dailyLogs = newSnapshot.dailyLogs,
             )
-            appSettingsRepository.replaceAppSettings(newSnapshot.appSettings)
+            appSettingsRepository.updateAppSettings(newSnapshot.appSettings)
             routinePhotoStore?.replaceAllFromBackup(assets)
         } catch (error: Throwable) {
             runCatching {
                 replaceRoomData(previous.routineSets, previous.routines, previous.dailyLogs)
-                appSettingsRepository.replaceAppSettings(previous.appSettings)
+                appSettingsRepository.updateAppSettings(previous.appSettings)
                 routinePhotoStore?.replaceAllFiles(previousAssets)
             }
             throw error
