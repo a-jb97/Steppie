@@ -692,7 +692,12 @@ class GuardianModeViewModel(
                 localeTag = localeProvider.languageTag(),
             )
         }.getOrElse { error ->
-            _uiState.update { it.copy(draftError = error.message ?: "루틴 세트를 저장할 수 없습니다.") }
+            _uiState.update {
+                GuardianEditorPersistenceReducer.routineSetSaveFailed(
+                    it,
+                    error.message ?: "루틴 세트를 저장할 수 없습니다.",
+                )
+            }
             return
         }
 
@@ -700,7 +705,7 @@ class GuardianModeViewModel(
             routineRepository.createRoutineSet(
                 routineSet.copy(isActive = _uiState.value.routineSets.none(RoutineSet::isActive)),
             )
-            returnToRoutineEdit()
+            _uiState.update(GuardianEditorPersistenceReducer::saveSucceeded)
         }
     }
 
@@ -709,17 +714,17 @@ class GuardianModeViewModel(
         val draft = state.draft ?: return
         val activeSet = state.activeRoutineSet
         if (activeSet == null) {
-            _uiState.update { it.copy(draftError = "먼저 루틴 세트를 생성해 주세요.") }
+            _uiState.update(GuardianEditorPersistenceReducer::routineSetRequired)
             return
         }
         val trimmedTitle = draft.title.trim()
         if (trimmedTitle.isBlank()) {
-            _uiState.update { it.copy(draftError = "활동 이름을 입력해 주세요.") }
+            _uiState.update(GuardianEditorPersistenceReducer::routineTitleRequired)
             return
         }
         val scheduledTime = parseScheduledTime(draft.scheduledTime)
         if (scheduledTime == null && draft.scheduledTime.isNotBlank()) {
-            _uiState.update { it.copy(draftError = "예정 시각은 HH:mm 형식으로 입력해 주세요.") }
+            _uiState.update(GuardianEditorPersistenceReducer::scheduledTimeInvalid)
             return
         }
 
@@ -751,25 +756,7 @@ class GuardianModeViewModel(
                     ),
                 )
             }
-            returnToRoutineEdit()
-        }
-    }
-
-    private fun returnToRoutineEdit() {
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.RoutineEdit,
-                destinationBackStack = it.destinationBackStack.dropLastMatching(GuardianDestination.RoutineEdit),
-                draft = null,
-                routineSetDraft = null,
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                draftError = null,
-                pendingDeleteRoutineId = null,
-                pendingDeleteRoutineSetId = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
+            _uiState.update(GuardianEditorPersistenceReducer::saveSucceeded)
         }
     }
 

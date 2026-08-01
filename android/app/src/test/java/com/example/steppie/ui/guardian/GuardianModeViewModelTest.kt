@@ -176,6 +176,92 @@ class GuardianModeViewModelTest {
     }
 
     @Test
+    fun `existing routine save preserves identity and ordering while updating editable fields`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val existing = viewModel.uiState.value.routines.first()
+            viewModel.openRoutineEdit()
+            viewModel.openRoutineEditor(existing.id)
+            viewModel.updateDraftTitle("  수정한 활동  ")
+            viewModel.updateDraftScheduledTime("09:20")
+
+            viewModel.saveDraft()
+            runCurrent()
+
+            val saved = requireNotNull(fixture.routineRepository.getRoutine(existing.id))
+            assertEquals(existing.id, saved.id)
+            assertEquals(existing.createdAt, saved.createdAt)
+            assertEquals(existing.order, saved.order)
+            assertEquals(mapOf("ko" to "수정한 활동"), saved.title.values)
+            assertEquals("09:20", saved.scheduledTime.toString())
+            assertEquals(TestInstant, saved.updatedAt)
+            assertEquals(GuardianDestination.RoutineEdit, viewModel.uiState.value.destination)
+            assertNull(viewModel.uiState.value.draft)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `routine set save persists its steps then clears the editor`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            viewModel.openRoutineEdit()
+            viewModel.openRoutineSetCreate()
+            viewModel.updateRoutineSetName("  외출 준비  ")
+            viewModel.updateRoutineSetStepTitle("  가방 챙기기  ")
+            viewModel.updateRoutineSetStepScheduledTime("10:30")
+            viewModel.addRoutineSetStep()
+
+            viewModel.saveRoutineSetDraft()
+            runCurrent()
+
+            val saved = fixture.routineRepository.observeRoutineSets().first()
+                .single { it.name.values["ko"] == "외출 준비" }
+            assertFalse(saved.isActive)
+            assertEquals(1, saved.routines.size)
+            assertEquals("가방 챙기기", saved.routines.single().title.values["ko"])
+            assertEquals("10:30", saved.routines.single().scheduledTime.toString())
+            assertEquals(GuardianDestination.RoutineEdit, viewModel.uiState.value.destination)
+            assertNull(viewModel.uiState.value.routineSetDraft)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `routine move persists the requested adjacent ordering and ignores its boundary`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val initialIds = viewModel.uiState.value.routines.map { it.id }
+            assertTrue(initialIds.size >= 2)
+
+            viewModel.moveRoutine(initialIds.first(), direction = -1)
+            runCurrent()
+            assertEquals(
+                initialIds,
+                fixture.routineRepository.observeRoutineSets().first().single().routines.map { it.id },
+            )
+
+            viewModel.moveRoutine(initialIds.first(), direction = 1)
+            runCurrent()
+
+            val reorderedIds = fixture.routineRepository.observeRoutineSets().first().single().routines.map { it.id }
+            assertEquals(initialIds[1], reorderedIds[0])
+            assertEquals(initialIds[0], reorderedIds[1])
+            assertEquals(initialIds.drop(2), reorderedIds.drop(2))
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
     fun `template save invokes callback before success state and persists routine set`() = runTest {
         val fixture = authenticatedGuardianFixture()
         val viewModel = fixture.viewModel
