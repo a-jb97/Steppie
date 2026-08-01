@@ -199,20 +199,21 @@ final class SwiftDataRoutineRepository: RoutineRepository {
             throw RoutineRepositoryError.routineNotFound(routineID)
         }
         try validateParent(routineSetID)
+        let existingRecord = try dailyLogRecord(on: date, routineID: routineID)
 
         let log = try DailyLog(
-            id: dailyLogRecord(on: date, routineID: routineID)?.id ?? UUID(),
+            id: existingRecord?.id ?? UUID(),
             date: date,
             routineID: routineID,
             routineSetID: routineSetID,
             status: .completed,
             completedAt: completedAt,
-            createdAt: dailyLogRecord(on: date, routineID: routineID)?.createdAt ?? completedAt,
+            createdAt: existingRecord?.createdAt ?? completedAt,
             updatedAt: completedAt
         )
 
-        if let record = try dailyLogRecord(on: date, routineID: routineID) {
-            record.apply(log)
+        if let existingRecord {
+            existingRecord.apply(log)
         } else {
             context.insert(DailyLogRecord(domain: log))
         }
