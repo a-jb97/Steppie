@@ -454,19 +454,7 @@ class GuardianModeViewModel(
     fun openRecoveryPinReset() {
         verifiedPinForChange = null
         verifiedRecoveryCodeForReset = null
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.RecoveryCode,
-                destinationBackStack = it.backStackFor(GuardianDestination.RecoveryCode),
-                recoveryStep = GuardianRecoveryStep.EnterCodeForPinReset,
-                recoveryCodeToShow = null,
-                recoveryDigits = "",
-                recoveryError = null,
-                pinDigits = "",
-                pinError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianRecoveryReducer::openPinReset)
     }
 
     fun closeRecoveryCode() {
@@ -484,20 +472,7 @@ class GuardianModeViewModel(
                     routines = it.routines,
                 )
             }
-            val destination = it.recoveryReturnDestination
-            val nextState = it.copy(
-                isAuthenticated = true,
-                destination = destination,
-                recoveryStep = null,
-                recoveryCodeToShow = null,
-                recoveryDigits = "",
-                recoveryError = null,
-                pinDigits = "",
-                pinError = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-            nextState.copy(showDailyRoutineSelectionPrompt = nextState.shouldShowDailyRoutineSelectionPrompt())
+            GuardianRecoveryReducer.close(it)
         }
     }
 
@@ -510,14 +485,7 @@ class GuardianModeViewModel(
     }
 
     fun updateRecoveryCodeInput(value: String) {
-        val digits = value.filter(Char::isDigit).take(6)
-        _uiState.update {
-            it.copy(
-                recoveryDigits = digits,
-                recoveryError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRecoveryReducer.updateCodeInput(it, value) }
     }
 
     fun deleteRecoveryDigit() {
@@ -532,19 +500,7 @@ class GuardianModeViewModel(
 
     fun cancelRecoveryPinReset() {
         verifiedRecoveryCodeForReset = null
-        _uiState.update {
-            it.copy(
-                destination = if (it.isAuthenticated) GuardianDestination.Security else GuardianDestination.Pin,
-                pinMode = if (it.hasGuardianPin) GuardianPinMode.Enter else GuardianPinMode.Setup,
-                pinDigits = "",
-                pinError = null,
-                recoveryStep = null,
-                recoveryCodeToShow = null,
-                recoveryDigits = "",
-                recoveryError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianRecoveryReducer::cancelPinReset)
     }
 
     fun openNewRoutineEditor() {
@@ -1436,28 +1392,10 @@ class GuardianModeViewModel(
         viewModelScope.launch {
             if (appSettingsRepository.verifyRecoveryCode(recoveryCode)) {
                 verifiedRecoveryCodeForReset = recoveryCode
-                _uiState.update {
-                    it.copy(
-                        destination = GuardianDestination.Pin,
-                        pinMode = GuardianPinMode.RecoveryResetNew,
-                        pinDigits = "",
-                        pinError = null,
-                        recoveryStep = null,
-                        recoveryCodeToShow = null,
-                        recoveryDigits = "",
-                        recoveryError = null,
-                        interactionToken = it.interactionToken + 1,
-                    )
-                }
+                _uiState.update(GuardianRecoveryReducer::verificationSucceeded)
             } else {
                 verifiedRecoveryCodeForReset = null
-                _uiState.update {
-                    it.copy(
-                        recoveryDigits = "",
-                        recoveryError = GuardianRecoveryError.CodeMismatch,
-                        interactionToken = it.interactionToken + 1,
-                    )
-                }
+                _uiState.update(GuardianRecoveryReducer::verificationFailed)
             }
         }
     }
