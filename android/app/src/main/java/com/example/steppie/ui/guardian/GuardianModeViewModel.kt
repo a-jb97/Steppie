@@ -416,27 +416,7 @@ class GuardianModeViewModel(
     }
 
     fun openBackupRestore() {
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.BackupRestore,
-                destinationBackStack = it.backStackFor(GuardianDestination.BackupRestore),
-                draft = null,
-                routineSetDraft = null,
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                routineSetListEditing = false,
-                editingRoutineSetId = null,
-                editingRoutineSetName = "",
-                draftError = null,
-                backupError = null,
-                backupMessage = null,
-                pendingRestoreUri = null,
-                pendingRestorePreview = null,
-                restorePinDigits = "",
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianBackupReducer::open)
     }
 
     fun openPinChange() {
@@ -1168,77 +1148,34 @@ class GuardianModeViewModel(
 
     fun exportBackup(uri: Uri) {
         val provider = backupProvider ?: run {
-            _uiState.update { it.copy(backupError = "백업 기능을 사용할 수 없습니다.") }
+            _uiState.update(GuardianBackupReducer::exportUnavailable)
             return
         }
-        _uiState.update {
-            it.copy(
-                backupInProgress = true,
-                backupError = null,
-                backupMessage = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianBackupReducer::exportStarted)
         viewModelScope.launch {
             runCatching { provider.exportTo(uri) }
                 .onSuccess {
-                    _uiState.update {
-                        it.copy(
-                            backupInProgress = false,
-                            backupMessage = "백업 파일을 저장했습니다.",
-                            interactionToken = it.interactionToken + 1,
-                        )
-                    }
+                    _uiState.update(GuardianBackupReducer::exportSucceeded)
                 }
                 .onFailure { error ->
-                    _uiState.update {
-                        it.copy(
-                            backupInProgress = false,
-                            backupError = backupErrorMessage(error),
-                            interactionToken = it.interactionToken + 1,
-                        )
-                    }
+                    _uiState.update { GuardianBackupReducer.operationFailed(it, backupErrorMessage(error)) }
                 }
         }
     }
 
     fun previewRestoreBackup(uri: Uri) {
         val provider = backupProvider ?: run {
-            _uiState.update { it.copy(backupError = "복원 기능을 사용할 수 없습니다.") }
+            _uiState.update(GuardianBackupReducer::restoreUnavailable)
             return
         }
-        _uiState.update {
-            it.copy(
-                backupInProgress = true,
-                backupError = null,
-                backupMessage = null,
-                pendingRestoreUri = null,
-                pendingRestorePreview = null,
-                restorePinDigits = "",
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianBackupReducer::previewStarted)
         viewModelScope.launch {
             runCatching { provider.previewImport(uri) }
                 .onSuccess { preview ->
-                    _uiState.update {
-                        it.copy(
-                            backupInProgress = false,
-                            pendingRestoreUri = uri,
-                            pendingRestorePreview = preview,
-                            restorePinDigits = "",
-                            interactionToken = it.interactionToken + 1,
-                        )
-                    }
+                    _uiState.update { GuardianBackupReducer.previewSucceeded(it, uri, preview) }
                 }
                 .onFailure { error ->
-                    _uiState.update {
-                        it.copy(
-                            backupInProgress = false,
-                            backupError = backupErrorMessage(error),
-                            interactionToken = it.interactionToken + 1,
-                        )
-                    }
+                    _uiState.update { GuardianBackupReducer.operationFailed(it, backupErrorMessage(error)) }
                 }
         }
     }
@@ -1248,73 +1185,35 @@ class GuardianModeViewModel(
         val current = _uiState.value
         if (current.restorePinDigits.length >= 4) return
         val nextDigits = current.restorePinDigits + digit.toString()
-        _uiState.update {
-            it.copy(
-                restorePinDigits = nextDigits,
-                backupError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianBackupReducer.inputRestorePinDigit(it, digit) }
         if (nextDigits.length == 4) restoreWithPin(nextDigits)
     }
 
     fun deleteRestorePinDigit() {
-        _uiState.update {
-            it.copy(
-                restorePinDigits = it.restorePinDigits.dropLast(1),
-                backupError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianBackupReducer::deleteRestorePinDigit)
     }
 
     fun cancelRestore() {
-        _uiState.update {
-            it.copy(
-                pendingRestoreUri = null,
-                pendingRestorePreview = null,
-                restorePinDigits = "",
-                backupError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianBackupReducer::cancelRestore)
     }
 
     private fun restoreWithPin(pin: String) {
         val provider = backupProvider ?: return
         val uri = _uiState.value.pendingRestoreUri ?: return
-        _uiState.update { it.copy(backupInProgress = true, backupError = null) }
+        _uiState.update(GuardianBackupReducer::restoreStarted)
         viewModelScope.launch {
             if (!appSettingsRepository.verifyGuardianPin(pin)) {
-                _uiState.update {
-                    it.copy(
-                        backupInProgress = false,
-                        restorePinDigits = "",
-                        backupError = "PIN이 맞지 않아요. 다시 입력해 주세요.",
-                        interactionToken = it.interactionToken + 1,
-                    )
-                }
+                _uiState.update(GuardianBackupReducer::restorePinRejected)
                 return@launch
             }
             runCatching { provider.restoreReplace(uri) }
                 .onSuccess {
                     _uiState.update {
-                        initialState().copy(
-                            backupMessage = "백업 파일에서 복원했습니다.",
-                            interactionToken = it.interactionToken + 1,
-                            restoreCompletedToken = it.restoreCompletedToken + 1,
-                        )
+                        GuardianBackupReducer.restoreSucceeded(it, initialState())
                     }
                 }
                 .onFailure { error ->
-                    _uiState.update {
-                        it.copy(
-                            backupInProgress = false,
-                            restorePinDigits = "",
-                            backupError = backupErrorMessage(error),
-                            interactionToken = it.interactionToken + 1,
-                        )
-                    }
+                    _uiState.update { GuardianBackupReducer.restoreFailed(it, backupErrorMessage(error)) }
                 }
         }
     }
