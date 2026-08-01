@@ -102,3 +102,6 @@ internal fun GuardianModeUiState.backStackFor(destination: GuardianDestination):
     this.destination == GuardianDestination.Pin && destination == GuardianDestination.Home -> emptyList()
     else -> destinationBackStack + this.destination
 }
+
+internal fun List<GuardianDestination>.dropLastMatching(destination: GuardianDestination): List<GuardianDestination> =
+    if (lastOrNull() == destination) dropLast(1) else this
