@@ -160,15 +160,17 @@ class GuardianModeViewModel(
                         todayRoutineSetId = todaySet?.id,
                         selectedRoutineSetId = selectedSetId,
                         routines = selectedSet?.routines.orEmpty().sortedBy(Routine::order),
-                        recordDays = records.days,
-                        selectedRecordRoutines = records.routines,
-                        selectedRecordSummary = records.summary,
                         selectedCalendarRecordsDate = selectedCalendarDate,
-                        calendarRecordDates = calendarRecordDates,
-                        selectedCalendarRecordRoutines = calendarRecords.routines,
-                        selectedCalendarRecordSummary = calendarRecords.summary,
                     )
-                    nextState.copy(showDailyRoutineSelectionPrompt = nextState.shouldShowDailyRoutineSelectionPrompt())
+                    val recordsState = GuardianRecordsReducer.repositoryDataChanged(
+                        state = nextState,
+                        records = records,
+                        calendarRecordDates = calendarRecordDates,
+                        calendarRecords = calendarRecords,
+                    )
+                    recordsState.copy(
+                        showDailyRoutineSelectionPrompt = recordsState.shouldShowDailyRoutineSelectionPrompt(),
+                    )
                 }
             }
         }
@@ -242,25 +244,7 @@ class GuardianModeViewModel(
     fun openRecords() {
         val today = refreshCurrentDate()
         recordsEndDate.value = today
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.Records,
-                destinationBackStack = it.backStackFor(GuardianDestination.Records),
-                selectedRecordsDate = today,
-                draft = null,
-                routineSetDraft = null,
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                routineSetListEditing = false,
-                editingRoutineSetId = null,
-                editingRoutineSetName = "",
-                draftError = null,
-                pendingDeleteRoutineId = null,
-                pendingDeleteRoutineSetId = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRecordsReducer.open(it, today) }
     }
 
     fun openRecordsCalendar() {
@@ -275,33 +259,12 @@ class GuardianModeViewModel(
             localeTag = localeProvider.languageTag(),
             zoneId = clockProvider.zoneId,
         )
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.RecordsCalendar,
-                destinationBackStack = it.backStackFor(GuardianDestination.RecordsCalendar),
-                recordsCalendarMonth = YearMonth.from(today),
-                selectedCalendarRecordsDate = today,
-                selectedCalendarRecordRoutines = records.routines,
-                selectedCalendarRecordSummary = records.summary,
-                draft = null,
-                routineSetDraft = null,
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                routineSetListEditing = false,
-                editingRoutineSetId = null,
-                editingRoutineSetName = "",
-                draftError = null,
-                pendingDeleteRoutineId = null,
-                pendingDeleteRoutineSetId = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRecordsReducer.openCalendar(it, today, records) }
     }
 
     fun selectRecordsDate(date: LocalDate) {
         val current = _uiState.value
-        if (current.recordDays.none { it.date == date }) return
+        if (!GuardianRecordsReducer.canSelectDate(current, date)) return
         val records = buildGuardianRecords(
             selectedDate = date,
             endDate = recordsEndDate.value,
@@ -310,22 +273,13 @@ class GuardianModeViewModel(
             localeTag = localeProvider.languageTag(),
             zoneId = clockProvider.zoneId,
         )
-        _uiState.update {
-            it.copy(
-                selectedRecordsDate = date,
-                recordDays = records.days,
-                selectedRecordRoutines = records.routines,
-                selectedRecordSummary = records.summary,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRecordsReducer.selectDate(it, date, records) }
     }
 
     fun selectRecordsCalendarDate(date: LocalDate) {
         val current = _uiState.value
         val today = currentDate.value
-        val canSelectTodayRoutine = date == today && current.routineSets.any(RoutineSet::isActive)
-        if (date !in current.calendarRecordDates && !canSelectTodayRoutine) return
+        if (!GuardianRecordsReducer.canSelectCalendarDate(current, date, today)) return
         val records = buildGuardianRecordDetail(
             selectedDate = date,
             routineSets = recordRoutineSetsCache,
@@ -338,24 +292,11 @@ class GuardianModeViewModel(
             localeTag = localeProvider.languageTag(),
             zoneId = clockProvider.zoneId,
         )
-        _uiState.update {
-            it.copy(
-                recordsCalendarMonth = YearMonth.from(date),
-                selectedCalendarRecordsDate = date,
-                selectedCalendarRecordRoutines = records.routines,
-                selectedCalendarRecordSummary = records.summary,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRecordsReducer.selectCalendarDate(it, date, records) }
     }
 
     fun moveRecordsCalendarMonth(monthDelta: Long) {
-        _uiState.update {
-            it.copy(
-                recordsCalendarMonth = it.recordsCalendarMonth.plusMonths(monthDelta),
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRecordsReducer.moveCalendarMonth(it, monthDelta) }
     }
 
     fun updateFeedbackIntensity(intensity: FeedbackIntensity) = updateSettings {
@@ -1390,12 +1331,6 @@ private data class TodayRoutineSelectionSnapshot(
     val date: LocalDate,
     val routineSets: List<RoutineSet>,
     val todayRoutineSetId: String?,
-)
-
-private data class GuardianRecordsResult(
-    val days: List<GuardianRecordDay>,
-    val routines: List<GuardianRecordRoutine>,
-    val summary: GuardianRecordDay,
 )
 
 private fun buildGuardianRecords(
