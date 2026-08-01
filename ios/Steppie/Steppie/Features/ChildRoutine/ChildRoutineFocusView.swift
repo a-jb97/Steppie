@@ -1,26 +1,9 @@
 import SwiftUI
 
-struct ChildRoutineFocusView<CompletionFeedback: View, FeedbackUndo: View, NextPreview: View>: View {
+struct ChildRoutineFocusView: View {
     @Environment(\.locale) private var locale
     let presentation: ChildRoutinePanePresentation
     let viewModel: ChildRoutineViewModel
-    private let completionFeedback: (Routine, CGFloat) -> CompletionFeedback
-    private let feedbackUndo: FeedbackUndo
-    private let nextPreview: NextPreview
-
-    init(
-        presentation: ChildRoutinePanePresentation,
-        viewModel: ChildRoutineViewModel,
-        @ViewBuilder completionFeedback: @escaping (Routine, CGFloat) -> CompletionFeedback,
-        @ViewBuilder feedbackUndo: () -> FeedbackUndo,
-        @ViewBuilder nextPreview: () -> NextPreview
-    ) {
-        self.presentation = presentation
-        self.viewModel = viewModel
-        self.completionFeedback = completionFeedback
-        self.feedbackUndo = feedbackUndo()
-        self.nextPreview = nextPreview()
-    }
 
     @ViewBuilder
     var body: some View {
@@ -46,9 +29,9 @@ struct ChildRoutineFocusView<CompletionFeedback: View, FeedbackUndo: View, NextP
                     .tutorialTarget(.primary)
 
                 if viewModel.isShowingCompletionFeedback {
-                    feedbackUndo
+                    ChildRoutineFeedbackUndoButton(viewModel: viewModel)
                         .padding(.top, SteppieSpacing.small)
-                    nextPreview
+                    ChildRoutineNextPreview(viewModel: viewModel)
                         .padding(.top, SteppieSpacing.extraSmall)
                 } else {
                     ChildRoutinePaneSwitchButton(
@@ -75,8 +58,8 @@ struct ChildRoutineFocusView<CompletionFeedback: View, FeedbackUndo: View, NextP
                 focusContent(minimumHeight: 520)
 
                 if viewModel.isShowingCompletionFeedback {
-                    feedbackUndo
-                    nextPreview
+                    ChildRoutineFeedbackUndoButton(viewModel: viewModel)
+                    ChildRoutineNextPreview(viewModel: viewModel)
                 }
             }
             .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
@@ -130,7 +113,11 @@ struct ChildRoutineFocusView<CompletionFeedback: View, FeedbackUndo: View, NextP
     @ViewBuilder
     private func focusContent(minimumHeight: CGFloat) -> some View {
         if viewModel.isShowingCompletionFeedback, let routine = viewModel.selectedRoutine {
-            completionFeedback(routine, minimumHeight)
+            ChildRoutineCompletedCard(
+                routine: routine,
+                minimumHeight: minimumHeight,
+                settings: viewModel.settings
+            )
         } else if let routine = viewModel.selectedRoutine {
             RoutineCard(
                 title: Text(verbatim: localizedTitle(for: routine)),
