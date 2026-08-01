@@ -176,6 +176,35 @@ class GuardianModeViewModelTest {
     }
 
     @Test
+    fun `template save invokes callback before success state and persists routine set`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val callbackDestinations = mutableListOf<GuardianDestination>()
+            viewModel.openRoutineEdit()
+            viewModel.openTemplateSelect()
+
+            viewModel.saveTemplatePreview {
+                callbackDestinations += viewModel.uiState.value.destination
+            }
+            runCurrent()
+
+            val routineSets = fixture.routineRepository.observeRoutineSets().first()
+            val state = viewModel.uiState.value
+
+            assertEquals(listOf(GuardianDestination.TemplateSelect), callbackDestinations)
+            assertEquals(2, routineSets.size)
+            assertEquals(1, routineSets.count { it.isActive })
+            assertEquals(GuardianDestination.RoutineEdit, state.destination)
+            assertNull(state.selectedTemplate)
+            assertEquals("템플릿으로 새 루틴 세트를 저장했습니다.", state.notice)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
     fun `environment changes update optimistic state and persist each resulting settings snapshot`() = runTest {
         val fixture = authenticatedGuardianFixture()
         val viewModel = fixture.viewModel

@@ -423,18 +423,9 @@ class GuardianModeViewModel(
     }
 
     fun openTemplateSelect(returnDestination: GuardianDestination = GuardianDestination.RoutineEdit) {
+        val initialTemplate = RoutineTemplates.find(RoutineTemplateId.Morning)
         _uiState.update {
-            it.copy(
-                destination = GuardianDestination.TemplateSelect,
-                destinationBackStack = it.backStackFor(GuardianDestination.TemplateSelect),
-                draft = null,
-                routineSetDraft = null,
-                selectedTemplate = RoutineTemplates.find(RoutineTemplateId.Morning),
-                templateReturnDestination = returnDestination,
-                draftError = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
+            GuardianTemplateReducer.open(it, returnDestination, initialTemplate)
         }
     }
 
@@ -444,31 +435,12 @@ class GuardianModeViewModel(
 
     fun closeTemplateSelect() {
         val destination = _uiState.value.templateReturnDestination
-        _uiState.update {
-            it.copy(
-                destination = destination,
-                destinationBackStack = it.destinationBackStack.dropLastMatching(destination),
-                selectedTemplate = null,
-                draftError = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianTemplateReducer.close(it, destination) }
     }
 
     fun previewTemplate(templateId: RoutineTemplateId) {
         val template = RoutineTemplates.find(templateId) ?: return
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.TemplateSelect,
-                selectedTemplate = template,
-                draft = null,
-                routineSetDraft = null,
-                draftError = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianTemplateReducer.preview(it, template) }
     }
 
     fun saveTemplatePreview(onDataChanged: () -> Unit) {
@@ -481,23 +453,12 @@ class GuardianModeViewModel(
                 )
             }.onSuccess {
                 onDataChanged()
-                _uiState.update { state ->
-                    state.copy(
-                        destination = GuardianDestination.RoutineEdit,
-                        destinationBackStack = state.destinationBackStack.dropLastMatching(GuardianDestination.RoutineEdit),
-                        selectedTemplate = null,
-                        draft = null,
-                        routineSetDraft = null,
-                        draftError = null,
-                        notice = "템플릿으로 새 루틴 세트를 저장했습니다.",
-                        interactionToken = state.interactionToken + 1,
-                    )
-                }
+                _uiState.update(GuardianTemplateReducer::saveSucceeded)
             }.onFailure { error ->
                 _uiState.update { state ->
-                    state.copy(
-                        draftError = error.message ?: "템플릿을 저장할 수 없습니다.",
-                        interactionToken = state.interactionToken + 1,
+                    GuardianTemplateReducer.saveFailed(
+                        state,
+                        error.message ?: "템플릿을 저장할 수 없습니다.",
                     )
                 }
             }
