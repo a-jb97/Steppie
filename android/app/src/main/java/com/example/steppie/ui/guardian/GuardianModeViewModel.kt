@@ -258,89 +258,20 @@ class GuardianModeViewModel(
     }
 
     fun openHome() {
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.Home,
-                destinationBackStack = emptyList(),
-                draft = null,
-                routineSetDraft = null,
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                routineSetListEditing = false,
-                editingRoutineSetId = null,
-                editingRoutineSetName = "",
-                draftError = null,
-                pendingDeleteRoutineId = null,
-                pendingDeleteRoutineSetId = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianNavigationReducer::openHome)
     }
 
     fun openRoutineEdit() {
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.RoutineEdit,
-                destinationBackStack = it.backStackFor(GuardianDestination.RoutineEdit),
-                draft = null,
-                routineSetDraft = null,
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                draftError = null,
-                pendingDeleteRoutineId = null,
-                pendingDeleteRoutineSetId = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianNavigationReducer::openRoutineEdit)
     }
 
     fun openSecurity() {
         verifiedRecoveryCodeForReset = null
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.Security,
-                destinationBackStack = it.backStackFor(GuardianDestination.Security),
-                draft = null,
-                routineSetDraft = null,
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                routineSetListEditing = false,
-                editingRoutineSetId = null,
-                editingRoutineSetName = "",
-                draftError = null,
-                backupError = null,
-                backupMessage = null,
-                recoveryStep = null,
-                recoveryCodeToShow = null,
-                recoveryDigits = "",
-                recoveryError = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianNavigationReducer::openSecurity)
     }
 
     fun openEnvironmentSettings() {
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.EnvironmentSettings,
-                destinationBackStack = it.backStackFor(GuardianDestination.EnvironmentSettings),
-                draft = null,
-                routineSetDraft = null,
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                routineSetListEditing = false,
-                editingRoutineSetId = null,
-                editingRoutineSetName = "",
-                draftError = null,
-                pendingDeleteRoutineId = null,
-                pendingDeleteRoutineSetId = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianNavigationReducer::openEnvironmentSettings)
     }
 
     fun openRecords() {
@@ -1337,34 +1268,7 @@ class GuardianModeViewModel(
     }
 
     fun navigateBack() {
-        _uiState.update {
-            val destination = it.destinationBackStack.lastOrNull() ?: GuardianDestination.Home
-            it.copy(
-                destination = destination,
-                destinationBackStack = it.destinationBackStack.dropLast(1),
-                draft = null,
-                routineSetDraft = null,
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                routineSetListEditing = false,
-                editingRoutineSetId = null,
-                editingRoutineSetName = "",
-                draftError = null,
-                pendingDeleteRoutineId = null,
-                pendingDeleteRoutineSetId = null,
-                backupError = null,
-                backupMessage = null,
-                pendingRestoreUri = null,
-                pendingRestorePreview = null,
-                restorePinDigits = "",
-                recoveryStep = null,
-                recoveryCodeToShow = null,
-                recoveryDigits = "",
-                recoveryError = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianNavigationReducer::navigateBack)
     }
 
     fun exportBackup(uri: Uri) {
@@ -1789,12 +1693,6 @@ class GuardianModeViewModel(
             }
         }
     }
-}
-
-private fun GuardianModeUiState.backStackFor(destination: GuardianDestination): List<GuardianDestination> = when {
-    this.destination == destination -> destinationBackStack
-    this.destination == GuardianDestination.Pin && destination == GuardianDestination.Home -> emptyList()
-    else -> destinationBackStack + this.destination
 }
 
 private fun List<GuardianDestination>.dropLastMatching(destination: GuardianDestination): List<GuardianDestination> =
