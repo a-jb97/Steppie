@@ -300,60 +300,47 @@ class GuardianModeViewModel(
     }
 
     fun updateFeedbackIntensity(intensity: FeedbackIntensity) = updateSettings {
-        it.copy(feedbackIntensity = intensity)
+        GuardianSettingsReducer.updateFeedbackIntensity(it, intensity)
     }
 
     fun updateTtsEnabled(enabled: Boolean) = updateSettings {
-        it.copy(ttsEnabled = enabled)
+        GuardianSettingsReducer.updateTtsEnabled(it, enabled)
     }
 
     fun updateTtsRate(rate: Double) = updateSettings {
-        it.copy(ttsRate = rate)
+        GuardianSettingsReducer.updateTtsRate(it, rate)
     }
 
     fun updateTtsVolume(volume: Double) = updateSettings {
-        it.copy(ttsVolume = volume)
+        GuardianSettingsReducer.updateTtsVolume(it, volume)
     }
 
     fun updateSoundEnabled(enabled: Boolean) = updateSettings {
-        it.copy(soundEnabled = enabled)
+        GuardianSettingsReducer.updateSoundEnabled(it, enabled)
     }
 
     fun updateHapticEnabled(enabled: Boolean) = updateSettings {
-        it.copy(hapticEnabled = enabled)
+        GuardianSettingsReducer.updateHapticEnabled(it, enabled)
     }
 
     fun updateNotificationLeadTime(leadMinutes: Int, enabled: Boolean) {
-        require(leadMinutes in setOf(10, 5))
-        updateSettings { settings ->
-            val leadTimes = if (enabled) {
-                (settings.notificationLeadTimes + leadMinutes).distinct()
-            } else {
-                settings.notificationLeadTimes.filterNot { it == leadMinutes }
-            }.sortedDescending()
-            settings.copy(notificationLeadTimes = leadTimes)
+        updateSettings {
+            GuardianSettingsReducer.updateNotificationLeadTime(it, leadMinutes, enabled)
         }
     }
 
     fun updateQuietHoursEnabled(enabled: Boolean) = updateSettings {
-        if (enabled) {
-            it.copy(
-                quietHoursStart = it.quietHoursStart ?: LocalTime.of(21, 0),
-                quietHoursEnd = it.quietHoursEnd ?: LocalTime.of(7, 0),
-            )
-        } else {
-            it.copy(quietHoursStart = null, quietHoursEnd = null)
-        }
+        GuardianSettingsReducer.updateQuietHoursEnabled(it, enabled)
     }
 
     fun updateQuietHoursStart(value: String) {
         val time = parseScheduledTime(value) ?: return
-        updateSettings { it.copy(quietHoursStart = time) }
+        updateSettings { GuardianSettingsReducer.updateQuietHoursStart(it, time) }
     }
 
     fun updateQuietHoursEnd(value: String) {
         val time = parseScheduledTime(value) ?: return
-        updateSettings { it.copy(quietHoursEnd = time) }
+        updateSettings { GuardianSettingsReducer.updateQuietHoursEnd(it, time) }
     }
 
     fun openBackupRestore() {
@@ -1266,12 +1253,7 @@ class GuardianModeViewModel(
 
     private fun updateSettings(transform: (AppSettings) -> AppSettings) {
         val nextSettings = transform(_uiState.value.appSettings)
-        _uiState.update {
-            it.copy(
-                appSettings = nextSettings,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianSettingsReducer.settingsChanged(it, nextSettings) }
         viewModelScope.launch {
             appSettingsRepository.updateAppSettings(nextSettings)
         }
