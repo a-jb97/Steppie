@@ -1658,14 +1658,16 @@ struct SteppieTests {
     func backupExportAndReplaceRestore() throws {
         let source = try RoutinePreviewStore.makeSampleRepository()
         let recoveryCode = "654321"
+        let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
         let settingsWithPIN = try AppSettings(
             guardianPinHash: GuardianPinService.makeHash(for: "1234", salt: "backup-test"),
-            recoveryCodeHash: GuardianPinService.makeRecoveryCodeHash(for: recoveryCode, salt: "backup-recovery-test")
+            recoveryCodeHash: GuardianPinService.makeRecoveryCodeHash(for: recoveryCode, salt: "backup-recovery-test"),
+            createdAt: completedAt,
+            updatedAt: completedAt
         )
         try source.updateAppSettings(settingsWithPIN)
         let activeSet = try #require(try source.routineSets().first)
         let firstRoutine = try #require(try source.routines(in: activeSet.id).first)
-        let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
         _ = try source.setRoutineCompleted(
             routineID: firstRoutine.id,
             routineSetID: activeSet.id,
@@ -1673,26 +1675,60 @@ struct SteppieTests {
             at: completedAt
         )
 
+        let exportedAt = Date(timeIntervalSince1970: 1_767_230_000)
+        let sourceSnapshot = try source.backupSnapshot()
         let package = try BackupService(
             repository: source,
-            now: { Date(timeIntervalSince1970: 1_767_230_000) },
+            now: { exportedAt },
             appVersion: { "1.0.0" }
         ).exportPackage()
         let entries = try SteppieZipArchive.readArchive(package.archiveData)
-        #expect(entries["manifest.json"] != nil)
-        #expect(entries["data.json"] != nil)
-        let dataJSON = String(data: try #require(entries["data.json"]), encoding: .utf8)
+        let manifestJSON = try #require(entries["manifest.json"])
+        let dataJSONData = try #require(entries["data.json"])
+        #expect(Set(entries.keys) == ["manifest.json", "data.json", "assets/"])
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let manifest = try decoder.decode(BackupManifest.self, from: manifestJSON)
+        let backupData = try decoder.decode(BackupData.self, from: dataJSONData)
+        let dataChecksum = SHA256.hash(data: dataJSONData)
+            .map { String(format: "%02x", $0) }
+            .joined()
+
+        #expect(package.manifest == manifest)
+        #expect(manifest.app == "Steppie")
+        #expect(manifest.backupSchemaVersion == 1)
+        #expect(manifest.createdAt == exportedAt)
+        #expect(manifest.sourcePlatform == "ios")
+        #expect(manifest.appVersion == "1.0.0")
+        #expect(manifest.dataFile == "data.json")
+        #expect(manifest.assetDirectory == "assets")
+        #expect(manifest.checksum == BackupChecksum(algorithm: "sha256", dataJson: dataChecksum))
+        #expect(backupData.schemaVersion == 1)
+        #expect(backupData.exportedAt == exportedAt)
+        #expect(backupData.routineSets == sourceSnapshot.routineSets)
+        #expect(backupData.routines == sourceSnapshot.routines)
+        #expect(backupData.dailyLogs == sourceSnapshot.dailyLogs)
+        #expect(backupData.dailyRoutineAssignments == sourceSnapshot.dailyRoutineAssignments)
+        #expect(backupData.appSettings == sourceSnapshot.appSettings)
+
+        let dataJSON = String(data: dataJSONData, encoding: .utf8)
         #expect(dataJSON?.contains("1234") == false)
         #expect(dataJSON?.contains(recoveryCode) == false)
 
         let target = try RoutinePreviewStore.makeRepository()
-        try BackupService(repository: target).restorePackage(package.archiveData)
+        try BackupService(repository: target, now: { exportedAt }).restorePackage(package.archiveData)
+        let restoredSnapshot = try target.backupSnapshot()
 
-        #expect(try target.routineSets().map(\.id) == [activeSet.id])
-        #expect(try target.routines(in: activeSet.id).map(\.id).contains(firstRoutine.id))
-        #expect(try target.appSettings().guardianPinHash == settingsWithPIN.guardianPinHash)
-        #expect(try target.appSettings().recoveryCodeHash == settingsWithPIN.recoveryCodeHash)
-        #expect(try target.dailyLogs(on: DailyLog.localDateString(for: completedAt), routineSetID: activeSet.id).count == 1)
+        #expect(restoredSnapshot.routineSets.sorted(by: { $0.id.uuidString < $1.id.uuidString })
+            == sourceSnapshot.routineSets.sorted(by: { $0.id.uuidString < $1.id.uuidString }))
+        #expect(restoredSnapshot.routines.sorted(by: { $0.id.uuidString < $1.id.uuidString })
+            == sourceSnapshot.routines.sorted(by: { $0.id.uuidString < $1.id.uuidString }))
+        #expect(restoredSnapshot.dailyLogs.sorted(by: { $0.id.uuidString < $1.id.uuidString })
+            == sourceSnapshot.dailyLogs.sorted(by: { $0.id.uuidString < $1.id.uuidString }))
+        #expect(restoredSnapshot.dailyRoutineAssignments.sorted(by: { $0.id.uuidString < $1.id.uuidString })
+            == sourceSnapshot.dailyRoutineAssignments.sorted(by: { $0.id.uuidString < $1.id.uuidString }))
+        #expect(restoredSnapshot.appSettings == sourceSnapshot.appSettings)
     }
 
     @Test("복원 당일의 루틴 세트 배정은 복원하지 않고 아이 모드는 빈 상태를 표시한다")
