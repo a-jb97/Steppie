@@ -13,7 +13,6 @@ nonisolated enum RoutineRepositoryError: Error, Equatable {
     case orderChangesRequireReorder(routineID: UUID)
     case invalidReorder
     case duplicateDailyLog(date: String, routineID: UUID)
-    case dailyLogNotFound(date: String, routineID: UUID)
 }
 
 nonisolated struct RoutineRepositorySnapshot: Equatable, Sendable {
