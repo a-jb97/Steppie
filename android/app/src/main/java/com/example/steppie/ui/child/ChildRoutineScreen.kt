@@ -9,28 +9,22 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -81,9 +75,6 @@ import com.example.steppie.ui.tutorial.TutorialTarget
 import com.example.steppie.ui.tutorial.tutorialAnchor
 import java.util.Locale
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeoutOrNull
-
-private val SplitLayoutMinimumWidth = 905.dp
 
 @Composable
 fun ChildRoutineScreen(
@@ -97,61 +88,21 @@ fun ChildRoutineScreen(
     onRequestGuardianMode: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.safeDrawing),
-    ) {
-        when {
-            state.isLoading -> LoadingContent()
-            maxWidth >= SplitLayoutMinimumWidth && maxWidth > maxHeight -> SplitRoutineLayout(
-                state = state,
-                onSelectRoutine = onSelectRoutine,
-                onCompleteRoutine = onCompleteRoutine,
-                onAdvanceFromFeedback = onAdvanceFromFeedback,
-                onUndoRoutine = onUndoRoutine,
-            )
-            state.singlePane == ChildSinglePane.List -> PhoneRoutineList(
-                state = state,
-                onShowFocus = onShowFocus,
-                onSelectRoutine = onSelectRoutine,
-            )
-            else -> PhoneFocusView(
-                state = state,
-                onShowList = onShowList,
-                onCompleteRoutine = onCompleteRoutine,
-                onAdvanceFromFeedback = onAdvanceFromFeedback,
-                onUndoRoutine = onUndoRoutine,
-            )
-        }
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .size(SteppieLayout.ChildMinimumTouchTarget)
-                .tutorialAnchor(TutorialTarget.GuardianEntry)
-                .testTag("guardian_hidden_entry")
-                .pointerInput(onRequestGuardianMode) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val heldForThreeSeconds: Boolean = withTimeoutOrNull<Boolean>(3_000L) {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                if (event.changes.none { it.id == down.id && it.pressed }) {
-                                    return@withTimeoutOrNull false
-                                }
-                            }
-                            false
-                        } ?: true
-                        if (heldForThreeSeconds) onRequestGuardianMode()
-                    }
-                },
-        )
-    }
+    ChildRoutineLayoutHost(
+        state = state,
+        onShowList = onShowList,
+        onShowFocus = onShowFocus,
+        onSelectRoutine = onSelectRoutine,
+        onCompleteRoutine = onCompleteRoutine,
+        onAdvanceFromFeedback = onAdvanceFromFeedback,
+        onUndoRoutine = onUndoRoutine,
+        onRequestGuardianMode = onRequestGuardianMode,
+        modifier = modifier,
+    )
 }
 
 @Composable
-private fun LoadingContent() {
+internal fun LoadingContent() {
     val description = stringResource(R.string.state_loading)
     Box(
         modifier = Modifier
@@ -164,7 +115,7 @@ private fun LoadingContent() {
 }
 
 @Composable
-private fun PhoneFocusView(
+internal fun PhoneFocusView(
     state: ChildRoutineUiState,
     onShowList: () -> Unit,
     onCompleteRoutine: () -> Unit,
@@ -240,7 +191,7 @@ private fun PhoneFocusView(
 }
 
 @Composable
-private fun PhoneRoutineList(
+internal fun PhoneRoutineList(
     state: ChildRoutineUiState,
     onShowFocus: () -> Unit,
     onSelectRoutine: (String) -> Unit,
@@ -283,7 +234,7 @@ private fun PhoneRoutineList(
 }
 
 @Composable
-private fun SplitRoutineLayout(
+internal fun SplitRoutineLayout(
     state: ChildRoutineUiState,
     onSelectRoutine: (String) -> Unit,
     onCompleteRoutine: () -> Unit,
