@@ -10,14 +10,11 @@ import com.example.steppie.data.backup.BackupProvider
 import com.example.steppie.data.backup.BackupValidationException
 import com.example.steppie.data.photo.RoutinePhotoStore
 import com.example.steppie.domain.model.AppSettings
-import com.example.steppie.domain.model.BuiltinIconNames
 import com.example.steppie.domain.model.DailyLog
 import com.example.steppie.domain.model.FeedbackIntensity
-import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.model.Routine
-import com.example.steppie.domain.model.RoutineColorTokens
 import com.example.steppie.domain.model.RoutineSet
 import com.example.steppie.domain.model.newUuidV4
 import com.example.steppie.domain.repository.AppSettingsRepository
@@ -422,21 +419,7 @@ class GuardianModeViewModel(
     }
 
     fun openRoutineSetCreate() {
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.RoutineSetCreate,
-                destinationBackStack = it.backStackFor(GuardianDestination.RoutineSetCreate),
-                draft = null,
-                routineSetDraft = RoutineSetDraft(),
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                draftError = null,
-                pendingDeleteRoutineId = null,
-                pendingDeleteRoutineSetId = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianRoutineSetDraftReducer::open)
     }
 
     fun openTemplateSelect(returnDestination: GuardianDestination = GuardianDestination.RoutineEdit) {
@@ -738,30 +721,33 @@ class GuardianModeViewModel(
         _uiState.update { GuardianRoutineDraftReducer.updateScheduledTime(it, value) }
     }
 
-    fun updateRoutineSetName(name: String) = updateRoutineSetDraft { it.copy(name = name) }
+    fun updateRoutineSetName(name: String) {
+        _uiState.update { GuardianRoutineSetDraftReducer.updateName(it, name) }
+    }
 
-    fun updateRoutineSetStepTitle(title: String) = updateRoutineSetDraft {
-        it.copy(stepDraft = it.stepDraft.copy(title = title))
+    fun updateRoutineSetStepTitle(title: String) {
+        _uiState.update { GuardianRoutineSetDraftReducer.updateStepTitle(it, title) }
     }
 
     fun updateRoutineSetStepIcon(iconName: String) {
-        if (iconName !in BuiltinIconNames.all) return
-        updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(icon = IconRef.Builtin(iconName))) }
+        _uiState.update { GuardianRoutineSetDraftReducer.updateStepBuiltinIcon(it, iconName) }
     }
 
     fun importRoutineSetStepPhoto(uri: Uri) {
         val store = routinePhotoStore ?: run {
-            _uiState.update { it.copy(draftError = "사진 선택 기능을 사용할 수 없습니다.") }
+            _uiState.update(GuardianRoutineSetDraftReducer::photoUnavailable)
             return
         }
         viewModelScope.launch {
             runCatching { store.importPhoto(uri) }
-                .onSuccess { photo -> updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(icon = photo)) } }
+                .onSuccess { photo ->
+                    _uiState.update { GuardianRoutineSetDraftReducer.photoImported(it, photo) }
+                }
                 .onFailure { error ->
-                    _uiState.update {
-                        it.copy(
-                            draftError = error.message ?: "사진을 저장할 수 없습니다.",
-                            interactionToken = it.interactionToken + 1,
+                    _uiState.update { state ->
+                        GuardianRoutineSetDraftReducer.photoImportFailed(
+                            state,
+                            error.message ?: "사진을 저장할 수 없습니다.",
                         )
                     }
                 }
@@ -769,77 +755,41 @@ class GuardianModeViewModel(
     }
 
     fun removeRoutineSetStepPhoto() {
-        updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(icon = IconRef.Builtin("star"))) }
+        _uiState.update(GuardianRoutineSetDraftReducer::removeStepPhoto)
     }
 
     fun updateRoutineSetStepColor(colorToken: String) {
-        if (colorToken !in RoutineColorTokens.all) return
-        updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(colorToken = colorToken)) }
+        _uiState.update { GuardianRoutineSetDraftReducer.updateStepColor(it, colorToken) }
     }
 
     fun updateRoutineSetStepScheduledTime(value: String) {
-        val sanitized = value.filter { it.isDigit() || it == ':' }.take(5)
-        updateRoutineSetDraft { it.copy(stepDraft = it.stepDraft.copy(scheduledTime = sanitized)) }
+        _uiState.update { GuardianRoutineSetDraftReducer.updateStepScheduledTime(it, value) }
     }
 
     fun addRoutineSetStep() {
         val draft = _uiState.value.routineSetDraft ?: return
         val trimmedTitle = draft.stepDraft.title.trim()
         if (trimmedTitle.isBlank()) {
-            _uiState.update { it.copy(draftError = "단계 이름을 입력해 주세요.") }
+            _uiState.update {
+                GuardianRoutineSetDraftReducer.showError(it, "단계 이름을 입력해 주세요.")
+            }
             return
         }
         if (parseScheduledTime(draft.stepDraft.scheduledTime) == null && draft.stepDraft.scheduledTime.isNotBlank()) {
-            _uiState.update { it.copy(draftError = "예정 시각은 HH:mm 형식으로 입력해 주세요.") }
+            _uiState.update {
+                GuardianRoutineSetDraftReducer.showError(it, "예정 시각은 HH:mm 형식으로 입력해 주세요.")
+            }
             return
         }
-        _uiState.update {
-            val currentDraft = it.routineSetDraft ?: return@update it
-            it.copy(
-                routineSetDraft = currentDraft.copy(
-                    stepDraft = RoutineDraft(),
-                    steps = currentDraft.editingStepIndex?.let { index ->
-                        currentDraft.steps.mapIndexed { stepIndex, step ->
-                            if (stepIndex == index) currentDraft.stepDraft.copy(title = trimmedTitle) else step
-                        }
-                    } ?: (currentDraft.steps + currentDraft.stepDraft.copy(title = trimmedTitle)),
-                    editingStepIndex = null,
-                ),
-                draftError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRoutineSetDraftReducer.addOrUpdateStep(it, trimmedTitle) }
     }
 
     fun editRoutineSetStep(index: Int) {
-        _uiState.update {
-            val currentDraft = it.routineSetDraft ?: return@update it
-            val step = currentDraft.steps.getOrNull(index) ?: return@update it
-            it.copy(
-                routineSetDraft = currentDraft.copy(
-                    stepDraft = step,
-                    editingStepIndex = index,
-                ),
-                draftError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRoutineSetDraftReducer.editStep(it, index) }
     }
 
     fun removeRoutineSetStep(index: Int) {
-        _uiState.update {
-            val currentDraft = it.routineSetDraft ?: return@update it
-            if (index !in currentDraft.steps.indices) return@update it
-            it.copy(
-                routineSetDraft = currentDraft.copy(
-                    steps = currentDraft.steps.filterIndexed { stepIndex, _ -> stepIndex != index },
-                    stepDraft = if (currentDraft.editingStepIndex == index) RoutineDraft() else currentDraft.stepDraft,
-                    editingStepIndex = null,
-                ),
-                draftError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRoutineSetDraftReducer.removeStep(it, index) }
     }
 
     fun saveRoutineSetDraft() {
@@ -1200,16 +1150,6 @@ class GuardianModeViewModel(
 
     private fun showPinError() {
         _uiState.update(GuardianPinReducer::showPinError)
-    }
-
-    private fun updateRoutineSetDraft(transform: (RoutineSetDraft) -> RoutineSetDraft) {
-        _uiState.update {
-            it.copy(
-                routineSetDraft = it.routineSetDraft?.let(transform),
-                draftError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
     }
 
     private fun updateSettings(transform: (AppSettings) -> AppSettings) {
