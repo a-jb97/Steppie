@@ -205,6 +205,72 @@ class GuardianModeViewModelTest {
     }
 
     @Test
+    fun `only active routine set cannot be removed from daily participation`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val routineSet = viewModel.uiState.value.routineSets.single()
+
+            viewModel.setRoutineSetForToday(routineSet.id)
+
+            val persisted = fixture.routineRepository.observeRoutineSets().first().single()
+            assertTrue(persisted.isActive)
+            assertEquals("최소 한 개의 루틴 세트는 매일 진행해야 합니다.", viewModel.uiState.value.notice)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `routine set start time validates input then persists a valid time`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val routineSetId = viewModel.uiState.value.routineSets.single().id
+
+            viewModel.updateRoutineSetStartTime(routineSetId, "8시")
+
+            assertEquals("시작 시각은 HH:mm 형식으로 입력해 주세요.", viewModel.uiState.value.draftError)
+            assertNull(fixture.routineRepository.observeRoutineSets().first().single().startTime)
+
+            viewModel.updateRoutineSetStartTime(routineSetId, "08:15")
+            runCurrent()
+
+            assertEquals("08:15", fixture.routineRepository.observeRoutineSets().first().single().startTime.toString())
+            assertNull(viewModel.uiState.value.draftError)
+            assertEquals("루틴 세트 시작 시간을 저장했습니다.", viewModel.uiState.value.notice)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `routine set name edit resolves locale and persists the trimmed name`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val routineSet = viewModel.uiState.value.routineSets.single()
+
+            viewModel.requestEditRoutineSetName(routineSet.id)
+            assertEquals(routineSet.name.resolve(null, "ko"), viewModel.uiState.value.editingRoutineSetName)
+
+            viewModel.updateEditingRoutineSetName("  새 루틴 이름  ")
+            viewModel.saveEditingRoutineSetName()
+            runCurrent()
+
+            val persisted = fixture.routineRepository.observeRoutineSets().first().single()
+            assertEquals(mapOf("ko" to "새 루틴 이름"), persisted.name.values)
+            assertNull(viewModel.uiState.value.editingRoutineSetId)
+            assertEquals("", viewModel.uiState.value.editingRoutineSetName)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
     fun `routine deletion clears the request after repository deletion`() = runTest {
         val fixture = authenticatedGuardianFixture()
         val viewModel = fixture.viewModel

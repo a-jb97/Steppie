@@ -466,62 +466,30 @@ class GuardianModeViewModel(
     }
 
     fun toggleRoutineSetListEditing() {
-        _uiState.update {
-            it.copy(
-                routineSetListEditing = !it.routineSetListEditing,
-                editingRoutineSetId = null,
-                editingRoutineSetName = "",
-                pendingDeleteRoutineSetId = null,
-                draftError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianRoutineSetReducer::toggleListEditing)
     }
 
     fun selectRoutineSet(routineSetId: String) {
         val routineSet = _uiState.value.routineSets.firstOrNull { it.id == routineSetId } ?: return
-        _uiState.update {
-            it.copy(
-                activeRoutineSet = routineSet,
-                selectedRoutineSetId = routineSet.id,
-                routines = routineSet.routines.sortedBy(Routine::order),
-                draftError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRoutineSetReducer.select(it, routineSet) }
     }
 
     fun setRoutineSetForToday(routineSetId: String) {
         val state = _uiState.value
         val target = state.routineSets.firstOrNull { it.id == routineSetId } ?: return
         if (target.isActive && state.routineSets.count(RoutineSet::isActive) <= 1) {
-            _uiState.update {
-                it.copy(
-                    notice = "최소 한 개의 루틴 세트는 매일 진행해야 합니다.",
-                    interactionToken = it.interactionToken + 1,
-                )
-            }
+            _uiState.update(GuardianRoutineSetReducer::lastDailyRoutineSetRejected)
             return
         }
         if (!target.isActive && target.startTime == null) {
-            _uiState.update {
-                it.copy(
-                    notice = "추가할 루틴 세트의 시작 시간을 먼저 설정해 주세요.",
-                    interactionToken = it.interactionToken + 1,
-                )
-            }
+            _uiState.update(GuardianRoutineSetReducer::missingStartTimeRejected)
             return
         }
         if (
             !target.isActive &&
             state.routineSets.any { it.id != target.id && it.isActive && it.startTime == target.startTime }
         ) {
-            _uiState.update {
-                it.copy(
-                    notice = "다른 루틴 세트와 시작 시간이 같아요.",
-                    interactionToken = it.interactionToken + 1,
-                )
-            }
+            _uiState.update(GuardianRoutineSetReducer::duplicateDailyStartTimeRejected)
             return
         }
         viewModelScope.launch {
@@ -529,16 +497,7 @@ class GuardianModeViewModel(
                 target.copy(isActive = !target.isActive, updatedAt = clockProvider.now()),
             )
             _uiState.update {
-                it.copy(
-                    selectedRoutineSetId = routineSetId,
-                    showDailyRoutineSelectionPrompt = false,
-                    notice = if (target.isActive) {
-                        "매일 진행에서 제외했습니다."
-                    } else {
-                        "매일 진행에 추가했습니다."
-                    },
-                    interactionToken = it.interactionToken + 1,
-                )
+                GuardianRoutineSetReducer.dailyParticipationChanged(it, routineSetId, target.isActive)
             }
         }
     }
@@ -547,37 +506,26 @@ class GuardianModeViewModel(
         val target = _uiState.value.routineSets.firstOrNull { it.id == routineSetId } ?: return
         val parsed = parseDraftScheduledTime(value)
         if (value.isNotBlank() && parsed == null) {
-            _uiState.update { it.copy(draftError = "시작 시각은 HH:mm 형식으로 입력해 주세요.") }
+            _uiState.update(GuardianRoutineSetReducer::invalidStartTime)
             return
         }
         if (
             parsed != null &&
             _uiState.value.routineSets.any { it.id != target.id && it.isActive && it.startTime == parsed }
         ) {
-            _uiState.update { it.copy(draftError = "다른 루틴 세트와 시작 시간이 같아요.") }
+            _uiState.update(GuardianRoutineSetReducer::duplicateStartTime)
             return
         }
         viewModelScope.launch {
             routineRepository.updateRoutineSet(
                 target.copy(startTime = parsed, updatedAt = clockProvider.now()),
             )
-            _uiState.update {
-                it.copy(
-                    draftError = null,
-                    notice = "루틴 세트 시작 시간을 저장했습니다.",
-                    interactionToken = it.interactionToken + 1,
-                )
-            }
+            _uiState.update(GuardianRoutineSetReducer::startTimeSaved)
         }
     }
 
     fun dismissDailyRoutineSelectionPrompt() {
-        _uiState.update {
-            it.copy(
-                showDailyRoutineSelectionPrompt = false,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianRoutineSetReducer::dismissDailySelectionPrompt)
     }
 
     private fun refreshCurrentDate(): LocalDate {
@@ -590,35 +538,16 @@ class GuardianModeViewModel(
 
     fun requestEditRoutineSetName(routineSetId: String) {
         val routineSet = _uiState.value.routineSets.firstOrNull { it.id == routineSetId } ?: return
-        _uiState.update {
-            it.copy(
-                editingRoutineSetId = routineSet.id,
-                editingRoutineSetName = routineSet.name.resolve(null, localeProvider.languageTag()),
-                draftError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        val resolvedName = routineSet.name.resolve(null, localeProvider.languageTag())
+        _uiState.update { GuardianRoutineSetReducer.beginNameEdit(it, routineSet.id, resolvedName) }
     }
 
     fun updateEditingRoutineSetName(name: String) {
-        _uiState.update {
-            it.copy(
-                editingRoutineSetName = name,
-                draftError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRoutineSetReducer.updateEditingName(it, name) }
     }
 
     fun cancelEditRoutineSetName() {
-        _uiState.update {
-            it.copy(
-                editingRoutineSetId = null,
-                editingRoutineSetName = "",
-                draftError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianRoutineSetReducer::cancelNameEdit)
     }
 
     fun saveEditingRoutineSetName() {
@@ -627,7 +556,7 @@ class GuardianModeViewModel(
         val routineSet = state.routineSets.firstOrNull { it.id == routineSetId } ?: return
         val trimmedName = state.editingRoutineSetName.trim()
         if (trimmedName.isBlank()) {
-            _uiState.update { it.copy(draftError = "루틴 세트 이름을 입력해 주세요.") }
+            _uiState.update(GuardianRoutineSetReducer::blankNameRejected)
             return
         }
         viewModelScope.launch {
