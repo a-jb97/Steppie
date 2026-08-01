@@ -412,43 +412,13 @@ class GuardianModeViewModel(
     }
 
     fun openNewRoutineEditor() {
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.CardEdit,
-                destinationBackStack = it.backStackFor(GuardianDestination.CardEdit),
-                draft = RoutineDraft(),
-                routineSetDraft = null,
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                draftError = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianRoutineDraftReducer::openNew)
     }
 
     fun openRoutineEditor(routineId: String) {
         val routine = _uiState.value.routines.firstOrNull { it.id == routineId } ?: return
         val title = routine.title.resolve(null, localeProvider.languageTag())
-        _uiState.update {
-            it.copy(
-                destination = GuardianDestination.CardEdit,
-                destinationBackStack = it.backStackFor(GuardianDestination.CardEdit),
-                routineSetDraft = null,
-                selectedTemplate = null,
-                templateReturnDestination = GuardianDestination.RoutineEdit,
-                draft = RoutineDraft(
-                    routineId = routine.id,
-                    title = title,
-                    icon = routine.icon,
-                    colorToken = routine.colorToken,
-                    scheduledTime = routine.scheduledTime?.toString().orEmpty(),
-                ),
-                draftError = null,
-                notice = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianRoutineDraftReducer.openExisting(it, routine, title) }
     }
 
     fun openRoutineSetCreate() {
@@ -727,26 +697,29 @@ class GuardianModeViewModel(
         }
     }
 
-    fun updateDraftTitle(title: String) = updateDraft { it.copy(title = title) }
+    fun updateDraftTitle(title: String) {
+        _uiState.update { GuardianRoutineDraftReducer.updateTitle(it, title) }
+    }
 
     fun updateDraftIcon(iconName: String) {
-        if (iconName !in BuiltinIconNames.all) return
-        updateDraft { it.copy(icon = IconRef.Builtin(iconName)) }
+        _uiState.update { GuardianRoutineDraftReducer.updateBuiltinIcon(it, iconName) }
     }
 
     fun importDraftPhoto(uri: Uri) {
         val store = routinePhotoStore ?: run {
-            _uiState.update { it.copy(draftError = "사진 선택 기능을 사용할 수 없습니다.") }
+            _uiState.update(GuardianRoutineDraftReducer::photoUnavailable)
             return
         }
         viewModelScope.launch {
             runCatching { store.importPhoto(uri) }
-                .onSuccess { photo -> updateDraft { it.copy(icon = photo) } }
+                .onSuccess { photo ->
+                    _uiState.update { GuardianRoutineDraftReducer.photoImported(it, photo) }
+                }
                 .onFailure { error ->
-                    _uiState.update {
-                        it.copy(
-                            draftError = error.message ?: "사진을 저장할 수 없습니다.",
-                            interactionToken = it.interactionToken + 1,
+                    _uiState.update { state ->
+                        GuardianRoutineDraftReducer.photoImportFailed(
+                            state,
+                            error.message ?: "사진을 저장할 수 없습니다.",
                         )
                     }
                 }
@@ -754,17 +727,15 @@ class GuardianModeViewModel(
     }
 
     fun removeDraftPhoto() {
-        updateDraft { it.copy(icon = IconRef.Builtin("star")) }
+        _uiState.update(GuardianRoutineDraftReducer::removePhoto)
     }
 
     fun updateDraftColor(colorToken: String) {
-        if (colorToken !in RoutineColorTokens.all) return
-        updateDraft { it.copy(colorToken = colorToken) }
+        _uiState.update { GuardianRoutineDraftReducer.updateColor(it, colorToken) }
     }
 
     fun updateDraftScheduledTime(value: String) {
-        val sanitized = value.filter { it.isDigit() || it == ':' }.take(5)
-        updateDraft { it.copy(scheduledTime = sanitized) }
+        _uiState.update { GuardianRoutineDraftReducer.updateScheduledTime(it, value) }
     }
 
     fun updateRoutineSetName(name: String) = updateRoutineSetDraft { it.copy(name = name) }
@@ -1229,16 +1200,6 @@ class GuardianModeViewModel(
 
     private fun showPinError() {
         _uiState.update(GuardianPinReducer::showPinError)
-    }
-
-    private fun updateDraft(transform: (RoutineDraft) -> RoutineDraft) {
-        _uiState.update {
-            it.copy(
-                draft = it.draft?.let(transform),
-                draftError = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
     }
 
     private fun updateRoutineSetDraft(transform: (RoutineSetDraft) -> RoutineSetDraft) {
