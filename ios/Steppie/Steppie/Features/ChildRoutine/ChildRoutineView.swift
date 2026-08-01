@@ -90,31 +90,19 @@ struct ChildRoutineView: View {
 
     @ViewBuilder
     private func loadedContent(layout: ChildRoutineLayout) -> some View {
-        switch layout {
-        case .splitPane:
-            HStack(spacing: 0) {
-                splitRoutineList
-                    .frame(width: SteppieLayout.splitListWidth)
-
-                Rectangle()
-                    .fill(Color.steppieBorderSubtle)
-                    .frame(width: SteppieStroke.divider)
-                    .accessibilityHidden(true)
-
-                splitFocusView
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        case .singlePane:
-            switch viewModel.page {
-            case .focus:
-                phoneFocusView
-                    .contentShape(.rect)
-                    .gesture(verticalSwipe(up: viewModel.showList))
-            case .list:
-                phoneRoutineList
-                    .contentShape(.rect)
-                    .simultaneousGesture(verticalSwipe(down: viewModel.showFocus))
-            }
+        ChildRoutineLayoutView(
+            layout: layout,
+            page: viewModel.page,
+            onShowList: viewModel.showList,
+            onShowFocus: viewModel.showFocus
+        ) {
+            phoneFocusView
+        } phoneList: {
+            phoneRoutineList
+        } splitList: {
+            splitRoutineList
+        } splitFocus: {
+            splitFocusView
         }
     }
 
@@ -750,28 +738,6 @@ struct ChildRoutineView: View {
             }
         }
         .padding(SteppieLayout.childScreenPadding)
-    }
-
-    private func verticalSwipe(
-        up action: @escaping () -> Void
-    ) -> some Gesture {
-        DragGesture(minimumDistance: 60)
-            .onEnded { value in
-                guard abs(value.translation.height) > abs(value.translation.width),
-                      value.translation.height < -60 else { return }
-                action()
-            }
-    }
-
-    private func verticalSwipe(
-        down action: @escaping () -> Void
-    ) -> some Gesture {
-        DragGesture(minimumDistance: 60)
-            .onEnded { value in
-                guard abs(value.translation.height) > abs(value.translation.width),
-                      value.translation.height > 60 else { return }
-                action()
-            }
     }
 
     @ViewBuilder

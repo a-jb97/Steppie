@@ -13,17 +13,6 @@ enum ChildRoutinePage: Equatable {
     case list
 }
 
-enum ChildRoutineLayout: Equatable {
-    case singlePane
-    case splitPane
-}
-
-enum ChildRoutineLayoutPolicy {
-    static func layout(for availableWidth: CGFloat) -> ChildRoutineLayout {
-        availableWidth >= SteppieLayout.splitMinimumWidth ? .splitPane : .singlePane
-    }
-}
-
 @MainActor
 @Observable
 final class ChildRoutineViewModel {
