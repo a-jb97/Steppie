@@ -122,7 +122,10 @@ struct ChildRoutineNextPreview: View {
             Button(action: viewModel.proceedAfterCompletionFeedback) {
                 adaptivePreviewStack {
                     RoutineVisualView(icon: nextRoutine.icon, size: .list)
-                        .frame(width: 52, height: 52)
+                        .frame(
+                            width: ChildRoutinePresentationMetrics.previewVisualSize,
+                            height: ChildRoutinePresentationMetrics.previewVisualSize
+                        )
                         .accessibilityHidden(true)
 
                     Text("screen.feedback.nextPrefix")
@@ -172,7 +175,10 @@ struct ChildRoutineNextPreview: View {
                     Image("routine-all-done-stamp")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 52, height: 52)
+                        .frame(
+                            width: ChildRoutinePresentationMetrics.previewVisualSize,
+                            height: ChildRoutinePresentationMetrics.previewVisualSize
+                        )
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
@@ -205,7 +211,10 @@ struct ChildRoutineNextPreview: View {
     ) -> some View {
         adaptivePreviewStack {
             RoutineVisualView(icon: firstRoutine.icon, size: .list)
-                .frame(width: 52, height: 52)
+                .frame(
+                    width: ChildRoutinePresentationMetrics.previewVisualSize,
+                    height: ChildRoutinePresentationMetrics.previewVisualSize
+                )
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {

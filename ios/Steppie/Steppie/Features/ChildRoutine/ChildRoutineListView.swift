@@ -32,7 +32,7 @@ struct ChildRoutineListView: View {
                 .tutorialTarget(.primary)
 
                 progress
-                    .padding(.top, 18)
+                    .padding(.top, ChildRoutinePresentationMetrics.progressTopPadding)
 
                 routineCards(compactMetadata: false)
                     .padding(.top, SteppieSpacing.extraLarge)

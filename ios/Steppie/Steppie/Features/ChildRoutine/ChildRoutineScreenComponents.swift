@@ -5,6 +5,34 @@ enum ChildRoutinePanePresentation {
     case split
 }
 
+enum ChildRoutinePresentationMetrics {
+    static let progressTopPadding: CGFloat = 18
+    static let previewVisualSize: CGFloat = 52
+    static let stateScreenVerticalInset: CGFloat = 72
+}
+
+struct ChildRoutineStateScreenContainer<Content: View>: View {
+    private let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack {
+                Spacer(minLength: ChildRoutinePresentationMetrics.stateScreenVerticalInset)
+                content
+                Spacer(minLength: ChildRoutinePresentationMetrics.stateScreenVerticalInset)
+            }
+            .frame(maxWidth: SteppieLayout.focusCardTabletMaximumWidth)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, SteppieLayout.childScreenPadding)
+        }
+        .background(Color.steppieBackgroundSecondary)
+    }
+}
+
 struct ChildRoutineHeader: View {
     let title: LocalizedStringKey
     let subtitle: LocalizedStringKey

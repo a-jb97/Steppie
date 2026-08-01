@@ -21,7 +21,7 @@ struct ChildRoutineFocusView: View {
                 phoneHeader
 
                 progress
-                    .padding(.top, 18)
+                    .padding(.top, ChildRoutinePresentationMetrics.progressTopPadding)
                     .tutorialTarget(.secondary)
 
                 focusContent(minimumHeight: 448)
