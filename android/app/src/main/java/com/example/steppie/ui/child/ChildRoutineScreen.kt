@@ -13,7 +13,6 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -25,8 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,7 +43,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -191,49 +187,6 @@ internal fun PhoneFocusView(
 }
 
 @Composable
-internal fun PhoneRoutineList(
-    state: ChildRoutineUiState,
-    onShowFocus: () -> Unit,
-    onSelectRoutine: (String) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("phone_list")
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        FocusListNavigation(
-            label = stringResource(R.string.child_focus_title),
-            directionUp = true,
-            onClick = onShowFocus,
-            modifier = Modifier.onVerticalSwipe(onSwipeDown = onShowFocus),
-        )
-        Column(
-            modifier = Modifier.padding(horizontal = SteppieLayout.ChildScreenPadding),
-            verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
-        ) {
-            ChildHeader(
-                title = stringResource(R.string.child_list_title),
-                subtitle = stringResource(R.string.child_list_subtitle),
-            )
-            ProgressIndicator(completed = state.progressCount, total = state.progressTotal)
-        }
-        RoutineList(
-            state = state,
-            onSelectRoutine = onSelectRoutine,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(
-                    start = SteppieLayout.ChildScreenPadding,
-                    end = SteppieLayout.ChildScreenPadding,
-                    top = SteppieSpacing.Large,
-                ),
-            contentBottomPadding = SteppieLayout.ChildScreenPadding,
-        )
-    }
-}
-
-@Composable
 internal fun SplitRoutineLayout(
     state: ChildRoutineUiState,
     onSelectRoutine: (String) -> Unit,
@@ -339,7 +292,7 @@ internal fun SplitRoutineLayout(
 }
 
 @Composable
-private fun ChildHeader(
+internal fun ChildHeader(
     title: String,
     subtitle: String,
 ) {
@@ -362,7 +315,7 @@ private fun ChildHeader(
 }
 
 @Composable
-private fun ProgressIndicator(completed: Int, total: Int) {
+internal fun ProgressIndicator(completed: Int, total: Int) {
     val description = stringResource(R.string.a11y_progress, completed, total)
     Row(
         modifier = Modifier
@@ -456,75 +409,6 @@ private fun FocusRoutineContent(
         } else {
             RoutineIcon(icon = routine.icon, focus = true, modifier = Modifier.fillMaxSize())
         }
-    }
-}
-
-@Composable
-private fun RoutineList(
-    state: ChildRoutineUiState,
-    onSelectRoutine: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    contentBottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
-) {
-    if (state.routines.isEmpty()) {
-        EmptyRoutineContent(modifier = modifier)
-        return
-    }
-    LazyColumn(
-        modifier = modifier.tutorialAnchor(TutorialTarget.ChildList),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = PaddingValues(bottom = contentBottomPadding),
-    ) {
-        items(state.routines, key = Routine::id) { routine ->
-            val isCurrent = routine.id == state.currentRoutine?.id
-            val isCompleted = routine.id in state.completedRoutineIds
-            RoutineCard(
-                title = routine.localizedTitle(),
-                state = when {
-                    isCompleted -> RoutineCardState.Completed
-                    isCurrent -> RoutineCardState.Current
-                    else -> RoutineCardState.Upcoming
-                },
-                onClick = { onSelectRoutine(routine.id) },
-                modifier = Modifier.testTag("routine_${routine.id}"),
-                cardColor = routine.cardColor(),
-                meta = routine.listMeta(
-                    isCurrent = isCurrent,
-                    isCompleted = isCompleted,
-                    lockedUntil = state.waitingUntil.takeIf { state.isRoutineSetLocked },
-                ),
-            ) {
-                RoutineIcon(icon = routine.icon, focus = false, modifier = Modifier.fillMaxSize())
-            }
-        }
-    }
-}
-
-@Composable
-private fun Routine.localizedTitle(): String {
-    val configuration = LocalConfiguration.current
-    val systemLocale = configuration.locales[0]?.toLanguageTag()
-        ?: Locale.getDefault().toLanguageTag()
-    return title.resolve(appLocale = null, systemLocale = systemLocale)
-}
-
-@Composable
-private fun Routine.listMeta(
-    isCurrent: Boolean,
-    isCompleted: Boolean,
-    lockedUntil: java.time.LocalTime? = null,
-): String {
-    val orderLabel = order + 1
-    return when {
-        isCompleted -> stringResource(R.string.routine_state_completed)
-        lockedUntil != null -> stringResource(R.string.child_locked_set_hint, lockedUntil.toString())
-        isCurrent -> stringResource(R.string.routine_meta_current, orderLabel)
-        scheduledTime != null -> stringResource(
-            R.string.routine_meta_scheduled,
-            orderLabel,
-            scheduledTime.toString(),
-        )
-        else -> stringResource(R.string.routine_meta_order, orderLabel)
     }
 }
 
@@ -893,7 +777,7 @@ private data class FireworkBurst(
 )
 
 @Composable
-private fun FocusListNavigation(
+internal fun FocusListNavigation(
     label: String,
     directionUp: Boolean,
     onClick: () -> Unit,
@@ -938,7 +822,7 @@ private fun FocusListNavigation(
 }
 
 @Composable
-private fun EmptyRoutineContent(modifier: Modifier = Modifier) {
+internal fun EmptyRoutineContent(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -1003,7 +887,7 @@ private fun Routine.previewColor(): Color = when (cardColor()) {
     RoutineCardColor.Rose -> SteppieTheme.colors.cardRose
 }
 
-private fun Modifier.onVerticalSwipe(
+internal fun Modifier.onVerticalSwipe(
     onSwipeUp: (() -> Unit)? = null,
     onSwipeDown: (() -> Unit)? = null,
 ): Modifier = pointerInput(onSwipeUp, onSwipeDown) {
