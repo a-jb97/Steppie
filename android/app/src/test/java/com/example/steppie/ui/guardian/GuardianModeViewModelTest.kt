@@ -205,6 +205,74 @@ class GuardianModeViewModelTest {
     }
 
     @Test
+    fun `routine deletion clears the request after repository deletion`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            viewModel.openRoutineEdit()
+            val routineId = requireNotNull(viewModel.uiState.value.routines.firstOrNull()).id
+
+            viewModel.requestDelete(routineId)
+            assertEquals(routineId, viewModel.uiState.value.pendingDeleteRoutineId)
+
+            viewModel.confirmDelete()
+            runCurrent()
+
+            val routines = fixture.routineRepository.observeRoutineSets().first().single().routines
+            assertTrue(routines.none { it.id == routineId })
+            assertNull(viewModel.uiState.value.pendingDeleteRoutineId)
+            assertEquals(GuardianDestination.RoutineEdit, viewModel.uiState.value.destination)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `last routine set deletion is rejected without repository mutation`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val routineSetId = viewModel.uiState.value.routineSets.single().id
+            viewModel.requestDeleteRoutineSet(routineSetId)
+            viewModel.confirmDeleteRoutineSet()
+
+            assertEquals(1, fixture.routineRepository.observeRoutineSets().first().size)
+            assertNull(viewModel.uiState.value.pendingDeleteRoutineSetId)
+            assertEquals("마지막 루틴 세트는 삭제할 수 없습니다.", viewModel.uiState.value.notice)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `deleting the only active routine set activates a replacement first`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val activeId = viewModel.uiState.value.routineSets.single().id
+            val replacement = requireNotNull(RoutineTemplates.find(RoutineTemplateId.Bedtime))
+                .instantiate(TestInstant)
+            fixture.routineRepository.createRoutineSet(replacement)
+            runCurrent()
+
+            viewModel.requestDeleteRoutineSet(activeId)
+            viewModel.confirmDeleteRoutineSet()
+            runCurrent()
+
+            val remaining = fixture.routineRepository.observeRoutineSets().first().single()
+            assertEquals(replacement.id, remaining.id)
+            assertTrue(remaining.isActive)
+            assertNull(viewModel.uiState.value.pendingDeleteRoutineSetId)
+            assertTrue(viewModel.uiState.value.routineSetListEditing)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
     fun `environment changes update optimistic state and persist each resulting settings snapshot`() = runTest {
         val fixture = authenticatedGuardianFixture()
         val viewModel = fixture.viewModel

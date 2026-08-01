@@ -845,47 +845,22 @@ class GuardianModeViewModel(
     }
 
     fun requestDelete(routineId: String) {
-        _uiState.update {
-            it.copy(
-                pendingDeleteRoutineId = routineId,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianDeletionReducer.requestRoutine(it, routineId) }
     }
 
     fun requestDeleteRoutineSet(routineSetId: String) {
-        _uiState.update {
-            it.copy(
-                pendingDeleteRoutineSetId = routineSetId,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update { GuardianDeletionReducer.requestRoutineSet(it, routineSetId) }
     }
 
     fun cancelDelete() {
-        _uiState.update {
-            it.copy(
-                pendingDeleteRoutineId = null,
-                pendingDeleteRoutineSetId = null,
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianDeletionReducer::cancel)
     }
 
     fun confirmDelete() {
         val routineId = _uiState.value.pendingDeleteRoutineId ?: return
         viewModelScope.launch {
             routineRepository.deleteRoutine(routineId)
-            _uiState.update {
-                it.copy(
-                    destination = GuardianDestination.RoutineEdit,
-                    destinationBackStack = it.destinationBackStack.dropLastMatching(GuardianDestination.RoutineEdit),
-                    draft = null,
-                    draftError = null,
-                    pendingDeleteRoutineId = null,
-                    interactionToken = it.interactionToken + 1,
-                )
-            }
+            _uiState.update(GuardianDeletionReducer::routineDeleted)
         }
     }
 
@@ -894,13 +869,7 @@ class GuardianModeViewModel(
         val routineSetId = state.pendingDeleteRoutineSetId ?: return
         val target = state.routineSets.firstOrNull { it.id == routineSetId } ?: return
         if (state.routineSets.size <= 1) {
-            _uiState.update {
-                it.copy(
-                    pendingDeleteRoutineSetId = null,
-                    notice = "마지막 루틴 세트는 삭제할 수 없습니다.",
-                    interactionToken = it.interactionToken + 1,
-                )
-            }
+            _uiState.update(GuardianDeletionReducer::lastRoutineSetRejected)
             return
         }
         viewModelScope.launch {
@@ -915,13 +884,7 @@ class GuardianModeViewModel(
                 routineRepository.updateRoutineSet(target.copy(isActive = false, updatedAt = clockProvider.now()))
             }
             routineRepository.deleteRoutineSet(target.id)
-            _uiState.update {
-                it.copy(
-                    pendingDeleteRoutineSetId = null,
-                    routineSetListEditing = true,
-                    interactionToken = it.interactionToken + 1,
-                )
-            }
+            _uiState.update(GuardianDeletionReducer::routineSetDeleted)
         }
     }
 
