@@ -19,12 +19,10 @@ final class ChildRoutineViewModel {
     private let repository: any RoutineRepository
     private let speechGuide: any RoutineSpeechGuiding
     private let feedbackPerformer: any RoutineFeedbackPerforming
-    private let notificationScheduler: any RoutineNotificationScheduling
+    private let notificationCoordinator: ChildRoutineNotificationCoordinator
     private let now: () -> Date
     private let calendar: Calendar
     private let locale: () -> Locale
-    private let isNotificationSchedulingEnabled: Bool
-    @ObservationIgnored private var didRequestNotificationAuthorization = false
     @ObservationIgnored private var pendingNotificationRoute: RoutineNotificationRoute?
     @ObservationIgnored private var isRoutineSpeechActive = true
     @ObservationIgnored private var scheduledTransitionTask: Task<Void, Never>?
@@ -58,11 +56,13 @@ final class ChildRoutineViewModel {
         self.repository = repository
         self.speechGuide = speechGuide ?? NoopRoutineSpeechGuide()
         self.feedbackPerformer = feedbackPerformer ?? NoopRoutineFeedbackPerformer()
-        self.notificationScheduler = notificationScheduler ?? NoopRoutineNotificationScheduler()
+        notificationCoordinator = ChildRoutineNotificationCoordinator(
+            scheduler: notificationScheduler ?? NoopRoutineNotificationScheduler(),
+            isSchedulingEnabled: isNotificationSchedulingEnabled
+        )
         self.now = now
         self.calendar = calendar
         self.locale = locale
-        self.isNotificationSchedulingEnabled = isNotificationSchedulingEnabled
         today = DailyLog.localDateString(for: now(), calendar: calendar)
     }
 
@@ -399,40 +399,26 @@ final class ChildRoutineViewModel {
     }
 
     private func requestNotificationAuthorizationAndRescheduleIfNeeded() {
-        guard isNotificationSchedulingEnabled else { return }
-        guard !didRequestNotificationAuthorization else {
-            rescheduleNotifications()
-            return
-        }
-        didRequestNotificationAuthorization = true
-        Task { [weak self, notificationScheduler] in
-            _ = await notificationScheduler.requestAuthorizationIfNeeded()
-            await MainActor.run {
-                self?.rescheduleNotifications()
-            }
+        notificationCoordinator.requestAuthorizationAndRescheduleIfNeeded { [weak self] in
+            self?.notificationSnapshot
         }
     }
 
     private func rescheduleNotifications() {
-        guard isNotificationSchedulingEnabled else { return }
-        guard let settings else { return }
-        let routines = plannedRoutines
-        let completedRoutineIDs = completedRoutineIDs
-        let date = today
-        let now = now()
-        let calendar = calendar
-        let locale = locale()
-        Task { [notificationScheduler] in
-            await notificationScheduler.rescheduleTodayReminders(
-                routines: routines,
-                completedRoutineIDs: completedRoutineIDs,
-                date: date,
-                settings: settings,
-                now: now,
-                calendar: calendar,
-                locale: locale
-            )
-        }
+        notificationCoordinator.reschedule(notificationSnapshot)
+    }
+
+    private var notificationSnapshot: ChildRoutineNotificationSnapshot? {
+        guard let settings else { return nil }
+        return ChildRoutineNotificationSnapshot(
+            routines: plannedRoutines,
+            completedRoutineIDs: completedRoutineIDs,
+            date: today,
+            settings: settings,
+            now: now(),
+            calendar: calendar,
+            locale: locale()
+        )
     }
 
     private func scheduleAutomaticTransitionIfNeeded() {
