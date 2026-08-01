@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -288,61 +287,6 @@ internal fun SplitRoutineLayout(
                 else -> EmptyRoutineContent()
             }
         }
-    }
-}
-
-@Composable
-internal fun ChildHeader(
-    title: String,
-    subtitle: String,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall)) {
-        Text(
-            text = title,
-            color = if (title == stringResource(R.string.child_feedback_title)) {
-                SteppieTheme.colors.success
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            style = SteppieTheme.typography.childCardTitle,
-        )
-        Text(
-            text = subtitle,
-            color = MaterialTheme.colorScheme.onSurface,
-            style = SteppieTheme.typography.guardianCaption,
-        )
-    }
-}
-
-@Composable
-internal fun ProgressIndicator(completed: Int, total: Int) {
-    val description = stringResource(R.string.a11y_progress, completed, total)
-    Row(
-        modifier = Modifier
-            .tutorialAnchor(TutorialTarget.ChildProgress)
-            .semantics(mergeDescendants = true) { contentDescription = description },
-        horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        repeat(total) { index ->
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (index < completed) {
-                            SteppieTheme.colors.progressComplete
-                        } else {
-                            SteppieTheme.colors.progressPending
-                        },
-                    ),
-            )
-        }
-        Text(
-            text = stringResource(R.string.child_progress_label, completed, total),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = SteppieTheme.typography.childProgress,
-        )
     }
 }
 
