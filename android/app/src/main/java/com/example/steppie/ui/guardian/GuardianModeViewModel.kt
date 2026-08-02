@@ -723,7 +723,7 @@ class GuardianModeViewModel(
     fun confirmDelete() {
         val routineId = _uiState.value.pendingDeleteRoutineId ?: return
         viewModelScope.launch {
-            routineRepository.deleteRoutine(routineId)
+            routineRepository.deleteRoutine(routineId, clockProvider.now())
             _uiState.update(GuardianDeletionReducer::routineDeleted)
         }
     }
@@ -747,7 +747,7 @@ class GuardianModeViewModel(
                 }
                 routineRepository.updateRoutineSet(target.copy(isActive = false, updatedAt = clockProvider.now()))
             }
-            routineRepository.deleteRoutineSet(target.id)
+            routineRepository.deleteRoutineSet(target.id, clockProvider.now())
             _uiState.update(GuardianDeletionReducer::routineSetDeleted)
         }
     }
@@ -762,7 +762,7 @@ class GuardianModeViewModel(
         val moved = ids.removeAt(index)
         ids.add(target, moved)
         viewModelScope.launch {
-            routineRepository.reorderRoutines(setId, ids)
+            routineRepository.reorderRoutines(setId, ids, clockProvider.now())
         }
     }
 

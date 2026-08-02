@@ -309,6 +309,10 @@ class GuardianModeViewModelTest {
             assertEquals(initialIds[1], reorderedIds[0])
             assertEquals(initialIds[0], reorderedIds[1])
             assertEquals(initialIds.drop(2), reorderedIds.drop(2))
+            assertTrue(
+                fixture.routineRepository.observeRoutineSets().first().single().routines
+                    .all { it.updatedAt == TestInstant },
+            )
         } finally {
             viewModel.viewModelScope.cancel()
         }
@@ -424,8 +428,10 @@ class GuardianModeViewModelTest {
             viewModel.confirmDelete()
             runCurrent()
 
-            val routines = fixture.routineRepository.observeRoutineSets().first().single().routines
-            assertTrue(routines.none { it.id == routineId })
+            val routineSet = fixture.routineRepository.observeRoutineSetsForRecords().first().single()
+            val deletedRoutine = routineSet.routines.single { it.id == routineId }
+            assertEquals(TestInstant, deletedRoutine.updatedAt)
+            assertEquals(TestInstant, deletedRoutine.deletedAt)
             assertNull(viewModel.uiState.value.pendingDeleteRoutineId)
             assertEquals(GuardianDestination.RoutineEdit, viewModel.uiState.value.destination)
         } finally {
@@ -470,6 +476,10 @@ class GuardianModeViewModelTest {
             val remaining = fixture.routineRepository.observeRoutineSets().first().single()
             assertEquals(replacement.id, remaining.id)
             assertTrue(remaining.isActive)
+            val deleted = fixture.routineRepository.observeRoutineSetsForRecords().first()
+                .single { it.id == activeId }
+            assertEquals(TestInstant, deleted.updatedAt)
+            assertEquals(TestInstant, deleted.deletedAt)
             assertNull(viewModel.uiState.value.pendingDeleteRoutineSetId)
             assertTrue(viewModel.uiState.value.routineSetListEditing)
         } finally {
