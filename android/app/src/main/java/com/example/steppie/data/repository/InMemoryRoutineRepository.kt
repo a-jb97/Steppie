@@ -1,7 +1,7 @@
 package com.example.steppie.data.repository
 
 import com.example.steppie.domain.model.DailyLog
-import com.example.steppie.domain.model.LogStatus
+import com.example.steppie.domain.model.DailyLogTransition
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
 import com.example.steppie.domain.model.requireUuidV4
@@ -205,15 +205,13 @@ class InMemoryRoutineRepository(
         val routine = requireNotNull(getRoutine(routineId)) { "Routine not found: $routineId" }
         val key = date to routineId
         val existing = logs.value[key]
-        val saved = DailyLog(
-            id = existing?.id ?: com.example.steppie.domain.model.newUuidV4(),
+        val saved = DailyLogTransition.complete(
+            existing = existing,
+            newLogId = existing?.id ?: com.example.steppie.domain.model.newUuidV4(),
             date = date,
             routineId = routineId,
             routineSetId = routine.routineSetId,
-            status = LogStatus.Completed,
             completedAt = completedAt,
-            createdAt = existing?.createdAt ?: completedAt,
-            updatedAt = completedAt,
         )
         logs.value = logs.value + (key to saved)
         saved
@@ -228,14 +226,12 @@ class InMemoryRoutineRepository(
         val routine = requireNotNull(getRoutine(routineId)) { "Routine not found: $routineId" }
         val key = date to routineId
         val existing = logs.value[key]
-        val saved = DailyLog(
-            id = existing?.id ?: com.example.steppie.domain.model.newUuidV4(),
+        val saved = DailyLogTransition.undo(
+            existing = existing,
+            newLogId = existing?.id ?: com.example.steppie.domain.model.newUuidV4(),
             date = date,
             routineId = routineId,
             routineSetId = routine.routineSetId,
-            status = LogStatus.Undone,
-            completedAt = null,
-            createdAt = existing?.createdAt ?: updatedAt,
             updatedAt = updatedAt,
         )
         logs.value = logs.value + (key to saved)
