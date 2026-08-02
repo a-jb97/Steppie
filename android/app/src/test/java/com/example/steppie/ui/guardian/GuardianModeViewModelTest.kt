@@ -106,6 +106,59 @@ class GuardianModeViewModelTest {
     }
 
     @Test
+    fun `closing guardian resets session state while preserving observed routine data`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val routineSets = viewModel.uiState.value.routineSets
+            val selectedRoutineSetId = viewModel.uiState.value.selectedRoutineSetId
+            viewModel.openRoutineEdit()
+            viewModel.openNewRoutineEditor()
+            viewModel.updateDraftTitle("임시 활동")
+
+            viewModel.closeToChild()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.isActive)
+            assertFalse(state.isAuthenticated)
+            assertEquals(GuardianDestination.Pin, state.destination)
+            assertNull(state.draft)
+            assertEquals(routineSets, state.routineSets)
+            assertEquals(selectedRoutineSetId, state.selectedRoutineSetId)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `closing setup recovery code ends guardian session with pin configured`() = runTest {
+        val fixture = guardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            viewModel.openInitialSetup()
+            inputPin(viewModel, "1234")
+            inputPin(viewModel, "1234")
+            runCurrent()
+
+            assertEquals(GuardianRecoveryStep.ShowCode, viewModel.uiState.value.recoveryStep)
+
+            viewModel.closeRecoveryCode()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.isActive)
+            assertFalse(state.isAuthenticated)
+            assertTrue(state.hasGuardianPin)
+            assertEquals(GuardianDestination.Pin, state.destination)
+            assertNull(state.recoveryStep)
+            assertNull(state.recoveryCodeToShow)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
     fun `guardian navigation returns through its back stack and clears transient drafts`() = runTest {
         val fixture = authenticatedGuardianFixture()
         val viewModel = fixture.viewModel

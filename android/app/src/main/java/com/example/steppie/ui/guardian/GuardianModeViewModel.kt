@@ -189,23 +189,12 @@ class GuardianModeViewModel(
     fun closeToChild() {
         verifiedPinForChange = null
         verifiedRecoveryCodeForReset = null
-        _uiState.update {
-            initialState().copy(
-                hasGuardianPin = it.hasGuardianPin,
-                appSettings = it.appSettings,
-                routineSets = it.routineSets,
-                activeRoutineSet = it.activeRoutineSet,
-                todayRoutineSetId = it.todayRoutineSetId,
-                selectedRoutineSetId = it.selectedRoutineSetId,
-                routines = it.routines,
-            )
-        }
+        val resetState = initialState()
+        _uiState.update { GuardianSessionReducer.closeToChild(it, resetState) }
     }
 
     fun markInteraction() {
-        if (_uiState.value.isActive && _uiState.value.isAuthenticated) {
-            _uiState.update { it.copy(interactionToken = it.interactionToken + 1) }
-        }
+        _uiState.update(GuardianSessionReducer::markInteraction)
     }
 
     fun inputPinDigit(digit: Int) {
@@ -364,20 +353,12 @@ class GuardianModeViewModel(
 
     fun closeRecoveryCode() {
         verifiedRecoveryCodeForReset = null
-        _uiState.update {
-            if (it.pinMode == GuardianPinMode.SetupConfirm) {
-                pendingSetupPin = null
-                return@update initialState().copy(
-                    hasGuardianPin = true,
-                    appSettings = it.appSettings,
-                    routineSets = it.routineSets,
-                    activeRoutineSet = it.activeRoutineSet,
-                    todayRoutineSetId = it.todayRoutineSetId,
-                    selectedRoutineSetId = it.selectedRoutineSetId,
-                    routines = it.routines,
-                )
-            }
-            GuardianRecoveryReducer.close(it)
+        if (_uiState.value.pinMode == GuardianPinMode.SetupConfirm) {
+            pendingSetupPin = null
+            val resetState = initialState()
+            _uiState.update { GuardianSessionReducer.closeAfterSetup(it, resetState) }
+        } else {
+            _uiState.update(GuardianRecoveryReducer::close)
         }
     }
 
@@ -819,16 +800,11 @@ class GuardianModeViewModel(
     }
 
     fun showOutOfScopeNotice() {
-        _uiState.update {
-            it.copy(
-                notice = "이 기능은 이후 스프린트에서 구현합니다.",
-                interactionToken = it.interactionToken + 1,
-            )
-        }
+        _uiState.update(GuardianSessionReducer::showOutOfScopeNotice)
     }
 
     fun clearNotice() {
-        _uiState.update { it.copy(notice = null) }
+        _uiState.update(GuardianSessionReducer::clearNotice)
     }
 
     fun navigateBack() {
