@@ -2,6 +2,7 @@ package com.example.steppie.ui.guardian
 
 import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.RoutineSet
+import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import org.junit.Assert.assertEquals
@@ -158,5 +159,6 @@ class GuardianRecordsReducerTest {
     private fun activeRoutineSet() = RoutineSet(
         name = LocalizedText(mapOf("ko" to "아침 루틴")),
         isActive = true,
+        createdAt = Instant.parse("2026-08-02T00:00:00Z"),
     )
 }

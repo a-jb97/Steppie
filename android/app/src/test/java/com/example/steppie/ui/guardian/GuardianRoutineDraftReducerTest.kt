@@ -3,6 +3,7 @@ package com.example.steppie.ui.guardian
 import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.Routine
+import java.time.Instant
 import java.time.LocalTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -127,5 +128,6 @@ class GuardianRoutineDraftReducerTest {
         colorToken = "color.card.mint",
         order = 0,
         scheduledTime = LocalTime.of(8, 15),
+        createdAt = Instant.parse("2026-01-02T00:00:00Z"),
     )
 }

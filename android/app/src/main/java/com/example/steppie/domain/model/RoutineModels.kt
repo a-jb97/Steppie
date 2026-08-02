@@ -88,7 +88,7 @@ data class Routine(
     val order: Int,
     val scheduledTime: LocalTime? = null,
     val isActive: Boolean = true,
-    val createdAt: Instant = Instant.now(),
+    val createdAt: Instant,
     val updatedAt: Instant = createdAt,
     val deletedAt: Instant? = null,
 ) {
@@ -111,7 +111,7 @@ data class RoutineSet(
     val name: LocalizedText,
     val isActive: Boolean = false,
     val startTime: LocalTime? = null,
-    val createdAt: Instant = Instant.now(),
+    val createdAt: Instant,
     val updatedAt: Instant = createdAt,
     val deletedAt: Instant? = null,
     val routines: List<Routine> = emptyList(),
@@ -199,7 +199,7 @@ data class DailyLog(
     val routineSetId: String,
     val status: LogStatus = LogStatus.Undone,
     val completedAt: Instant? = null,
-    val createdAt: Instant = Instant.now(),
+    val createdAt: Instant,
     val updatedAt: Instant = createdAt,
 ) {
     init {
