@@ -12,6 +12,7 @@ import com.example.steppie.data.local.SteppieDatabase
 import com.example.steppie.data.photo.RoutinePhotoStore
 import com.example.steppie.data.repository.DataStoreAppSettingsRepository
 import com.example.steppie.data.repository.RoomRoutineRepository
+import com.example.steppie.data.security.Pbkdf2PinCredentialService
 import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.domain.repository.RoutineRepository
 import com.example.steppie.notifications.AndroidRoutineNotificationScheduler
@@ -31,7 +32,10 @@ class AppContainer(context: Context) {
         RoomRoutineRepository(database)
     }
     val appSettingsRepository: AppSettingsRepository by lazy {
-        DataStoreAppSettingsRepository(appContext)
+        DataStoreAppSettingsRepository(
+            context = appContext,
+            pinCredentials = Pbkdf2PinCredentialService(),
+        )
     }
     val tutorialProgressRepository: TutorialProgressRepository by lazy {
         TutorialProgressRepository(appContext)

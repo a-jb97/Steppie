@@ -7,25 +7,20 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.steppie.data.security.PinCredentialService
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.FeedbackIntensity
 import com.example.steppie.domain.repository.AppSettingsRepository
-import java.security.SecureRandom
-import java.security.spec.KeySpec
 import java.time.LocalTime
-import java.util.Base64
-import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.PBEKeySpec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.appSettingsDataStore by preferencesDataStore(name = "app_settings")
-private val pinPattern = Regex("^\\d{4}$")
-private val recoveryCodePattern = Regex("^\\d{6}$")
 
 class DataStoreAppSettingsRepository(
     context: Context,
+    private val pinCredentials: PinCredentialService,
 ) : AppSettingsRepository {
     private val dataStore = context.applicationContext.appSettingsDataStore
 
@@ -78,45 +73,45 @@ class DataStoreAppSettingsRepository(
     }
 
     override suspend fun setGuardianPin(pin: String): String {
-        require(pin.matches(pinPattern)) { "Guardian PIN must be exactly 4 digits." }
-        val recoveryCode = generateRecoveryCode()
+        require(pinCredentials.isValidPin(pin)) { "Guardian PIN must be exactly 4 digits." }
+        val recoveryCode = pinCredentials.generateRecoveryCode()
         dataStore.edit { preferences ->
-            preferences[Keys.GuardianPinHash] = PinHashing.hash(pin)
-            preferences[Keys.RecoveryCodeHash] = PinHashing.hash(recoveryCode)
+            preferences[Keys.GuardianPinHash] = pinCredentials.hash(pin)
+            preferences[Keys.RecoveryCodeHash] = pinCredentials.hash(recoveryCode)
         }
         return recoveryCode
     }
 
     override suspend fun verifyGuardianPin(pin: String): Boolean {
-        if (!pin.matches(pinPattern)) return false
+        if (!pinCredentials.isValidPin(pin)) return false
         val storedHash = dataStore.data.first()[Keys.GuardianPinHash] ?: return false
-        return PinHashing.verify(pin, storedHash)
+        return pinCredentials.verify(pin, storedHash)
     }
 
     override suspend fun verifyRecoveryCode(recoveryCode: String): Boolean {
-        if (!recoveryCode.matches(recoveryCodePattern)) return false
+        if (!pinCredentials.isValidRecoveryCode(recoveryCode)) return false
         val storedHash = dataStore.data.first()[Keys.RecoveryCodeHash] ?: return false
-        return PinHashing.verify(recoveryCode, storedHash)
+        return pinCredentials.verify(recoveryCode, storedHash)
     }
 
     override suspend fun changeGuardianPin(currentPin: String, newPin: String): String? {
-        require(newPin.matches(pinPattern)) { "Guardian PIN must be exactly 4 digits." }
+        require(pinCredentials.isValidPin(newPin)) { "Guardian PIN must be exactly 4 digits." }
         if (!verifyGuardianPin(currentPin)) return null
         return setGuardianPin(newPin)
     }
 
     override suspend fun regenerateRecoveryCode(currentPin: String): String? {
         if (!verifyGuardianPin(currentPin)) return null
-        val recoveryCode = generateRecoveryCode()
+        val recoveryCode = pinCredentials.generateRecoveryCode()
         dataStore.edit { preferences ->
-            preferences[Keys.RecoveryCodeHash] = PinHashing.hash(recoveryCode)
+            preferences[Keys.RecoveryCodeHash] = pinCredentials.hash(recoveryCode)
         }
         return recoveryCode
     }
 
     override suspend fun resetGuardianPinWithRecoveryCode(recoveryCode: String, newPin: String): String? {
-        require(newPin.matches(pinPattern)) { "Guardian PIN must be exactly 4 digits." }
-        if (!recoveryCode.matches(recoveryCodePattern)) return null
+        require(pinCredentials.isValidPin(newPin)) { "Guardian PIN must be exactly 4 digits." }
+        if (!pinCredentials.isValidRecoveryCode(recoveryCode)) return null
         if (!verifyRecoveryCode(recoveryCode)) return null
         return setGuardianPin(newPin)
     }
@@ -137,51 +132,6 @@ class DataStoreAppSettingsRepository(
         val Locale = stringPreferencesKey("locale")
     }
 }
-
-object PinHashing {
-    private const val Algorithm = "PBKDF2WithHmacSHA256"
-    private const val Iterations = 120_000
-    private const val KeyLengthBits = 256
-    private val secureRandom = SecureRandom()
-
-    fun hash(value: String): String {
-        require(value.matches(pinPattern) || value.matches(recoveryCodePattern)) {
-            "PIN values must be 4 digits and recovery codes must be 6 digits."
-        }
-        val salt = ByteArray(16).also(secureRandom::nextBytes)
-        val encoded = derive(value, salt, Iterations)
-        return listOf(
-            "pbkdf2-sha256",
-            Iterations.toString(),
-            Base64.getEncoder().encodeToString(salt),
-            Base64.getEncoder().encodeToString(encoded),
-        ).joinToString("$")
-    }
-
-    fun verify(value: String, storedHash: String): Boolean {
-        val parts = storedHash.split('$')
-        if (parts.size != 4 || parts[0] != "pbkdf2-sha256") return false
-        val iterations = parts[1].toIntOrNull() ?: return false
-        val salt = runCatching { Base64.getDecoder().decode(parts[2]) }.getOrNull() ?: return false
-        val expected = runCatching { Base64.getDecoder().decode(parts[3]) }.getOrNull() ?: return false
-        val actual = derive(value, salt, iterations)
-        return constantTimeEquals(expected, actual)
-    }
-
-    private fun derive(value: String, salt: ByteArray, iterations: Int): ByteArray {
-        val spec: KeySpec = PBEKeySpec(value.toCharArray(), salt, iterations, KeyLengthBits)
-        return SecretKeyFactory.getInstance(Algorithm).generateSecret(spec).encoded
-    }
-
-    private fun constantTimeEquals(left: ByteArray, right: ByteArray): Boolean {
-        if (left.size != right.size) return false
-        var result = 0
-        left.indices.forEach { index -> result = result or (left[index].toInt() xor right[index].toInt()) }
-        return result == 0
-    }
-}
-
-private fun generateRecoveryCode(): String = (SecureRandom().nextInt(900_000) + 100_000).toString()
 
 private fun String.toLeadTimes(): List<Int> {
     if (isBlank()) return emptyList()
