@@ -1,8 +1,8 @@
 package com.example.steppie.ui.guardian
 
 import com.example.steppie.domain.model.AppSettings
-import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.domain.model.inRoutineOrder
 import java.time.LocalDate
 
 internal object GuardianRepositoryReducer {
@@ -31,7 +31,7 @@ internal object GuardianRepositoryReducer {
             activeRoutineSet = selectedSet,
             todayRoutineSetId = todaySet?.id,
             selectedRoutineSetId = selectedSetId,
-            routines = selectedSet?.routines.orEmpty().sortedBy(Routine::order),
+            routines = selectedSet?.routines.orEmpty().inRoutineOrder(),
         )
         return GuardianRecordsReducer.repositoryDataChanged(
             state = repositoryState,

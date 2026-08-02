@@ -11,6 +11,8 @@ import com.example.steppie.domain.model.DailyLog
 import com.example.steppie.domain.model.DailyLogTransition
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.domain.model.childRoutineSetsInScheduleOrder
+import com.example.steppie.domain.model.inRoutineOrder
 import com.example.steppie.domain.model.newUuidV4
 import com.example.steppie.domain.model.requireUuidV4
 import com.example.steppie.domain.repository.RoutineRepository
@@ -38,13 +40,7 @@ class RoomRoutineRepository(
     override fun observeRoutineSetsForDate(date: LocalDate): Flow<List<RoutineSet>> =
         dao.observeRoutineSets().map { sets ->
             sets.map { it.toDomain() }
-                .filter(RoutineSet::isActive)
-                .sortedWith(
-                    compareBy<RoutineSet> { it.startTime != null }
-                        .thenBy { it.startTime }
-                        .thenBy { it.createdAt }
-                        .thenBy { it.id },
-                )
+                .childRoutineSetsInScheduleOrder()
         }
 
     override fun observeRoutineSetForDate(date: LocalDate): Flow<RoutineSet?> =
@@ -83,7 +79,7 @@ class RoomRoutineRepository(
     override suspend fun createRoutineSet(routineSet: RoutineSet): RoutineSet = database.withTransaction {
         check(dao.getRoutineSetEntity(routineSet.id) == null) { "RoutineSet already exists: ${routineSet.id}" }
         dao.insertRoutineSet(routineSet.toEntity())
-        routineSet.routines.sortedBy(Routine::order).forEach { dao.insertRoutine(it.toEntity()) }
+        routineSet.routines.inRoutineOrder().forEach { dao.insertRoutine(it.toEntity()) }
         requireNotNull(dao.getRoutineSet(routineSet.id)).toDomain()
     }
 

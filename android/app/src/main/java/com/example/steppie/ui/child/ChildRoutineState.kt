@@ -3,6 +3,9 @@ package com.example.steppie.ui.child
 import com.example.steppie.domain.model.FeedbackIntensity
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.domain.model.childRoutineSetsInScheduleOrder
+import com.example.steppie.domain.model.childRoutinesInOrder
+import com.example.steppie.domain.model.isAvailableToChild
 import java.time.LocalTime
 
 enum class ChildSinglePane { Focus, List }
@@ -70,16 +73,9 @@ internal fun resolveRoutineSchedule(
     completedRoutineIds: Set<String>,
     now: LocalTime,
 ): RoutineScheduleResolution {
-    val scheduledSets = routineSets
-        .filter { it.isActive && it.deletedAt == null }
-        .sortedWith(
-            compareBy<RoutineSet> { it.startTime != null }
-                .thenBy { it.startTime }
-                .thenBy { it.createdAt }
-                .thenBy { it.id },
-        )
+    val scheduledSets = routineSets.childRoutineSetsInScheduleOrder()
     val firstIncomplete = scheduledSets.firstOrNull { set ->
-        set.routines.any { it.isActive && it.deletedAt == null && it.id !in completedRoutineIds }
+        set.routines.any { it.isAvailableToChild && it.id !in completedRoutineIds }
     }
     if (firstIncomplete == null) {
         return RoutineScheduleResolution(
@@ -104,9 +100,7 @@ internal fun childRoutineState(
     undoRoutineId: String? = null,
     feedbackIntensity: FeedbackIntensity = FeedbackIntensity.Normal,
 ): ChildRoutineUiState {
-    val visibleRoutines = routines
-        .filter { it.isActive && it.deletedAt == null }
-        .sortedBy(Routine::order)
+    val visibleRoutines = routines.childRoutinesInOrder()
     val visibleIds = visibleRoutines.mapTo(mutableSetOf(), Routine::id)
     val resolvedCompletedIds = completedRoutineIds.intersect(visibleIds)
     val resolvedFeedbackId = feedbackRoutineId?.takeIf { it in visibleIds }
@@ -152,11 +146,11 @@ internal fun scheduledChildRoutineState(
         feedbackIntensity = feedbackIntensity,
     )
     val allVisibleRoutines = routineSets
-        .filter { it.isActive && it.deletedAt == null }
-        .flatMap { set -> set.routines.filter { it.isActive && it.deletedAt == null } }
+        .childRoutineSetsInScheduleOrder()
+        .flatMap { set -> set.routines.childRoutinesInOrder() }
     val progressRoutines = when {
-        displaySet != null -> displaySet.routines.filter { it.isActive && it.deletedAt == null }
-        resolution.waitingSet != null -> resolution.waitingSet.routines.filter { it.isActive && it.deletedAt == null }
+        displaySet != null -> displaySet.routines.childRoutinesInOrder()
+        resolution.waitingSet != null -> resolution.waitingSet.routines.childRoutinesInOrder()
         resolution.allComplete -> allVisibleRoutines
         else -> emptyList()
     }

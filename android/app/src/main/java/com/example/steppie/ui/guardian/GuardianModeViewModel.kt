@@ -16,6 +16,8 @@ import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.domain.model.isAvailableToChild
+import com.example.steppie.domain.model.isVisible
 import com.example.steppie.domain.model.newUuidV4
 import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.domain.repository.RoutineRepository
@@ -92,7 +94,7 @@ class GuardianModeViewModel(
                 GuardianRepositorySnapshot(
                     settings = settings,
                     today = routineSetsAndTodaySelection.date,
-                    visibleRoutineSets = routineSetsAndTodaySelection.routineSets.filter { it.deletedAt == null },
+                    visibleRoutineSets = routineSetsAndTodaySelection.routineSets.filter(RoutineSet::isVisible),
                     todayRoutineSetId = routineSetsAndTodaySelection.todayRoutineSetId,
                     recordRoutineSets = recordRoutineSets,
                     dailyLogs = dailyLogs,
@@ -119,7 +121,7 @@ class GuardianModeViewModel(
                         routineSets = snapshot.recordRoutineSets,
                         dailyLogs = snapshot.allDailyLogs,
                         routineSetsForSelectedDate = snapshot.visibleRoutineSets
-                            .filter(RoutineSet::isActive)
+                            .filter(RoutineSet::isAvailableToChild)
                             .takeIf { selectedCalendarDate == snapshot.today }
                             .orEmpty(),
                         fallbackDate = snapshot.today,
@@ -207,7 +209,7 @@ class GuardianModeViewModel(
             selectedDate = today,
             routineSets = recordRoutineSetsCache,
             dailyLogs = allDailyLogsCache,
-            routineSetsForSelectedDate = current.routineSets.filter(RoutineSet::isActive),
+            routineSetsForSelectedDate = current.routineSets.filter(RoutineSet::isAvailableToChild),
             fallbackDate = today,
             localeTag = localeProvider.languageTag(),
             zoneId = clockProvider.zoneId,
@@ -238,7 +240,7 @@ class GuardianModeViewModel(
             routineSets = recordRoutineSetsCache,
             dailyLogs = allDailyLogsCache,
             routineSetsForSelectedDate = current.routineSets
-                .filter(RoutineSet::isActive)
+                .filter(RoutineSet::isAvailableToChild)
                 .takeIf { date == today }
                 .orEmpty(),
             fallbackDate = today,
@@ -1092,7 +1094,7 @@ private fun buildGuardianRecordRoutines(
                     .thenBy { it.createdAt },
             )
             .flatMap(RoutineSet::routines)
-            .filter { it.existedOn(date, zoneId) && it.deletedAt == null && it.isActive }
+            .filter { it.existedOn(date, zoneId) && it.isAvailableToChild }
             .sortedWith(compareBy<Routine> { it.order }.thenBy { it.createdAt }.thenBy { it.id })
             .map { routine ->
                 GuardianRecordRoutine(

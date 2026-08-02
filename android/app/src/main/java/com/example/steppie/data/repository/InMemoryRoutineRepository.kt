@@ -4,7 +4,10 @@ import com.example.steppie.domain.model.DailyLog
 import com.example.steppie.domain.model.DailyLogTransition
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.domain.model.childRoutineSetsInScheduleOrder
+import com.example.steppie.domain.model.isVisible
 import com.example.steppie.domain.model.requireUuidV4
+import com.example.steppie.domain.model.visibleRoutinesInOrder
 import com.example.steppie.domain.repository.RoutineRepository
 import java.time.Instant
 import java.time.LocalDate
@@ -25,7 +28,7 @@ class InMemoryRoutineRepository(
     private val selections = MutableStateFlow<Map<LocalDate, String>>(emptyMap())
 
     override fun observeRoutineSets(): Flow<List<RoutineSet>> = state
-        .map { sets -> sets.values.filter { it.deletedAt == null }.sortedBy { it.createdAt }.map(::visible) }
+        .map { sets -> sets.values.filter(RoutineSet::isVisible).sortedBy { it.createdAt }.map(::visible) }
         .distinctUntilChanged()
 
     override fun observeRoutineSetsForRecords(): Flow<List<RoutineSet>> = state
@@ -40,14 +43,8 @@ class InMemoryRoutineRepository(
     override fun observeRoutineSetsForDate(date: LocalDate): Flow<List<RoutineSet>> = state
         .map { sets ->
             sets.values
-                .filter { it.deletedAt == null && it.isActive }
                 .map(::visible)
-                .sortedWith(
-                    compareBy<RoutineSet> { it.startTime != null }
-                        .thenBy { it.startTime }
-                        .thenBy { it.createdAt }
-                        .thenBy { it.id },
-                )
+                .childRoutineSetsInScheduleOrder()
         }
         .distinctUntilChanged()
 
@@ -158,7 +155,7 @@ class InMemoryRoutineRepository(
         val set = requireNotNull(state.value[routineSetId]?.takeIf { it.deletedAt == null }) {
             "RoutineSet not found: $routineSetId"
         }
-        val visible = set.routines.filter { it.deletedAt == null }
+        val visible = set.routines.filter(Routine::isVisible)
         check(orderedRoutineIds.size == orderedRoutineIds.distinct().size &&
             orderedRoutineIds.toSet() == visible.map { it.id }.toSet()) {
             "orderedRoutineIds must contain every visible routine in the set exactly once."
@@ -247,13 +244,13 @@ class InMemoryRoutineRepository(
     ) { "Routine not found: $id" }
 
     private fun visible(set: RoutineSet): RoutineSet = set.copy(
-        routines = set.routines.filter { it.deletedAt == null }.sortedBy(Routine::order),
+        routines = set.routines.visibleRoutinesInOrder(),
     )
 
     private fun List<Routine>.renumberVisible(updatedAt: Instant): List<Routine> {
         var next = 0
         return map { routine ->
-            if (routine.deletedAt == null) routine.copy(order = next++, updatedAt = updatedAt) else routine
+            if (routine.isVisible) routine.copy(order = next++, updatedAt = updatedAt) else routine
         }
     }
 

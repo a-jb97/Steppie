@@ -1,7 +1,7 @@
 package com.example.steppie.ui.guardian
 
-import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.domain.model.inRoutineOrder
 
 internal object GuardianRoutineSetReducer {
     fun toggleListEditing(state: GuardianModeUiState): GuardianModeUiState = state.copy(
@@ -19,7 +19,7 @@ internal object GuardianRoutineSetReducer {
     ): GuardianModeUiState = state.copy(
         activeRoutineSet = routineSet,
         selectedRoutineSetId = routineSet.id,
-        routines = routineSet.routines.sortedBy(Routine::order),
+        routines = routineSet.routines.inRoutineOrder(),
         draftError = null,
         interactionToken = state.interactionToken + 1,
     )

@@ -3,6 +3,7 @@ package com.example.steppie.notifications
 import com.example.steppie.core.environment.LocaleProvider
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.Routine
+import com.example.steppie.domain.model.isAvailableToChild
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -32,7 +33,7 @@ class RoutineNotificationPlanner(
     ): List<RoutineNotificationRequest> {
         val localeTag = settings.locale ?: localeProvider.languageTag()
         return routines
-            .filter { it.isActive && it.deletedAt == null && it.id !in completedRoutineIds }
+            .filter { it.isAvailableToChild && it.id !in completedRoutineIds }
             .flatMap { routine ->
                 val scheduledTime = routine.scheduledTime ?: return@flatMap emptyList()
                 settings.notificationLeadTimes.mapNotNull { leadMinutes ->

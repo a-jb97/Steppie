@@ -125,7 +125,7 @@ data class RoutineSet(
         require(deletedAt == null || deletedAt >= createdAt) { "RoutineSet.deletedAt cannot precede createdAt." }
         require(!(isActive && deletedAt != null)) { "An active RoutineSet cannot be deleted." }
         require(routines.all { it.routineSetId == id }) { "Every routine must belong to this RoutineSet." }
-        val visible = routines.filter { it.deletedAt == null }
+        val visible = routines.filter(Routine::isVisible)
         require(visible.map(Routine::order).distinct().size == visible.size) {
             "Visible routine orders must be unique within a RoutineSet."
         }
