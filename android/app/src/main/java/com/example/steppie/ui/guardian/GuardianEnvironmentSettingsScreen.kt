@@ -37,12 +37,12 @@ import androidx.compose.ui.unit.dp
 import com.example.steppie.R
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.FeedbackIntensity
+import com.example.steppie.presentation.environment.currentPresentationLocale
 import com.example.steppie.ui.components.SteppieButton
 import com.example.steppie.ui.theme.SteppieCornerRadius
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
-import java.util.Locale
 
 @Composable
 internal fun GuardianEnvironmentSettingsScreen(
@@ -92,7 +92,7 @@ internal fun GuardianEnvironmentSettingsScreen(
                     steps = 9,
                     startLabel = "0.5",
                     endLabel = "1.5",
-                    valueLabel = String.format(Locale.getDefault(), "%.1fx", settings.ttsRate),
+                    valueLabel = String.format(currentPresentationLocale(), "%.1fx", settings.ttsRate),
                     onValueChange = { onTtsRateChange(it.toDouble()) },
                 )
             }

@@ -56,6 +56,7 @@ import androidx.compose.ui.zIndex
 import com.example.steppie.R
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.presentation.environment.currentPresentationLocale
 import com.example.steppie.presentation.formatting.formatLocalizedTime
 import com.example.steppie.ui.child.RoutineIcon
 import com.example.steppie.ui.components.SteppieButton
@@ -65,7 +66,6 @@ import com.example.steppie.ui.theme.SteppieLayout
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
-import java.util.Locale
 
 @Composable
 internal fun GuardianRoutineEditScreen(
@@ -84,6 +84,7 @@ internal fun GuardianRoutineEditScreen(
     onMoveRoutine: (String, Int) -> Unit,
     onShowOutOfScopeNotice: () -> Unit,
 ) {
+    val locale = currentPresentationLocale()
     GuardianScaffold(
         title = stringResource(R.string.guardian_menu_routine),
         subtitle = stringResource(R.string.guardian_routine_edit_subtitle),
@@ -150,7 +151,7 @@ internal fun GuardianRoutineEditScreen(
                         text = stringResource(
                             R.string.guardian_active_routine_steps_title,
                             state.activeRoutineSet?.name
-                                ?.resolve(null, Locale.getDefault().toLanguageTag())
+                                ?.resolve(null, locale.toLanguageTag())
                                 .orEmpty(),
                         ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -225,12 +226,13 @@ private fun RoutineSetRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val locale = currentPresentationLocale()
     val borderColor = if (selected) SteppieTheme.colors.warning else MaterialTheme.colorScheme.outline
-    val routineSetName = routineSet.name.resolve(null, Locale.getDefault().toLanguageTag())
+    val routineSetName = routineSet.name.resolve(null, locale.toLanguageTag())
     val meta = if (routineSet.isActive) {
         stringResource(
             R.string.guardian_routine_set_schedule_meta,
-            routineSet.startTime?.let { formatLocalizedTime(it, Locale.getDefault()) }
+            routineSet.startTime?.let { formatLocalizedTime(it, locale) }
                 ?: stringResource(R.string.guardian_time_none),
             routineSet.routines.size,
         )
@@ -342,6 +344,7 @@ internal fun DailyRoutineSelectionDialog(
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val locale = currentPresentationLocale()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.guardian_daily_routine_prompt_title)) },
@@ -359,7 +362,7 @@ internal fun DailyRoutineSelectionDialog(
                     style = SteppieTheme.typography.guardianCaption,
                 )
                 routineSets.forEach { routineSet ->
-                    val routineSetName = routineSet.name.resolve(null, Locale.getDefault().toLanguageTag())
+                    val routineSetName = routineSet.name.resolve(null, locale.toLanguageTag())
                     val meta = stringResource(R.string.guardian_routine_set_meta, routineSet.routines.size)
                     val accessibilityDescription = stringResource(R.string.a11y_routine_set_row, routineSetName, meta)
                     Row(
@@ -521,11 +524,12 @@ private fun EditableRoutineRow(
     onMove: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val locale = currentPresentationLocale()
     val maxRevealPx = with(LocalDensity.current) { 76.dp.toPx() }
     var swipeOffsetPx by remember(routine.id) { mutableFloatStateOf(0f) }
     var reorderOffsetPx by remember(routine.id) { mutableFloatStateOf(0f) }
     var isReordering by remember(routine.id) { mutableStateOf(false) }
-    val routineTitle = routine.title.resolve(null, Locale.getDefault().toLanguageTag())
+    val routineTitle = routine.title.resolve(null, locale.toLanguageTag())
     val routineMeta = routine.scheduledTime?.toString() ?: stringResource(R.string.guardian_time_none)
     val rowDescription = stringResource(R.string.a11y_routine_edit_row, routineTitle, routineMeta)
     Box(

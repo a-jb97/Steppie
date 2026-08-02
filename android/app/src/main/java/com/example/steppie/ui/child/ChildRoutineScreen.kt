@@ -37,13 +37,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.steppie.R
+import com.example.steppie.presentation.environment.currentPresentationLocale
 import com.example.steppie.ui.theme.SteppieLayout
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
 import com.example.steppie.ui.tutorial.TutorialTarget
 import com.example.steppie.ui.tutorial.tutorialAnchor
-import java.util.Locale
 
 @Composable
 fun ChildRoutineScreen(
@@ -257,7 +257,7 @@ internal fun WaitingRoutineContent(
 ) {
     val setName = state.waitingRoutineSet
         ?.name
-        ?.resolve(null, Locale.getDefault().toLanguageTag())
+        ?.resolve(null, currentPresentationLocale().toLanguageTag())
         .orEmpty()
     val startTime = state.waitingUntil?.toString().orEmpty()
     Box(

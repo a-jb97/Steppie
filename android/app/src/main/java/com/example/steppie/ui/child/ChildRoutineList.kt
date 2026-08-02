@@ -11,19 +11,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.steppie.R
 import com.example.steppie.domain.model.Routine
+import com.example.steppie.presentation.environment.currentPresentationLocale
 import com.example.steppie.ui.components.RoutineCard
 import com.example.steppie.ui.components.RoutineCardState
 import com.example.steppie.ui.theme.SteppieLayout
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.tutorial.TutorialTarget
 import com.example.steppie.ui.tutorial.tutorialAnchor
-import java.util.Locale
 
 @Composable
 internal fun PhoneRoutineList(
@@ -111,10 +110,10 @@ internal fun RoutineList(
 
 @Composable
 internal fun Routine.localizedTitle(): String {
-    val configuration = LocalConfiguration.current
-    val systemLocale = configuration.locales[0]?.toLanguageTag()
-        ?: Locale.getDefault().toLanguageTag()
-    return title.resolve(appLocale = null, systemLocale = systemLocale)
+    return title.resolve(
+        appLocale = null,
+        systemLocale = currentPresentationLocale().toLanguageTag(),
+    )
 }
 
 @Composable

@@ -39,6 +39,8 @@ import com.example.steppie.di.AppContainer
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.notifications.ACTION_OPEN_ROUTINE
 import com.example.steppie.notifications.EXTRA_ROUTINE_ID
+import com.example.steppie.presentation.environment.LocalPresentationClockProvider
+import com.example.steppie.presentation.environment.LocalPresentationLocaleProvider
 import com.example.steppie.presentation.formatting.formatBackupFileName
 import com.example.steppie.ui.app.AppMode
 import com.example.steppie.ui.app.NotificationReconcileEffect
@@ -233,7 +235,11 @@ class MainActivity : ComponentActivity() {
                     showFor = tutorialViewModel::showFor,
                 )
 
-                CompositionLocalProvider(LocalTutorialAnchorRegistry provides tutorialAnchorRegistry) {
+                CompositionLocalProvider(
+                    LocalPresentationClockProvider provides appContainer.clockProvider,
+                    LocalPresentationLocaleProvider provides appContainer.localeProvider,
+                    LocalTutorialAnchorRegistry provides tutorialAnchorRegistry,
+                ) {
                 val appMode = resolveAppMode(
                     bootstrapComplete = appBootstrapComplete,
                     guardianActive = guardianState.isActive,
