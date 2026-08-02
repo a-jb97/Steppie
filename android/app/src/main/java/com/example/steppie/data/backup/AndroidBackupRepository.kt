@@ -2,15 +2,17 @@ package com.example.steppie.data.backup
 
 import android.content.Context
 import android.net.Uri
+import com.example.steppie.core.environment.ClockProvider
 
 class AndroidBackupRepository(
     context: Context,
     private val dataSource: BackupDataSource,
+    private val clockProvider: ClockProvider,
 ) : BackupProvider {
     private val appContext = context.applicationContext
 
     override suspend fun exportTo(uri: Uri) {
-        val snapshot = dataSource.snapshot()
+        val snapshot = dataSource.snapshot(clockProvider.now())
         val output = appContext.contentResolver.openOutputStream(uri)
             ?: throw BackupValidationException("백업 파일을 만들 수 없습니다.")
         output.use {

@@ -7,6 +7,7 @@ import com.example.steppie.data.local.RoutineEntity
 import com.example.steppie.data.local.RoutineSetEntity
 import com.example.steppie.data.local.SteppieDatabase
 import com.example.steppie.data.photo.RoutinePhotoStore
+import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.repository.AppSettingsRepository
 import java.time.Instant
 import kotlinx.coroutines.flow.first
@@ -17,13 +18,16 @@ class BackupDataSource(
     private val routinePhotoStore: RoutinePhotoStore? = null,
     private val dao: RoutineDao = database.routineDao(),
 ) {
-    suspend fun snapshot(exportedAt: Instant = Instant.now()): BackupSnapshot = BackupSnapshot(
-        exportedAt = exportedAt,
-        routineSets = dao.getAllRoutineSetEntities(),
-        routines = dao.getAllRoutineEntities(),
-        dailyLogs = dao.getAllDailyLogEntities(),
-        appSettings = appSettingsRepository.observeAppSettings().first(),
-    )
+    suspend fun snapshot(exportedAt: Instant): BackupSnapshot {
+        val current = currentData()
+        return BackupSnapshot(
+            exportedAt = exportedAt,
+            routineSets = current.routineSets,
+            routines = current.routines,
+            dailyLogs = current.dailyLogs,
+            appSettings = current.appSettings,
+        )
+    }
 
     fun photoBackupAssets(snapshot: BackupSnapshot): Map<String, ByteArray> {
         val store = routinePhotoStore ?: return emptyMap()
@@ -37,7 +41,7 @@ class BackupDataSource(
     }
 
     suspend fun replaceAll(newSnapshot: BackupSnapshot, assets: Map<String, ByteArray> = emptyMap()) {
-        val previous = snapshot()
+        val previous = currentData()
         val previousAssets = routinePhotoStore?.snapshotFiles().orEmpty()
         try {
             replaceRoomData(
@@ -70,4 +74,18 @@ class BackupDataSource(
         dao.insertRoutines(routines)
         dao.insertDailyLogs(dailyLogs)
     }
+
+    private suspend fun currentData(): RestorableBackupData = RestorableBackupData(
+        routineSets = dao.getAllRoutineSetEntities(),
+        routines = dao.getAllRoutineEntities(),
+        dailyLogs = dao.getAllDailyLogEntities(),
+        appSettings = appSettingsRepository.observeAppSettings().first(),
+    )
 }
+
+private data class RestorableBackupData(
+    val routineSets: List<RoutineSetEntity>,
+    val routines: List<RoutineEntity>,
+    val dailyLogs: List<DailyLogEntity>,
+    val appSettings: AppSettings,
+)

@@ -48,6 +48,7 @@ class AppContainer(context: Context) {
         AndroidBackupRepository(
             context = appContext,
             dataSource = BackupDataSource(database, appSettingsRepository, routinePhotoStore),
+            clockProvider = clockProvider,
         )
     }
     val notificationScheduler: RoutineNotificationScheduler by lazy {
