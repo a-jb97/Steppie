@@ -25,14 +25,14 @@ interface RoutineNotificationScheduler {
         routines: List<Routine>,
         completedRoutineIds: Set<String>,
         settings: AppSettings,
-        now: Instant = Instant.now(),
-        date: LocalDate = LocalDate.now(),
+        now: Instant,
+        date: LocalDate,
     )
 }
 
 class AndroidRoutineNotificationScheduler(
     context: Context,
-    private val planner: RoutineNotificationPlanner = RoutineNotificationPlanner(),
+    private val planner: RoutineNotificationPlanner,
 ) : RoutineNotificationScheduler {
     private val appContext = context.applicationContext
     private val alarmManager = appContext.getSystemService(AlarmManager::class.java)

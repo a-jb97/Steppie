@@ -4,6 +4,7 @@ import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.Routine
+import com.example.steppie.testing.TestLocaleProvider
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -15,7 +16,10 @@ import org.junit.Test
 class RoutineNotificationPlannerTest {
     private val date = LocalDate.parse("2026-01-02")
     private val zone = ZoneId.of("UTC")
-    private val planner = RoutineNotificationPlanner(zoneId = zone)
+    private val planner = RoutineNotificationPlanner(
+        zoneId = zone,
+        localeProvider = TestLocaleProvider("ko"),
+    )
 
     @Test
     fun `routines without scheduled time do not create notifications`() {
@@ -96,6 +100,19 @@ class RoutineNotificationPlannerTest {
         )
 
         assertEquals(listOf(5), requests.map { it.leadMinutes })
+    }
+
+    @Test
+    fun `device locale provider resolves a title when app locale is not set`() {
+        val requests = planner.requestsForToday(
+            routines = listOf(routine(scheduledTime = LocalTime.of(8, 0))),
+            completedRoutineIds = emptySet(),
+            settings = AppSettings(notificationLeadTimes = listOf(10), locale = null),
+            now = Instant.parse("2026-01-02T07:00:00Z"),
+            date = date,
+        )
+
+        assertEquals("양치하기", requests.single().routineTitle)
     }
 
     private fun routine(scheduledTime: LocalTime?): Routine = Routine(

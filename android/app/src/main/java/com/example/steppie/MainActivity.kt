@@ -194,6 +194,8 @@ class MainActivity : ComponentActivity() {
                         routines = input.routines,
                         completedRoutineIds = input.completedRoutineIds,
                         settings = input.settings,
+                        now = appContainer.clockProvider.now(),
+                        date = appContainer.clockProvider.today(),
                     )
                 }
                 LaunchedEffect(targetRoutineId, childState.routines) {

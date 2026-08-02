@@ -1,5 +1,6 @@
 package com.example.steppie.notifications
 
+import com.example.steppie.core.environment.LocaleProvider
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.Routine
 import java.time.Instant
@@ -7,7 +8,6 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 
 data class RoutineNotificationRequest(
     val routineId: String,
@@ -20,17 +20,17 @@ data class RoutineNotificationRequest(
 }
 
 class RoutineNotificationPlanner(
-    private val zoneId: ZoneId = ZoneId.systemDefault(),
-    private val localeProvider: () -> Locale = Locale::getDefault,
+    private val zoneId: ZoneId,
+    private val localeProvider: LocaleProvider,
 ) {
     fun requestsForToday(
         routines: List<Routine>,
         completedRoutineIds: Set<String>,
         settings: AppSettings,
-        now: Instant = Instant.now(),
-        date: LocalDate = LocalDate.now(zoneId),
+        now: Instant,
+        date: LocalDate,
     ): List<RoutineNotificationRequest> {
-        val localeTag = settings.locale ?: localeProvider().toLanguageTag()
+        val localeTag = settings.locale ?: localeProvider.languageTag()
         return routines
             .filter { it.isActive && it.deletedAt == null && it.id !in completedRoutineIds }
             .flatMap { routine ->

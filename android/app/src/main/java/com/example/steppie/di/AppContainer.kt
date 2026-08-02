@@ -16,6 +16,7 @@ import com.example.steppie.data.security.Pbkdf2PinCredentialService
 import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.domain.repository.RoutineRepository
 import com.example.steppie.notifications.AndroidRoutineNotificationScheduler
+import com.example.steppie.notifications.RoutineNotificationPlanner
 import com.example.steppie.notifications.RoutineNotificationScheduler
 import com.example.steppie.ui.tutorial.TutorialProgressRepository
 
@@ -50,6 +51,12 @@ class AppContainer(context: Context) {
         )
     }
     val notificationScheduler: RoutineNotificationScheduler by lazy {
-        AndroidRoutineNotificationScheduler(appContext)
+        AndroidRoutineNotificationScheduler(
+            context = appContext,
+            planner = RoutineNotificationPlanner(
+                zoneId = clockProvider.zoneId,
+                localeProvider = localeProvider,
+            ),
+        )
     }
 }
