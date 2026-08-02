@@ -104,13 +104,6 @@ class GuardianModeViewModel(
                 dailyLogsCache = snapshot.dailyLogs
                 allDailyLogsCache = snapshot.allDailyLogs
                 _uiState.update { state ->
-                    val todaySet = snapshot.visibleRoutineSets.firstOrNull { it.id == snapshot.todayRoutineSetId }
-                    val selectedSetId = state.selectedRoutineSetId
-                        ?.takeIf { selectedId -> snapshot.visibleRoutineSets.any { it.id == selectedId } }
-                        ?: todaySet?.id
-                        ?: snapshot.visibleRoutineSets.firstOrNull { it.isActive }?.id
-                        ?: snapshot.visibleRoutineSets.firstOrNull()?.id
-                    val selectedSet = snapshot.visibleRoutineSets.firstOrNull { it.id == selectedSetId }
                     val records = buildGuardianRecords(
                         selectedDate = state.selectedRecordsDate,
                         endDate = snapshot.recordsEndDate,
@@ -133,40 +126,14 @@ class GuardianModeViewModel(
                         localeTag = localeProvider.languageTag(),
                         zoneId = clockProvider.zoneId,
                     )
-                    val resolvedPinMode = if (
-                        state.isActive &&
-                        !state.isAuthenticated &&
-                        state.destination == GuardianDestination.Pin
-                    ) {
-                        if (snapshot.settings.hasGuardianPin) {
-                            GuardianPinMode.Enter
-                        } else if (state.pinMode == GuardianPinMode.SetupConfirm) {
-                            GuardianPinMode.SetupConfirm
-                        } else {
-                            GuardianPinMode.Setup
-                        }
-                    } else {
-                        state.pinMode
-                    }
-                    val nextState = state.copy(
-                        hasGuardianPin = snapshot.settings.hasGuardianPin,
-                        appSettings = snapshot.settings,
-                        pinMode = resolvedPinMode,
-                        routineSets = snapshot.visibleRoutineSets,
-                        activeRoutineSet = selectedSet,
-                        todayRoutineSetId = todaySet?.id,
-                        selectedRoutineSetId = selectedSetId,
-                        routines = selectedSet?.routines.orEmpty().sortedBy(Routine::order),
-                        selectedCalendarRecordsDate = selectedCalendarDate,
-                    )
-                    val recordsState = GuardianRecordsReducer.repositoryDataChanged(
-                        state = nextState,
+                    GuardianRepositoryReducer.dataChanged(
+                        state = state,
+                        settings = snapshot.settings,
+                        visibleRoutineSets = snapshot.visibleRoutineSets,
+                        todayRoutineSetId = snapshot.todayRoutineSetId,
                         records = records,
                         calendarRecordDates = calendarRecordDates,
                         calendarRecords = calendarRecords,
-                    )
-                    recordsState.copy(
-                        showDailyRoutineSelectionPrompt = recordsState.shouldShowDailyRoutineSelectionPrompt(),
                     )
                 }
             }
@@ -1006,9 +973,6 @@ class GuardianModeViewModel(
         }
     }
 }
-
-private fun GuardianModeUiState.shouldShowDailyRoutineSelectionPrompt(): Boolean =
-    false
 
 private fun backupErrorMessage(error: Throwable): String = when (error) {
     is BackupValidationException -> error.message ?: "백업 파일을 확인할 수 없습니다."
