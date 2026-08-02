@@ -23,13 +23,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal object BackupJson {
-    fun encodeData(snapshot: BackupSnapshot): String {
+    fun encodeData(snapshot: BackupSnapshot, zoneId: ZoneId): String {
         val root = JSONObject()
             .put("schemaVersion", BackupSchemaVersion)
-            .put("exportedAt", formatInstant(snapshot.exportedAt))
-            .put("routineSets", JSONArray(snapshot.routineSets.map(::encodeRoutineSet)))
-            .put("routines", JSONArray(snapshot.routines.map(::encodeRoutine)))
-            .put("dailyLogs", JSONArray(snapshot.dailyLogs.map(::encodeDailyLog)))
+            .put("exportedAt", formatInstant(snapshot.exportedAt, zoneId))
+            .put("routineSets", JSONArray(snapshot.routineSets.map { encodeRoutineSet(it, zoneId) }))
+            .put("routines", JSONArray(snapshot.routines.map { encodeRoutine(it, zoneId) }))
+            .put("dailyLogs", JSONArray(snapshot.dailyLogs.map { encodeDailyLog(it, zoneId) }))
             .put("appSettings", encodeAppSettings(snapshot.appSettings))
         return root.toString()
     }
@@ -61,10 +61,11 @@ internal object BackupJson {
         createdAt: Instant,
         appVersion: String,
         dataChecksum: String,
+        zoneId: ZoneId,
     ): String = JSONObject()
         .put("app", BackupAppName)
         .put("backupSchemaVersion", BackupSchemaVersion)
-        .put("createdAt", formatInstant(createdAt))
+        .put("createdAt", formatInstant(createdAt, zoneId))
         .put("sourcePlatform", "android")
         .put("appVersion", appVersion)
         .put("dataFile", BackupDataFileName)
@@ -104,14 +105,14 @@ internal object BackupJson {
         )
     }
 
-    private fun encodeRoutineSet(entity: RoutineSetEntity): JSONObject = JSONObject()
+    private fun encodeRoutineSet(entity: RoutineSetEntity, zoneId: ZoneId): JSONObject = JSONObject()
         .put("id", entity.id)
         .put("name", encodeLocalizedText(entity.localizedName))
         .put("isActive", entity.isActive)
         .putNullable("startTime", entity.startTime)
-        .put("createdAt", formatEpochMillis(entity.createdAtEpochMillis))
-        .put("updatedAt", formatEpochMillis(entity.updatedAtEpochMillis))
-        .putNullable("deletedAt", entity.deletedAtEpochMillis?.let(::formatEpochMillis))
+        .put("createdAt", formatEpochMillis(entity.createdAtEpochMillis, zoneId))
+        .put("updatedAt", formatEpochMillis(entity.updatedAtEpochMillis, zoneId))
+        .putNullable("deletedAt", entity.deletedAtEpochMillis?.let { formatEpochMillis(it, zoneId) })
 
     private fun decodeRoutineSet(json: JSONObject): RoutineSetEntity {
         val domain = RoutineSet(
@@ -126,7 +127,7 @@ internal object BackupJson {
         return domain.toEntity()
     }
 
-    private fun encodeRoutine(entity: RoutineEntity): JSONObject {
+    private fun encodeRoutine(entity: RoutineEntity, zoneId: ZoneId): JSONObject {
         val icon = if (entity.iconType == "photo") {
             JSONObject()
                 .put("type", "photo")
@@ -147,9 +148,9 @@ internal object BackupJson {
             .put("order", entity.sortOrder)
             .putNullable("scheduledTime", entity.scheduledTime)
             .put("isActive", entity.isActive)
-            .put("createdAt", formatEpochMillis(entity.createdAtEpochMillis))
-            .put("updatedAt", formatEpochMillis(entity.updatedAtEpochMillis))
-            .putNullable("deletedAt", entity.deletedAtEpochMillis?.let(::formatEpochMillis))
+            .put("createdAt", formatEpochMillis(entity.createdAtEpochMillis, zoneId))
+            .put("updatedAt", formatEpochMillis(entity.updatedAtEpochMillis, zoneId))
+            .putNullable("deletedAt", entity.deletedAtEpochMillis?.let { formatEpochMillis(it, zoneId) })
     }
 
     private fun decodeRoutine(json: JSONObject): RoutineEntity {
@@ -171,15 +172,15 @@ internal object BackupJson {
         return domain.toEntity()
     }
 
-    private fun encodeDailyLog(entity: DailyLogEntity): JSONObject = JSONObject()
+    private fun encodeDailyLog(entity: DailyLogEntity, zoneId: ZoneId): JSONObject = JSONObject()
         .put("id", entity.id)
         .put("date", entity.date)
         .put("routineId", entity.routineId)
         .put("routineSetId", entity.routineSetId)
         .put("status", entity.status)
-        .putNullable("completedAt", entity.completedAtEpochMillis?.let(::formatEpochMillis))
-        .put("createdAt", formatEpochMillis(entity.createdAtEpochMillis))
-        .put("updatedAt", formatEpochMillis(entity.updatedAtEpochMillis))
+        .putNullable("completedAt", entity.completedAtEpochMillis?.let { formatEpochMillis(it, zoneId) })
+        .put("createdAt", formatEpochMillis(entity.createdAtEpochMillis, zoneId))
+        .put("updatedAt", formatEpochMillis(entity.updatedAtEpochMillis, zoneId))
 
     private fun decodeDailyLog(json: JSONObject): DailyLogEntity {
         val status = LogStatus.fromStorageValue(json.requiredString("status"))
@@ -312,10 +313,11 @@ internal object BackupJson {
         throw BackupValidationException("$field 시간이 ISO 8601 형식이 아닙니다.")
     }
 
-    private fun formatEpochMillis(value: Long): String = formatInstant(Instant.ofEpochMilli(value))
+    private fun formatEpochMillis(value: Long, zoneId: ZoneId): String =
+        formatInstant(Instant.ofEpochMilli(value), zoneId)
 
-    private fun formatInstant(value: Instant): String =
-        DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(value.atZone(ZoneId.systemDefault()))
+    private fun formatInstant(value: Instant, zoneId: ZoneId): String =
+        DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(value.atZone(zoneId))
 }
 
 data class BackupManifest(

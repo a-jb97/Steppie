@@ -13,6 +13,7 @@ import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -25,6 +26,7 @@ import org.junit.Test
 
 class BackupArchiveTest {
     private val now = Instant.parse("2026-06-17T00:00:00Z")
+    private val zoneId = ZoneId.of("Asia/Seoul")
     private val routineSetId = "30000000-0000-4000-8000-000000000001"
     private val routineId = "40000000-0000-4000-8000-000000000001"
 
@@ -33,7 +35,7 @@ class BackupArchiveTest {
         val snapshot = testSnapshot()
         val bytes = ByteArrayOutputStream()
 
-        BackupArchive.write(snapshot, appVersion = "1.0", output = bytes)
+        BackupArchive.write(snapshot, appVersion = "1.0", zoneId = zoneId, output = bytes)
         val read = BackupArchive.read(ByteArrayInputStream(bytes.toByteArray()))
 
         assertEquals("android", read.manifest.sourcePlatform)
@@ -66,6 +68,7 @@ class BackupArchiveTest {
         BackupArchive.write(
             snapshot = snapshot,
             appVersion = "1.0",
+            zoneId = zoneId,
             output = bytes,
             assets = mapOf(assetName to byteArrayOf(1, 2, 3)),
         )
@@ -95,8 +98,28 @@ class BackupArchiveTest {
     }
 
     @Test
+    fun jsonTimestampsUseTheSuppliedLocalZone() {
+        val data = JSONObject(BackupJson.encodeData(testSnapshot(), zoneId))
+        val manifest = JSONObject(
+            BackupJson.encodeManifest(
+                createdAt = now,
+                appVersion = "1.0",
+                dataChecksum = "checksum",
+                zoneId = zoneId,
+            ),
+        )
+
+        assertEquals("2026-06-17T09:00:00+09:00", data.getString("exportedAt"))
+        assertEquals(
+            "2026-06-17T09:00:00+09:00",
+            data.getJSONArray("routineSets").getJSONObject(0).getString("createdAt"),
+        )
+        assertEquals("2026-06-17T09:00:00+09:00", manifest.getString("createdAt"))
+    }
+
+    @Test
     fun dataJson_version1MissingOptionalFields_usesCompatibleDefaults() {
-        val version1Json = JSONObject(BackupJson.encodeData(testSnapshot())).apply {
+        val version1Json = JSONObject(BackupJson.encodeData(testSnapshot(), zoneId)).apply {
             put("schemaVersion", 1)
             getJSONArray("routineSets").getJSONObject(0).remove("startTime")
             getJSONObject("appSettings").apply {
@@ -127,6 +150,7 @@ class BackupArchiveTest {
         BackupArchive.write(
             snapshot = testSnapshot(),
             appVersion = "1.0",
+            zoneId = zoneId,
             output = bytes,
             assets = mapOf("routine-photo-10000000-0000-4000-8000-000000000001.jpg" to ByteArray(5 * 1024 * 1024 + 1)),
         )
@@ -134,7 +158,7 @@ class BackupArchiveTest {
 
     @Test
     fun dataJson_doesNotContainRawPinFields() {
-        val dataJson = BackupJson.encodeData(testSnapshot())
+        val dataJson = BackupJson.encodeData(testSnapshot(), zoneId)
 
         assertTrue(dataJson.contains("guardianPinHash"))
         assertFalse(dataJson.contains("1234"))
@@ -146,7 +170,7 @@ class BackupArchiveTest {
         val snapshot = testSnapshot()
         val duplicate = snapshot.copy(routines = snapshot.routines + snapshot.routines.first())
 
-        BackupJson.decodeData(BackupJson.encodeData(duplicate))
+        BackupJson.decodeData(BackupJson.encodeData(duplicate, zoneId))
     }
 
     @Test(expected = BackupValidationException::class)
@@ -157,7 +181,7 @@ class BackupArchiveTest {
         )
         val duplicate = snapshot.copy(dailyLogs = snapshot.dailyLogs + duplicateLog)
 
-        BackupJson.decodeData(BackupJson.encodeData(duplicate))
+        BackupJson.decodeData(BackupJson.encodeData(duplicate, zoneId))
     }
 
     private fun writeArchive(
@@ -167,6 +191,7 @@ class BackupArchiveTest {
         BackupArchive.write(
             snapshot = snapshot,
             appVersion = "1.0",
+            zoneId = zoneId,
             output = output,
             assets = assets,
         )

@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
+import java.time.ZoneId
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -12,15 +13,17 @@ internal object BackupArchive {
     fun write(
         snapshot: BackupSnapshot,
         appVersion: String,
+        zoneId: ZoneId,
         output: OutputStream,
         assets: Map<String, ByteArray> = emptyMap(),
     ) {
-        val dataJson = BackupJson.encodeData(snapshot)
+        val dataJson = BackupJson.encodeData(snapshot, zoneId)
         val checksum = sha256(dataJson.toByteArray(Charsets.UTF_8))
         val manifestJson = BackupJson.encodeManifest(
             createdAt = snapshot.exportedAt,
             appVersion = appVersion,
             dataChecksum = checksum,
+            zoneId = zoneId,
         )
         ZipOutputStream(output.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry("manifest.json"))

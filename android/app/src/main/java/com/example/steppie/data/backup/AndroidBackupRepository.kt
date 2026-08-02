@@ -19,6 +19,7 @@ class AndroidBackupRepository(
             BackupArchive.write(
                 snapshot = snapshot,
                 appVersion = appVersionName(),
+                zoneId = clockProvider.zoneId,
                 output = it,
                 assets = dataSource.photoBackupAssets(snapshot),
             )
