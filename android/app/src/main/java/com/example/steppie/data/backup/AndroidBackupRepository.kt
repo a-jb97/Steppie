@@ -48,8 +48,4 @@ class AndroidBackupRepository(
     private fun appVersionName(): String = runCatching {
         appContext.packageManager.getPackageInfo(appContext.packageName, 0).versionName ?: "1.0"
     }.getOrDefault("1.0")
-
-    companion object {
-        fun defaultFileName(): String = BackupArchive.defaultFileName()
-    }
 }

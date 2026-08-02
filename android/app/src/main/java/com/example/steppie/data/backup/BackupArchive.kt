@@ -4,8 +4,6 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
-import java.time.Instant
-import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -79,13 +77,6 @@ internal object BackupArchive {
             throw BackupValidationException("백업 사진 에셋이 5MB를 초과합니다.")
         }
         return ReadBackup(manifest = manifest, snapshot = snapshot, assets = assets)
-    }
-
-    fun defaultFileName(now: Instant = Instant.now()): String {
-        val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
-            .withLocale(Locale.US)
-            .withZone(java.time.ZoneId.systemDefault())
-        return "steppie-backup-${formatter.format(now)}.zip"
     }
 
     private fun ZipInputStream.readEntryBytes(): ByteArray {

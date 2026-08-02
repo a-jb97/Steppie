@@ -35,11 +35,11 @@ import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.steppie.data.backup.AndroidBackupRepository
 import com.example.steppie.di.AppContainer
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.notifications.ACTION_OPEN_ROUTINE
 import com.example.steppie.notifications.EXTRA_ROUTINE_ID
+import com.example.steppie.presentation.formatting.formatBackupFileName
 import com.example.steppie.ui.app.AppMode
 import com.example.steppie.ui.app.NotificationReconcileEffect
 import com.example.steppie.ui.app.NotificationReconcileInput
@@ -358,7 +358,12 @@ class MainActivity : ComponentActivity() {
                             onOpenRecoveryCode = guardianViewModel::openRecoveryCodeRegeneration,
                             onOpenRecoveryPinReset = guardianViewModel::openRecoveryPinReset,
                             onCreateBackupFile = {
-                                createBackupLauncher.launch(AndroidBackupRepository.defaultFileName())
+                                createBackupLauncher.launch(
+                                    formatBackupFileName(
+                                        now = appContainer.clockProvider.now(),
+                                        zoneId = appContainer.clockProvider.zoneId,
+                                    ),
+                                )
                             },
                             onOpenRestoreFile = {
                                 openBackupLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
