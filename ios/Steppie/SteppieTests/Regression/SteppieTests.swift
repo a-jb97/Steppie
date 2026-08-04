@@ -372,6 +372,26 @@ struct SteppieTests {
         ])
     }
 
+    @Test("다중 루틴 전환 문구는 한국어와 영어 번역을 모두 제공한다")
+    func childRoutineScheduleStringsProvideKoreanAndEnglishLocalizations() throws {
+        let koreanBundle = try localizedResourceBundle(languageCode: "ko")
+        let englishBundle = try localizedResourceBundle(languageCode: "en")
+        let expectations = [
+            ("screen.waiting.title", "다음 루틴을 기다려요", "Wait for the next routine"),
+            ("screen.feedback.nextRoutineSet.available", "시작할 수 있음", "Can start"),
+            ("screen.feedback.nextRoutineSet.notAvailable", "아직 시작할 수 없음", "Not available yet"),
+            ("screen.feedback.nextRoutineSet.label %@", "다음 루틴 %@", "Next routine: %@"),
+            ("screen.feedback.nextRoutineSet.lockedUntil %@", "%@ 전에는 시작하거나 완료할 수 없음", "Cannot start or complete before %@"),
+            ("screen.routineSet.cannotStartUntil %@", "%@ 전에는 시작할 수 없어요", "Can't start before %@"),
+            ("screen.routineSet.startsAt %@", "%@에 시작해요", "Starts at %@")
+        ]
+
+        for (key, korean, english) in expectations {
+            #expect(koreanBundle.localizedString(forKey: key, value: nil, table: nil) == korean)
+            #expect(englishBundle.localizedString(forKey: key, value: nil, table: nil) == english)
+        }
+    }
+
     @Test("알림 요청 계산은 완료, 과거 시각, 알림 없음 설정, 방해 금지 시간을 제외한다")
     func notificationRequestCalculationFiltersIneligibleReminders() throws {
         let fixture = try makeFixture(routineCount: 1)
@@ -2074,6 +2094,11 @@ struct SteppieTests {
 
         #expect(changeCount == 2)
         #expect(try target.routineSets().isEmpty == false)
+    }
+
+    private func localizedResourceBundle(languageCode: String) throws -> Bundle {
+        let path = try #require(Bundle.main.path(forResource: languageCode, ofType: "lproj"))
+        return try #require(Bundle(path: path))
     }
 
 }
