@@ -724,6 +724,35 @@ struct SteppieTests {
         #expect(changeCount >= 4)
     }
 
+    @Test("보호자 루틴 관리 상태는 조회와 편집 저장 책임을 독립적으로 수행한다")
+    func guardianRoutineManagementStateOwnsRoutineEditing() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let state = GuardianRoutineManagementState(
+            repository: repository,
+            photoStore: FakeRoutinePhotoStore(icon: try IconRef.builtin(name: "star")),
+            now: { Date(timeIntervalSince1970: 1_767_229_200) },
+            calendar: Calendar(identifier: .gregorian)
+        )
+
+        try state.load()
+        let activeSetID = try #require(state.activeRoutineSet?.id)
+        #expect(state.loadState == .loaded)
+        #expect(state.routines.count == 3)
+
+        state.beginAddRoutine()
+        state.draft?.title = "학교 버스"
+        state.draft?.iconName = .bus
+        state.draft?.colorToken = "color.card.lemon"
+        #expect(state.hasUnsavedDraft)
+        #expect(try state.saveDraft(localeIdentifier: "ko"))
+
+        try state.load()
+        let added = try #require(state.routines.last)
+        #expect(state.routines.count == 4)
+        #expect(added.title.resolved(appLocale: "ko") == "학교 버스")
+        #expect(try repository.routines(in: activeSetID).map(\.order) == [0, 1, 2, 3])
+    }
+
     @Test("보호자 루틴 편집은 사진을 IconRef.photo로 저장하고 기본 아이콘으로 되돌릴 수 있다")
     func guardianRoutinePhotoEditing() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
