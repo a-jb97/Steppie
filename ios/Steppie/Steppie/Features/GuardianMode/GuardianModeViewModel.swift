@@ -12,7 +12,7 @@ enum GuardianDestination: Hashable {
     case backupRestore
 }
 
-enum GuardianPINPurpose: Equatable {
+nonisolated enum GuardianPINPurpose: Equatable {
     case enter
     case setup
     case change

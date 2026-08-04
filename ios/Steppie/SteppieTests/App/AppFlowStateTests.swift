@@ -1,7 +1,7 @@
 import Testing
 @testable import Steppie
 
-struct AppFlowStateTests {
+nonisolated struct AppFlowStateTests {
     @Test("표시 상태는 바탕 앱 모드와 시트 목적을 함께 유지한다")
     func presentingStateKeepsBaseModeAndSheetDestination() {
         let state = AppFlowState.presenting(

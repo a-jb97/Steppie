@@ -1,22 +1,22 @@
-enum SteppieAppMode: Equatable {
+nonisolated enum SteppieAppMode: Equatable {
     case child
     case guardian
 }
 
-enum GuardianPINFlow: Equatable {
+nonisolated enum GuardianPINFlow: Equatable {
     case guardianEntry
     case pinChange
     case recoveryRegeneration
     case recoveryReset
 }
 
-enum GuardianSheetDestination: Equatable {
+nonisolated enum GuardianSheetDestination: Equatable {
     case pin(purpose: GuardianPINPurpose, flow: GuardianPINFlow)
     case recoveryCodeReset
     case recoveryCodeDisplay
 }
 
-enum AppFlowState: Equatable {
+nonisolated enum AppFlowState: Equatable {
     case child
     case guardian
     case presenting(base: SteppieAppMode, sheet: GuardianSheetDestination)
