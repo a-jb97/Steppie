@@ -15,6 +15,8 @@ final class ChildRoutineNotificationCoordinator {
     private let scheduler: any RoutineNotificationScheduling
     private let isSchedulingEnabled: Bool
     private var didRequestAuthorization = false
+    private var pendingSnapshot: ChildRoutineNotificationSnapshot?
+    private var schedulingTask: Task<Void, Never>?
 
     init(
         scheduler: any RoutineNotificationScheduling,
@@ -42,16 +44,28 @@ final class ChildRoutineNotificationCoordinator {
 
     func reschedule(_ snapshot: ChildRoutineNotificationSnapshot?) {
         guard isSchedulingEnabled, let snapshot else { return }
-        Task { [scheduler] in
-            await scheduler.rescheduleTodayReminders(
-                routines: snapshot.routines,
-                completedRoutineIDs: snapshot.completedRoutineIDs,
-                date: snapshot.date,
-                settings: snapshot.settings,
-                now: snapshot.now,
-                calendar: snapshot.calendar,
-                locale: snapshot.locale
-            )
+
+        pendingSnapshot = snapshot
+        guard schedulingTask == nil else { return }
+
+        schedulingTask = Task { [weak self, scheduler] in
+            while let snapshot = self?.takePendingSnapshot() {
+                await scheduler.rescheduleTodayReminders(
+                    routines: snapshot.routines,
+                    completedRoutineIDs: snapshot.completedRoutineIDs,
+                    date: snapshot.date,
+                    settings: snapshot.settings,
+                    now: snapshot.now,
+                    calendar: snapshot.calendar,
+                    locale: snapshot.locale
+                )
+            }
+            self?.schedulingTask = nil
         }
+    }
+
+    private func takePendingSnapshot() -> ChildRoutineNotificationSnapshot? {
+        defer { pendingSnapshot = nil }
+        return pendingSnapshot
     }
 }

@@ -322,6 +322,56 @@ struct SteppieTests {
         #expect(scheduler.rescheduleCalls.last?.completedRoutineIDs.isEmpty == true)
     }
 
+    @Test("알림 재예약은 직렬 실행하고 대기 중에는 최신 상태만 반영한다")
+    func notificationReschedulingSerializesAndAppliesLatestSnapshot() async throws {
+        let scheduler = FakeRoutineNotificationScheduler()
+        scheduler.shouldSuspendFirstReschedule = true
+        let coordinator = ChildRoutineNotificationCoordinator(
+            scheduler: scheduler,
+            isSchedulingEnabled: true
+        )
+        let settings = try AppSettings(notificationLeadTimes: [10, 5])
+        let firstCompletedID = UUID()
+        let supersededCompletedID = UUID()
+        let latestCompletedID = UUID()
+
+        func snapshot(completedRoutineIDs: Set<UUID>) -> ChildRoutineNotificationSnapshot {
+            ChildRoutineNotificationSnapshot(
+                routines: [],
+                completedRoutineIDs: completedRoutineIDs,
+                date: "2026-01-01",
+                settings: settings,
+                now: Date(timeIntervalSince1970: 1_767_225_600),
+                calendar: Calendar(identifier: .gregorian),
+                locale: Locale(identifier: "ko_KR")
+            )
+        }
+
+        coordinator.reschedule(snapshot(completedRoutineIDs: [firstCompletedID]))
+        for _ in 0..<20 where scheduler.rescheduleCalls.isEmpty {
+            await Task.yield()
+        }
+        #expect(scheduler.rescheduleCalls.map(\.completedRoutineIDs) == [[firstCompletedID]])
+
+        coordinator.reschedule(snapshot(completedRoutineIDs: [supersededCompletedID]))
+        coordinator.reschedule(snapshot(completedRoutineIDs: [latestCompletedID]))
+        #expect(scheduler.rescheduleCalls.count == 1)
+
+        scheduler.resumeFirstReschedule()
+        for _ in 0..<20 where scheduler.completedRescheduleCalls.count < 2 {
+            await Task.yield()
+        }
+
+        #expect(scheduler.rescheduleCalls.map(\.completedRoutineIDs) == [
+            [firstCompletedID],
+            [latestCompletedID]
+        ])
+        #expect(scheduler.completedRescheduleCalls.map(\.completedRoutineIDs) == [
+            [firstCompletedID],
+            [latestCompletedID]
+        ])
+    }
+
     @Test("알림 요청 계산은 완료, 과거 시각, 알림 없음 설정, 방해 금지 시간을 제외한다")
     func notificationRequestCalculationFiltersIneligibleReminders() throws {
         let fixture = try makeFixture(routineCount: 1)
