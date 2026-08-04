@@ -1772,6 +1772,31 @@ struct SteppieTests {
         #expect(assetStore.removedAssetNames == [assetName])
     }
 
+    @Test("복원 중 DB replace가 실패하면 덮어쓴 기존 사진 에셋을 원본으로 복구한다")
+    func restoreRecoversOverwrittenAssetWhenReplaceFails() throws {
+        let assetName = "routine-photo-88888888-8888-4888-8888-888888888888.jpg"
+        let originalData = Data([0xff, 0xd8, 0x01])
+        let restoredData = Data([0xff, 0xd8, 0x02])
+        let assetStore = FakeBackupAssetStore(assets: [assetName: originalData])
+        let repository = FailingReplaceRepository()
+        let payload = BackupRestorePayload(
+            snapshot: RoutineRepositorySnapshot(
+                routineSets: [],
+                routines: [],
+                dailyLogs: [],
+                dailyRoutineAssignments: [],
+                appSettings: try AppSettings()
+            ),
+            assets: [assetName: restoredData]
+        )
+
+        #expect(throws: FailingReplaceRepository.ReplaceError.failed) {
+            try BackupService(repository: repository, assetStore: assetStore).restorePayload(payload)
+        }
+        #expect(assetStore.assets[assetName] == originalData)
+        #expect(assetStore.removedAssetNames.isEmpty)
+    }
+
     @Test("checksum이 손상된 백업은 복원을 거부한다")
     func backupRejectsInvalidChecksum() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
