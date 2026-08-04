@@ -53,6 +53,7 @@ struct SteppieApp: App {
             if isPreview {
                 ContentView(
                     repository: repository,
+                    photoStore: routinePhotoStore,
                     notificationScheduler: NoopRoutineNotificationScheduler(),
                     isNotificationSchedulingEnabled: false,
                     notificationRouter: notificationRouter
@@ -60,6 +61,7 @@ struct SteppieApp: App {
             } else {
                 ContentView(
                     repository: repository,
+                    photoStore: routinePhotoStore,
                     speechGuide: IOSRoutineSpeechGuide(),
                     feedbackPerformer: IOSRoutineFeedbackPerformer(),
                     notificationScheduler: IOSRoutineNotificationScheduler(),

@@ -35,16 +35,15 @@ final class GuardianModeViewModel {
     var templateReturnDestination: GuardianDestination?
     init(
         repository: any RoutineRepository,
-        photoStore: (any RoutinePhotoStoring)? = nil,
+        photoStore: any RoutinePhotoStoring,
         now: @escaping () -> Date = Date.init,
         calendar: Calendar = .current,
         onDataChanged: @escaping () -> Void
     ) {
-        let resolvedPhotoStore = photoStore ?? FileRoutinePhotoStore()
         self.onDataChanged = onDataChanged
         self.routineManagementState = GuardianRoutineManagementState(
             repository: repository,
-            photoStore: resolvedPhotoStore,
+            photoStore: photoStore,
             now: now,
             calendar: calendar
         )
@@ -64,7 +63,7 @@ final class GuardianModeViewModel {
         )
         self.routineSetCreationState = GuardianRoutineSetCreationState(
             repository: repository,
-            photoStore: resolvedPhotoStore,
+            photoStore: photoStore,
             now: now
         )
         self.routineTemplateState = GuardianRoutineTemplateState(

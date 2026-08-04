@@ -189,3 +189,13 @@ final class FakeRoutinePhotoStore: RoutinePhotoStoring {
         return icon
     }
 }
+
+struct NoopRoutinePhotoStore: RoutinePhotoStoring {
+    func data(forBackupAssetName name: String) throws -> Data? {
+        nil
+    }
+
+    func savePhotoData(_ data: Data) throws -> IconRef {
+        throw BackupError.invalidData
+    }
+}

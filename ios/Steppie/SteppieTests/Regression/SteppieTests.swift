@@ -7,6 +7,19 @@ import Testing
 
 @MainActor
 struct SteppieTests {
+    @Test("ContentView는 보호자 사진 저장소를 composition root에서 주입받는다")
+    func contentViewAcceptsInjectedRoutinePhotoStore() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let photoStore = NoopRoutinePhotoStore()
+
+        _ = ContentView(
+            repository: repository,
+            photoStore: photoStore,
+            notificationScheduler: NoopRoutineNotificationScheduler(),
+            isNotificationSchedulingEnabled: false
+        )
+    }
+
     @Test("루틴 사진 reader는 SwiftUI environment에서 주입된다")
     func routinePhotoReaderUsesEnvironmentInjection() throws {
         let expectedData = Data([0xff, 0xd8, 0xff])
@@ -532,7 +545,7 @@ struct SteppieTests {
                 recoveryCodeHash: legacyRecoveryHash
             )
         )
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
 
         #expect(viewModel.verifyPIN("1234"))
         let upgradedPINHash = try #require(try repository.appSettings().guardianPinHash)
@@ -548,7 +561,7 @@ struct SteppieTests {
     @Test("보호자 ViewModel은 PIN 설정과 검증을 AppSettings에 저장한다")
     func guardianViewModelStoresPINHash() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
 
         #expect(!viewModel.hasGuardianPIN())
         #expect(viewModel.setPIN("1234"))
@@ -561,7 +574,7 @@ struct SteppieTests {
     @Test("보호자 ViewModel은 PIN 생성 시 복구 코드 hash를 저장하고 원본은 1회 표시 후 폐기한다")
     func guardianViewModelStoresRecoveryCodeHashOnPINSetup() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
 
         #expect(viewModel.setPINAndGenerateRecoveryCode("1234"))
         let recoveryCode = try #require(viewModel.oneTimeRecoveryCode)
@@ -580,7 +593,7 @@ struct SteppieTests {
     @Test("보호자 ViewModel은 복구 코드 재생성 시 이전 코드를 무효화한다")
     func guardianViewModelRegeneratesRecoveryCode() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
 
         #expect(viewModel.setPINAndGenerateRecoveryCode("1234"))
         let firstCode = try #require(viewModel.oneTimeRecoveryCode)
@@ -599,7 +612,7 @@ struct SteppieTests {
     func guardianFeedbackSettingsPersist() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         var changeCount = 0
-        let viewModel = GuardianModeViewModel(repository: repository) {
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {
             changeCount += 1
         }
         viewModel.load()
@@ -656,7 +669,7 @@ struct SteppieTests {
     @Test("보호자 환경 설정은 알림 리드타임 조합과 방해 금지 시간을 저장한다")
     func guardianNotificationSettingsPersist() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
         viewModel.load()
 
         viewModel.updateFeedbackSettings {
@@ -701,7 +714,7 @@ struct SteppieTests {
     func guardianRoutineEditing() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         var changeCount = 0
-        let viewModel = GuardianModeViewModel(repository: repository) {
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {
             changeCount += 1
         }
         viewModel.load()
@@ -838,7 +851,7 @@ struct SteppieTests {
     @Test("보호자 모드는 활성 루틴 세트가 없어도 루틴 세트 생성으로 진입할 수 있다")
     func guardianModeCanCreateRoutineSetFromEmptyRepository() throws {
         let repository = try RoutinePreviewStore.makeRepository()
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
 
         viewModel.load()
         #expect(viewModel.loadState == .empty)
@@ -853,7 +866,7 @@ struct SteppieTests {
     @Test("루틴 세트 생성은 최소 1개 단계를 요구한다")
     func guardianRoutineSetCreationRequiresAtLeastOneStep() throws {
         let repository = try RoutinePreviewStore.makeRepository()
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
 
         viewModel.beginCreateRoutineSet()
         viewModel.routineSetDraft?.name = "등원 루틴"
@@ -873,7 +886,7 @@ struct SteppieTests {
     func guardianRoutineSetCreationSavesStoredSetAndOrderedSteps() throws {
         let repository = try RoutinePreviewStore.makeRepository()
         var changeCount = 0
-        let viewModel = GuardianModeViewModel(repository: repository) {
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {
             changeCount += 1
         }
 
@@ -931,7 +944,7 @@ struct SteppieTests {
     func guardianTemplateSaveCreatesStoredRoutineSetAndOrderedRoutines() throws {
         let repository = try RoutinePreviewStore.makeRepository()
         var changeCount = 0
-        let viewModel = GuardianModeViewModel(repository: repository) {
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {
             changeCount += 1
         }
 
@@ -956,7 +969,7 @@ struct SteppieTests {
     @Test("같은 템플릿을 두 번 저장해도 RoutineSet과 Routine UUID는 중복되지 않는다")
     func guardianTemplateSaveGeneratesFreshIDsEveryTime() throws {
         let repository = try RoutinePreviewStore.makeRepository()
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
         let bedtime = try #require(viewModel.routineTemplates.first { $0.id == "bedtime" })
 
         viewModel.beginTemplateSelection()
@@ -979,7 +992,7 @@ struct SteppieTests {
     @Test("템플릿으로 생성된 루틴은 일반 루틴처럼 편집 삭제 정렬할 수 있다")
     func guardianTemplateRoutinesRemainEditable() throws {
         let repository = try RoutinePreviewStore.makeRepository()
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
         let school = try #require(viewModel.routineTemplates.first { $0.id == "school" })
 
         viewModel.beginTemplateSelection()
@@ -1010,7 +1023,7 @@ struct SteppieTests {
     func templateSaveRefreshesChildModeAndBackupSnapshot() throws {
         let repository = try RoutinePreviewStore.makeRepository()
         let childViewModel = ChildRoutineViewModel(repository: repository)
-        let guardianViewModel = GuardianModeViewModel(repository: repository) {
+        let guardianViewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {
             childViewModel.load()
         }
         let bedtime = try #require(guardianViewModel.routineTemplates.first { $0.id == "bedtime" })
@@ -1036,7 +1049,7 @@ struct SteppieTests {
     @Test("루틴 관리는 여러 루틴 세트를 목록으로 유지하고 선택한 세트의 단계만 편집한다")
     func guardianRoutineManagementKeepsMultipleRoutineSets() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
         viewModel.load()
         let originalSet = try #require(viewModel.selectedRoutineSet)
 
@@ -1078,7 +1091,7 @@ struct SteppieTests {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let now = Date(timeIntervalSince1970: 1_767_312_000)
         var childReloadCount = 0
-        let viewModel = GuardianModeViewModel(repository: repository, now: { now }) {
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore(), now: { now }) {
             childReloadCount += 1
         }
         viewModel.load()
@@ -1108,7 +1121,7 @@ struct SteppieTests {
     @Test("루틴 관리는 여러 세트의 매일 시작 시각을 저장하고 중복 시각을 거부한다")
     func guardianSchedulesMultipleRoutineSetsDaily() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
         viewModel.load()
         let morningSet = try #require(viewModel.selectedRoutineSet)
 
@@ -1143,7 +1156,7 @@ struct SteppieTests {
     func guardianSelectsTodayAssignedRoutineSetForRoutineManagement() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let now = Date(timeIntervalSince1970: 1_767_312_000)
-        let viewModel = GuardianModeViewModel(repository: repository, now: { now }) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore(), now: { now }) {}
         viewModel.load()
         let originalSet = try #require(viewModel.selectedRoutineSet)
 
@@ -1167,7 +1180,7 @@ struct SteppieTests {
     @Test("루틴 세트 편집 모드는 세트 이름 변경과 세트 삭제를 Repository에 반영한다")
     func guardianRoutineSetEditModeRenamesAndDeletesRoutineSets() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()
-        let viewModel = GuardianModeViewModel(repository: repository) {}
+        let viewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {}
         viewModel.load()
         let originalSet = try #require(viewModel.selectedRoutineSet)
 
@@ -1202,6 +1215,7 @@ struct SteppieTests {
         let now = Date(timeIntervalSince1970: 1_767_225_600)
         let viewModel = GuardianModeViewModel(
             repository: repository,
+            photoStore: NoopRoutinePhotoStore(),
             now: { now }
         ) {}
 
@@ -1245,6 +1259,7 @@ struct SteppieTests {
         try repository.createRoutine(addedAfterLogDate)
         let viewModel = GuardianModeViewModel(
             repository: repository,
+            photoStore: NoopRoutinePhotoStore(),
             now: { Date(timeIntervalSince1970: 1_767_744_000) }
         ) {}
 
@@ -1290,6 +1305,7 @@ struct SteppieTests {
 
         let viewModel = GuardianModeViewModel(
             repository: repository,
+            photoStore: NoopRoutinePhotoStore(),
             now: { Date(timeIntervalSince1970: 1_769_000_000) }
         ) {}
         viewModel.load()
@@ -1314,6 +1330,7 @@ struct SteppieTests {
         )
         let viewModel = GuardianModeViewModel(
             repository: repository,
+            photoStore: NoopRoutinePhotoStore(),
             now: { Date(timeIntervalSince1970: 1_769_000_000) }
         ) {}
 
@@ -1339,6 +1356,7 @@ struct SteppieTests {
         )
         let viewModel = GuardianModeViewModel(
             repository: repository,
+            photoStore: NoopRoutinePhotoStore(),
             now: { Date(timeIntervalSince1970: 1_769_000_000) }
         ) {}
 
@@ -1367,6 +1385,7 @@ struct SteppieTests {
         )
         let viewModel = GuardianModeViewModel(
             repository: repository,
+            photoStore: NoopRoutinePhotoStore(),
             now: { Date(timeIntervalSince1970: 1_769_000_000) }
         ) {}
 
@@ -1397,6 +1416,7 @@ struct SteppieTests {
         )
         let viewModel = GuardianModeViewModel(
             repository: repository,
+            photoStore: NoopRoutinePhotoStore(),
             now: { Date(timeIntervalSince1970: 1_767_744_000) }
         ) {}
 
@@ -1415,7 +1435,7 @@ struct SteppieTests {
     func childRoutineLoadsNewlyCreatedRoutineSet() throws {
         let repository = try RoutinePreviewStore.makeRepository()
         let childViewModel = ChildRoutineViewModel(repository: repository)
-        let guardianViewModel = GuardianModeViewModel(repository: repository) {
+        let guardianViewModel = GuardianModeViewModel(repository: repository, photoStore: NoopRoutinePhotoStore()) {
             childViewModel.load()
         }
 
@@ -2135,7 +2155,7 @@ struct SteppieTests {
         let source = try RoutinePreviewStore.makeSampleRepository()
         let package = try BackupService(repository: source).exportPackage()
         let target = try RoutinePreviewStore.makeRepository()
-        let viewModel = GuardianModeViewModel(repository: target) {}
+        let viewModel = GuardianModeViewModel(repository: target, photoStore: NoopRoutinePhotoStore()) {}
 
         #expect(viewModel.setPIN("1234"))
         viewModel.validateRestorePackage(package.archiveData)
@@ -2154,7 +2174,7 @@ struct SteppieTests {
         let package = try BackupService(repository: source).exportPackage()
         let target = try RoutinePreviewStore.makeRepository()
         var changeCount = 0
-        let viewModel = GuardianModeViewModel(repository: target) {
+        let viewModel = GuardianModeViewModel(repository: target, photoStore: NoopRoutinePhotoStore()) {
             changeCount += 1
         }
 

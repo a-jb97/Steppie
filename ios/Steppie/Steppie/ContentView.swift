@@ -11,6 +11,7 @@ struct ContentView: View {
 
     init(
         repository: any RoutineRepository,
+        photoStore: any RoutinePhotoStoring,
         speechGuide: (any RoutineSpeechGuiding)? = nil,
         feedbackPerformer: (any RoutineFeedbackPerforming)? = nil,
         notificationScheduler: (any RoutineNotificationScheduling)? = nil,
@@ -31,6 +32,7 @@ struct ContentView: View {
         _guardianViewModel = State(
             initialValue: GuardianModeViewModel(
                 repository: repository,
+                photoStore: photoStore,
                 onDataChanged: {
                     childViewModel.load()
                 }
@@ -370,6 +372,7 @@ private struct RecoveryCodeDisplayView: View {
     let repository = try! RoutinePreviewStore.makeLightweightSampleRepository()
     ContentView(
         repository: repository,
+        photoStore: FileRoutinePhotoStore(),
         notificationScheduler: NoopRoutineNotificationScheduler(),
         isNotificationSchedulingEnabled: false
     )
