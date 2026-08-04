@@ -18,20 +18,20 @@ interface RoutineRepository {
     suspend fun selectRoutineSetForDate(
         date: LocalDate,
         routineSetId: String,
-        selectedAt: Instant = Instant.now(),
+        selectedAt: Instant,
     )
     suspend fun createRoutineSet(routineSet: RoutineSet): RoutineSet
     suspend fun updateRoutineSet(routineSet: RoutineSet): RoutineSet
-    suspend fun deleteRoutineSet(id: String, deletedAt: Instant = Instant.now())
+    suspend fun deleteRoutineSet(id: String, deletedAt: Instant)
 
     suspend fun getRoutine(id: String): Routine?
     suspend fun createRoutine(routine: Routine): Routine
     suspend fun updateRoutine(routine: Routine): Routine
-    suspend fun deleteRoutine(id: String, deletedAt: Instant = Instant.now())
+    suspend fun deleteRoutine(id: String, deletedAt: Instant)
     suspend fun reorderRoutines(
         routineSetId: String,
         orderedRoutineIds: List<String>,
-        updatedAt: Instant = Instant.now(),
+        updatedAt: Instant,
     )
 
     fun observeDailyLogs(date: LocalDate): Flow<List<DailyLog>>
@@ -39,12 +39,12 @@ interface RoutineRepository {
     fun observeAllDailyLogs(): Flow<List<DailyLog>>
     suspend fun completeRoutine(
         routineId: String,
-        date: LocalDate = LocalDate.now(),
-        completedAt: Instant = Instant.now(),
+        date: LocalDate,
+        completedAt: Instant,
     ): DailyLog
     suspend fun undoRoutine(
         routineId: String,
-        date: LocalDate = LocalDate.now(),
-        updatedAt: Instant = Instant.now(),
+        date: LocalDate,
+        updatedAt: Instant,
     ): DailyLog
 }

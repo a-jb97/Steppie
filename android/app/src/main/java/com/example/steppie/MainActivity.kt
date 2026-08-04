@@ -1,24 +1,10 @@
 package com.example.steppie
 
-import android.Manifest
-import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.content.pm.PackageManager
-import android.media.AudioManager
-import android.net.Uri
-import android.media.ToneGenerator
-import android.os.Build
 import android.os.Bundle
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
-import android.provider.MediaStore
-import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -30,28 +16,29 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.steppie.data.backup.AndroidBackupRepository
 import com.example.steppie.di.AppContainer
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.notifications.ACTION_OPEN_ROUTINE
 import com.example.steppie.notifications.EXTRA_ROUTINE_ID
+import com.example.steppie.presentation.environment.LocalPresentationClockProvider
+import com.example.steppie.presentation.environment.LocalPresentationLocaleProvider
+import com.example.steppie.presentation.formatting.formatBackupFileName
+import com.example.steppie.ui.app.AndroidFeedbackController
 import com.example.steppie.ui.app.AppMode
 import com.example.steppie.ui.app.NotificationReconcileEffect
 import com.example.steppie.ui.app.NotificationReconcileInput
 import com.example.steppie.ui.app.PhotoTarget
 import com.example.steppie.ui.app.TutorialResolutionEffect
 import com.example.steppie.ui.app.resolveAppMode
-import com.example.steppie.ui.app.resolveCameraResult
 import com.example.steppie.ui.app.resolveNotificationRoute
 import com.example.steppie.ui.app.resolveNotificationTarget
-import com.example.steppie.ui.app.resolvePhotoPickerResult
 import com.example.steppie.ui.app.resolveTutorialScreen
-import com.example.steppie.ui.child.ChildRoutineFeedbackEvent
+import com.example.steppie.ui.app.rememberBackupDocumentActions
+import com.example.steppie.ui.app.rememberNotificationPermissionActions
+import com.example.steppie.ui.app.rememberPhotoActivityActions
 import com.example.steppie.ui.child.ChildRoutineScreen
 import com.example.steppie.ui.child.ChildRoutineViewModel
 import com.example.steppie.ui.guardian.GuardianModeScreen
@@ -70,8 +57,6 @@ import com.example.steppie.ui.tutorial.TutorialCoordinatorViewModel
 import com.example.steppie.ui.tutorial.TutorialOverlay
 import com.example.steppie.ui.tutorial.LocalTutorialAnchorRegistry
 import com.example.steppie.ui.tutorial.rememberTutorialAnchorRegistry
-import java.io.File
-import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -85,7 +70,7 @@ class MainActivity : ComponentActivity() {
         enforceSupportedOrientation()
         super.onCreate(savedInstanceState)
         notificationRoutineId.value = intent.notificationRoutineId()
-        feedbackController = AndroidFeedbackController(this)
+        feedbackController = AndroidFeedbackController(this, appContainer.localeProvider)
         enableEdgeToEdge()
         setContent {
             SteppieTheme {
@@ -118,55 +103,20 @@ class MainActivity : ComponentActivity() {
                     .collectAsStateWithLifecycle(initialValue = AppSettings())
                 val targetRoutineId by notificationRoutineId.collectAsStateWithLifecycle()
                 var notificationPermissionRefresh by remember { mutableIntStateOf(0) }
-                var photoTargetName by rememberSaveable { mutableStateOf<String?>(null) }
-                var cameraPhotoTargetName by rememberSaveable { mutableStateOf<String?>(null) }
-                var cameraPhotoUriString by rememberSaveable { mutableStateOf<String?>(null) }
                 var appBootstrapComplete by rememberSaveable { mutableStateOf(false) }
-                val notificationPermissionLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission(),
-                ) {
+                val notificationPermissionActions = rememberNotificationPermissionActions {
                     notificationPermissionRefresh += 1
                 }
-                val photoPickerLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.StartActivityForResult(),
-                ) { result ->
-                    val request = resolvePhotoPickerResult(
-                        targetName = photoTargetName,
-                        uri = result.data?.data?.toString(),
-                    )
-                    photoTargetName = null
-                    when (request?.target) {
+                val photoActivityActions = rememberPhotoActivityActions { request ->
+                    when (request.target) {
                         PhotoTarget.RoutineDraft -> guardianViewModel.importDraftPhoto(request.uri.toUri())
                         PhotoTarget.RoutineSetStep -> guardianViewModel.importRoutineSetStepPhoto(request.uri.toUri())
-                        null -> Unit
                     }
                 }
-                val cameraLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.TakePicture(),
-                ) { success ->
-                    val request = resolveCameraResult(
-                        targetName = cameraPhotoTargetName,
-                        uri = cameraPhotoUriString,
-                        succeeded = success,
-                    )
-                    cameraPhotoTargetName = null
-                    cameraPhotoUriString = null
-                    when (request?.target) {
-                        PhotoTarget.RoutineDraft -> guardianViewModel.importDraftPhoto(request.uri.toUri())
-                        PhotoTarget.RoutineSetStep -> guardianViewModel.importRoutineSetStepPhoto(request.uri.toUri())
-                        null -> Unit
-                    }
-                }
-                val createBackupLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.CreateDocument("application/zip"),
-                ) { uri ->
-                    uri?.let(guardianViewModel::exportBackup)
-                }
-                val openBackupLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.OpenDocument(),
-                ) { uri ->
-                    uri?.let(guardianViewModel::previewRestoreBackup)
-                }
+                val backupDocumentActions = rememberBackupDocumentActions(
+                    onCreateDocument = guardianViewModel::exportBackup,
+                    onOpenDocument = guardianViewModel::previewRestoreBackup,
+                )
 
                 LaunchedEffect(childViewModel) {
                     childViewModel.feedbackEvents.collect(feedbackController::play)
@@ -194,6 +144,8 @@ class MainActivity : ComponentActivity() {
                         routines = input.routines,
                         completedRoutineIds = input.completedRoutineIds,
                         settings = input.settings,
+                        now = appContainer.clockProvider.now(),
+                        date = appContainer.clockProvider.today(),
                     )
                 }
                 LaunchedEffect(targetRoutineId, childState.routines) {
@@ -231,7 +183,11 @@ class MainActivity : ComponentActivity() {
                     showFor = tutorialViewModel::showFor,
                 )
 
-                CompositionLocalProvider(LocalTutorialAnchorRegistry provides tutorialAnchorRegistry) {
+                CompositionLocalProvider(
+                    LocalPresentationClockProvider provides appContainer.clockProvider,
+                    LocalPresentationLocaleProvider provides appContainer.localeProvider,
+                    LocalTutorialAnchorRegistry provides tutorialAnchorRegistry,
+                ) {
                 val appMode = resolveAppMode(
                     bootstrapComplete = appBootstrapComplete,
                     guardianActive = guardianState.isActive,
@@ -257,14 +213,10 @@ class MainActivity : ComponentActivity() {
                             onDraftTitleChange = guardianViewModel::updateDraftTitle,
                             onDraftIconChange = guardianViewModel::updateDraftIcon,
                             onDraftPhotoPick = {
-                                photoTargetName = PhotoTarget.RoutineDraft.name
-                                photoPickerLauncher.launch(imageGalleryIntent())
+                                photoActivityActions.pick(PhotoTarget.RoutineDraft)
                             },
                             onDraftCameraCapture = {
-                                val uri = createCameraImageUri()
-                                cameraPhotoTargetName = PhotoTarget.RoutineDraft.name
-                                cameraPhotoUriString = uri.toString()
-                                cameraLauncher.launch(uri)
+                                photoActivityActions.capture(PhotoTarget.RoutineDraft)
                             },
                             onDraftPhotoRemove = guardianViewModel::removeDraftPhoto,
                             onDraftColorChange = guardianViewModel::updateDraftColor,
@@ -290,14 +242,10 @@ class MainActivity : ComponentActivity() {
                             onRoutineSetStepTitleChange = guardianViewModel::updateRoutineSetStepTitle,
                             onRoutineSetStepIconChange = guardianViewModel::updateRoutineSetStepIcon,
                             onRoutineSetStepPhotoPick = {
-                                photoTargetName = PhotoTarget.RoutineSetStep.name
-                                photoPickerLauncher.launch(imageGalleryIntent())
+                                photoActivityActions.pick(PhotoTarget.RoutineSetStep)
                             },
                             onRoutineSetStepCameraCapture = {
-                                val uri = createCameraImageUri()
-                                cameraPhotoTargetName = PhotoTarget.RoutineSetStep.name
-                                cameraPhotoUriString = uri.toString()
-                                cameraLauncher.launch(uri)
+                                photoActivityActions.capture(PhotoTarget.RoutineSetStep)
                             },
                             onRoutineSetStepPhotoRemove = guardianViewModel::removeRoutineSetStepPhoto,
                             onRoutineSetStepColorChange = guardianViewModel::updateRoutineSetStepColor,
@@ -335,14 +283,7 @@ class MainActivity : ComponentActivity() {
                             onHapticEnabledChange = guardianViewModel::updateHapticEnabled,
                             onNotificationLeadTimeChange = { leadMinutes, enabled ->
                                 guardianViewModel.updateNotificationLeadTime(leadMinutes, enabled)
-                                if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                    ContextCompat.checkSelfPermission(
-                                        this@MainActivity,
-                                        Manifest.permission.POST_NOTIFICATIONS,
-                                    ) != PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
+                                if (enabled) notificationPermissionActions.requestIfNeeded()
                             },
                             onQuietHoursEnabledChange = guardianViewModel::updateQuietHoursEnabled,
                             onQuietHoursStartChange = guardianViewModel::updateQuietHoursStart,
@@ -356,10 +297,15 @@ class MainActivity : ComponentActivity() {
                             onOpenRecoveryCode = guardianViewModel::openRecoveryCodeRegeneration,
                             onOpenRecoveryPinReset = guardianViewModel::openRecoveryPinReset,
                             onCreateBackupFile = {
-                                createBackupLauncher.launch(AndroidBackupRepository.defaultFileName())
+                                backupDocumentActions.create(
+                                    formatBackupFileName(
+                                        now = appContainer.clockProvider.now(),
+                                        zoneId = appContainer.clockProvider.zoneId,
+                                    ),
+                                )
                             },
                             onOpenRestoreFile = {
-                                openBackupLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
+                                backupDocumentActions.open()
                             },
                             onRestorePinDigit = guardianViewModel::inputRestorePinDigit,
                             onDeleteRestorePinDigit = guardianViewModel::deleteRestorePinDigit,
@@ -417,16 +363,6 @@ class MainActivity : ComponentActivity() {
             ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
     }
-
-    private fun imageGalleryIntent(): Intent = Intent(Intent.ACTION_PICK).apply {
-        setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*")
-    }
-
-    private fun createCameraImageUri(): Uri {
-        val directory = File(cacheDir, "camera_photos").apply { mkdirs() }
-        val file = File.createTempFile("routine-photo-", ".jpg", directory)
-        return FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
-    }
 }
 
 private fun android.content.Intent?.notificationRoutineId(): String? =
@@ -435,54 +371,3 @@ private fun android.content.Intent?.notificationRoutineId(): String? =
         routineId = this?.getStringExtra(EXTRA_ROUTINE_ID),
         expectedAction = ACTION_OPEN_ROUTINE,
     )
-
-private class AndroidFeedbackController(
-    private val activity: ComponentActivity,
-) {
-    private var ttsReady = false
-    private var tts: TextToSpeech? = null
-    private val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 40)
-
-    init {
-        tts = TextToSpeech(activity) { status ->
-            ttsReady = status == TextToSpeech.SUCCESS
-            if (ttsReady) {
-                tts?.language = Locale.getDefault()
-                tts?.setSpeechRate(1.0f)
-            }
-        }
-    }
-
-    fun play(event: ChildRoutineFeedbackEvent) {
-        if (event.vibrate) vibrate()
-        if (event.sound) {
-            toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 120)
-        }
-        val spokenText = event.spokenText
-        if (ttsReady && spokenText != null) {
-            tts?.stop()
-            tts?.setSpeechRate(event.ttsRate)
-            val params = Bundle().apply {
-                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, event.ttsVolume)
-            }
-            tts?.speak(spokenText, TextToSpeech.QUEUE_FLUSH, params, "routine-complete")
-        }
-    }
-
-    fun shutdown() {
-        tts?.stop()
-        tts?.shutdown()
-        tts = null
-        toneGenerator.release()
-    }
-
-    private fun vibrate() {
-        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            activity.getSystemService(VibratorManager::class.java).defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            activity.getSystemService(Vibrator::class.java)
-        }
-        vibrator.vibrate(VibrationEffect.createOneShot(60, VibrationEffect.DEFAULT_AMPLITUDE))
-    }
-}

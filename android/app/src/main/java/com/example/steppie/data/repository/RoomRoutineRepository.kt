@@ -8,9 +8,11 @@ import com.example.steppie.data.local.toDomain
 import com.example.steppie.data.local.toEntity
 import com.example.steppie.data.local.toRecordsDomain
 import com.example.steppie.domain.model.DailyLog
-import com.example.steppie.domain.model.LogStatus
+import com.example.steppie.domain.model.DailyLogTransition
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.domain.model.childRoutineSetsInScheduleOrder
+import com.example.steppie.domain.model.inRoutineOrder
 import com.example.steppie.domain.model.newUuidV4
 import com.example.steppie.domain.model.requireUuidV4
 import com.example.steppie.domain.repository.RoutineRepository
@@ -38,13 +40,7 @@ class RoomRoutineRepository(
     override fun observeRoutineSetsForDate(date: LocalDate): Flow<List<RoutineSet>> =
         dao.observeRoutineSets().map { sets ->
             sets.map { it.toDomain() }
-                .filter(RoutineSet::isActive)
-                .sortedWith(
-                    compareBy<RoutineSet> { it.startTime != null }
-                        .thenBy { it.startTime }
-                        .thenBy { it.createdAt }
-                        .thenBy { it.id },
-                )
+                .childRoutineSetsInScheduleOrder()
         }
 
     override fun observeRoutineSetForDate(date: LocalDate): Flow<RoutineSet?> =
@@ -83,7 +79,7 @@ class RoomRoutineRepository(
     override suspend fun createRoutineSet(routineSet: RoutineSet): RoutineSet = database.withTransaction {
         check(dao.getRoutineSetEntity(routineSet.id) == null) { "RoutineSet already exists: ${routineSet.id}" }
         dao.insertRoutineSet(routineSet.toEntity())
-        routineSet.routines.sortedBy(Routine::order).forEach { dao.insertRoutine(it.toEntity()) }
+        routineSet.routines.inRoutineOrder().forEach { dao.insertRoutine(it.toEntity()) }
         requireNotNull(dao.getRoutineSet(routineSet.id)).toDomain()
     }
 
@@ -215,16 +211,14 @@ class RoomRoutineRepository(
     ): DailyLog = database.withTransaction {
         requireUuidV4(routineId, "Routine.id")
         val routine = requireNotNull(dao.getVisibleRoutineEntity(routineId)) { "Routine not found: $routineId" }
-        val existing = dao.getDailyLog(date.toString(), routineId)
-        val saved = DailyLog(
-            id = existing?.id ?: newUuidV4(),
+        val existing = dao.getDailyLog(date.toString(), routineId)?.toDomain()
+        val saved = DailyLogTransition.complete(
+            existing = existing,
+            newLogId = existing?.id ?: newUuidV4(),
             date = date,
             routineId = routineId,
             routineSetId = routine.routineSetId,
-            status = LogStatus.Completed,
             completedAt = completedAt,
-            createdAt = existing?.createdAtEpochMillis?.let(Instant::ofEpochMilli) ?: completedAt,
-            updatedAt = completedAt,
         )
         dao.upsertDailyLog(saved.toEntity())
         saved
@@ -237,15 +231,13 @@ class RoomRoutineRepository(
     ): DailyLog = database.withTransaction {
         requireUuidV4(routineId, "Routine.id")
         val routine = requireNotNull(dao.getVisibleRoutineEntity(routineId)) { "Routine not found: $routineId" }
-        val existing = dao.getDailyLog(date.toString(), routineId)
-        val saved = DailyLog(
-            id = existing?.id ?: newUuidV4(),
+        val existing = dao.getDailyLog(date.toString(), routineId)?.toDomain()
+        val saved = DailyLogTransition.undo(
+            existing = existing,
+            newLogId = existing?.id ?: newUuidV4(),
             date = date,
             routineId = routineId,
             routineSetId = routine.routineSetId,
-            status = LogStatus.Undone,
-            completedAt = null,
-            createdAt = existing?.createdAtEpochMillis?.let(Instant::ofEpochMilli) ?: updatedAt,
             updatedAt = updatedAt,
         )
         dao.upsertDailyLog(saved.toEntity())

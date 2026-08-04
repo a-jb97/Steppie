@@ -51,6 +51,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.steppie.R
+import com.example.steppie.presentation.environment.currentPresentationLocale
+import com.example.steppie.presentation.environment.currentPresentationZoneId
 import com.example.steppie.presentation.formatting.formatCalendarMonth
 import com.example.steppie.presentation.formatting.formatCompletedTime
 import com.example.steppie.presentation.formatting.formatFullRecordDate
@@ -66,9 +68,7 @@ import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 
 @Composable
 internal fun GuardianRecordsScreen(
@@ -182,7 +182,7 @@ private fun GuardianRecordDayRow(
             verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
         ) {
             Text(
-                text = formatWeekday(day.date, Locale.getDefault()),
+                text = formatWeekday(day.date, currentPresentationLocale()),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = SteppieTheme.typography.guardianSection,
             )
@@ -412,7 +412,7 @@ private fun GuardianRecordsCalendarHeader(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = formatCalendarMonth(month, Locale.getDefault()),
+                text = formatCalendarMonth(month, currentPresentationLocale()),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = SteppieTheme.typography.guardianSection,
                 textAlign = TextAlign.Center,
@@ -524,7 +524,7 @@ private fun GuardianRecordsCalendarGrid(
     selectedDate: LocalDate?,
     onSelectDate: (LocalDate) -> Unit,
 ) {
-    val locale = Locale.getDefault()
+    val locale = currentPresentationLocale()
     val weekdays = orderedWeekdays(locale)
     val firstOfMonth = month.atDay(1)
     val leadingBlankCount = weekdays.indexOf(firstOfMonth.dayOfWeek).coerceAtLeast(0)
@@ -636,7 +636,7 @@ private fun GuardianRecordsDetail(
         verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Medium),
     ) {
         Text(
-            text = formatFullRecordDate(summary.date, Locale.getDefault()),
+            text = formatFullRecordDate(summary.date, currentPresentationLocale()),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = SteppieTheme.typography.guardianTitle,
         )
@@ -738,7 +738,7 @@ private fun GuardianRecordRoutineRow(routine: GuardianRecordRoutine) {
     val title = routine.title ?: stringResource(R.string.guardian_records_deleted_routine)
     val status = stringResource(if (routine.isCompleted) R.string.guardian_records_completed else R.string.guardian_records_not_completed)
     val completedTime = routine.completedAt?.let {
-        formatCompletedTime(it, Locale.getDefault(), ZoneId.systemDefault())
+        formatCompletedTime(it, currentPresentationLocale(), currentPresentationZoneId())
     }
     val statusDetail = if (routine.isCompleted && completedTime != null) {
         stringResource(R.string.guardian_records_completed_at, completedTime)

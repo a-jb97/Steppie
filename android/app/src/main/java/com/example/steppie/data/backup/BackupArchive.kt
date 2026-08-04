@@ -4,8 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
-import java.time.Instant
-import java.util.Locale
+import java.time.ZoneId
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -14,15 +13,17 @@ internal object BackupArchive {
     fun write(
         snapshot: BackupSnapshot,
         appVersion: String,
+        zoneId: ZoneId,
         output: OutputStream,
         assets: Map<String, ByteArray> = emptyMap(),
     ) {
-        val dataJson = BackupJson.encodeData(snapshot)
+        val dataJson = BackupJson.encodeData(snapshot, zoneId)
         val checksum = sha256(dataJson.toByteArray(Charsets.UTF_8))
         val manifestJson = BackupJson.encodeManifest(
             createdAt = snapshot.exportedAt,
             appVersion = appVersion,
             dataChecksum = checksum,
+            zoneId = zoneId,
         )
         ZipOutputStream(output.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry("manifest.json"))
@@ -79,13 +80,6 @@ internal object BackupArchive {
             throw BackupValidationException("백업 사진 에셋이 5MB를 초과합니다.")
         }
         return ReadBackup(manifest = manifest, snapshot = snapshot, assets = assets)
-    }
-
-    fun defaultFileName(now: Instant = Instant.now()): String {
-        val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
-            .withLocale(Locale.US)
-            .withZone(java.time.ZoneId.systemDefault())
-        return "steppie-backup-${formatter.format(now)}.zip"
     }
 
     private fun ZipInputStream.readEntryBytes(): ByteArray {

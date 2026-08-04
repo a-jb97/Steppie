@@ -51,4 +51,15 @@ class DateTimeTextFormatterTest {
         assertEquals("12:00\u202FAM", formatCompletedTime(completedAt, Locale.US, ZoneOffset.UTC))
         assertEquals("9:00\u202FAM", formatCompletedTime(completedAt, Locale.US, ZoneId.of("Asia/Seoul")))
     }
+
+    @Test
+    fun `backup file name keeps the contract pattern in the supplied local zone`() {
+        val now = Instant.parse("2026-06-17T00:00:00Z")
+
+        assertEquals("steppie-backup-20260617-000000.zip", formatBackupFileName(now, ZoneOffset.UTC))
+        assertEquals(
+            "steppie-backup-20260617-090000.zip",
+            formatBackupFileName(now, ZoneId.of("Asia/Seoul")),
+        )
+    }
 }

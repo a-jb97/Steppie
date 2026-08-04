@@ -47,3 +47,10 @@ internal fun formatCompletedTime(
 ): String = completedAt.atZone(zoneId).format(
     DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale),
 )
+
+internal fun formatBackupFileName(now: Instant, zoneId: ZoneId): String {
+    val timestamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.US)
+        .withZone(zoneId)
+        .format(now)
+    return "steppie-backup-$timestamp.zip"
+}

@@ -88,7 +88,7 @@ data class Routine(
     val order: Int,
     val scheduledTime: LocalTime? = null,
     val isActive: Boolean = true,
-    val createdAt: Instant = Instant.now(),
+    val createdAt: Instant,
     val updatedAt: Instant = createdAt,
     val deletedAt: Instant? = null,
 ) {
@@ -111,7 +111,7 @@ data class RoutineSet(
     val name: LocalizedText,
     val isActive: Boolean = false,
     val startTime: LocalTime? = null,
-    val createdAt: Instant = Instant.now(),
+    val createdAt: Instant,
     val updatedAt: Instant = createdAt,
     val deletedAt: Instant? = null,
     val routines: List<Routine> = emptyList(),
@@ -125,7 +125,7 @@ data class RoutineSet(
         require(deletedAt == null || deletedAt >= createdAt) { "RoutineSet.deletedAt cannot precede createdAt." }
         require(!(isActive && deletedAt != null)) { "An active RoutineSet cannot be deleted." }
         require(routines.all { it.routineSetId == id }) { "Every routine must belong to this RoutineSet." }
-        val visible = routines.filter { it.deletedAt == null }
+        val visible = routines.filter(Routine::isVisible)
         require(visible.map(Routine::order).distinct().size == visible.size) {
             "Visible routine orders must be unique within a RoutineSet."
         }
@@ -199,7 +199,7 @@ data class DailyLog(
     val routineSetId: String,
     val status: LogStatus = LogStatus.Undone,
     val completedAt: Instant? = null,
-    val createdAt: Instant = Instant.now(),
+    val createdAt: Instant,
     val updatedAt: Instant = createdAt,
 ) {
     init {

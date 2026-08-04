@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.example.steppie.R
 import com.example.steppie.domain.model.IconRef
+import com.example.steppie.presentation.environment.currentPresentationLocale
 import com.example.steppie.ui.child.RoutineIcon
 import com.example.steppie.ui.components.SteppieButton
 import com.example.steppie.ui.components.SteppieButtonStyle
@@ -37,7 +38,6 @@ import com.example.steppie.ui.theme.SteppieCornerRadius
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieStroke
 import com.example.steppie.ui.theme.SteppieTheme
-import java.util.Locale
 
 @Composable
 internal fun GuardianTemplateSelectScreen(
@@ -110,7 +110,7 @@ private fun TemplateSelectionRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val templateName = template.name.resolve(null, Locale.getDefault().toLanguageTag())
+    val templateName = template.name.resolve(null, currentPresentationLocale().toLanguageTag())
     val stepCount = stringResource(R.string.guardian_template_step_count, template.steps.size)
     val accessibilityDescription = stringResource(R.string.a11y_template_row, templateName, stepCount)
     val selectionState = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
@@ -180,7 +180,7 @@ private fun TemplatePreviewSummary(
     template: RoutineTemplate,
     modifier: Modifier = Modifier,
 ) {
-    val templateName = template.name.resolve(null, Locale.getDefault().toLanguageTag())
+    val templateName = template.name.resolve(null, currentPresentationLocale().toLanguageTag())
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(SteppieSpacing.TwoExtraSmall),
@@ -218,7 +218,7 @@ private fun TemplatePreviewStepRow(
     index: Int,
     step: RoutineTemplateStep,
 ) {
-    val title = step.title.resolve(null, Locale.getDefault().toLanguageTag())
+    val title = step.title.resolve(null, currentPresentationLocale().toLanguageTag())
     Row(
         modifier = Modifier
             .fillMaxWidth()

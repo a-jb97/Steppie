@@ -5,6 +5,8 @@ import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
+import com.example.steppie.domain.model.inRoutineOrder
+import com.example.steppie.domain.model.visibleRoutinesInOrder
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -66,17 +68,14 @@ fun RoutineSet.toEntity(): RoutineSetEntity = RoutineSetEntity(
 
 fun RoutineSetWithRoutines.toDomain(): RoutineSet = routineSet.toDomain(
     routines = routines
-        .asSequence()
-        .filter { it.deletedAtEpochMillis == null }
-        .sortedBy(RoutineEntity::sortOrder)
         .map(RoutineEntity::toDomain)
-        .toList(),
+        .visibleRoutinesInOrder(),
 )
 
 fun RoutineSetWithRoutines.toRecordsDomain(): RoutineSet = routineSet.toDomain(
     routines = routines
-        .sortedBy(RoutineEntity::sortOrder)
-        .map(RoutineEntity::toDomain),
+        .map(RoutineEntity::toDomain)
+        .inRoutineOrder(),
 )
 
 fun RoutineSetEntity.toDomain(routines: List<Routine> = emptyList()): RoutineSet = RoutineSet(

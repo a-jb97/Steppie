@@ -63,6 +63,13 @@ class AppShellRoutingTest {
     }
 
     @Test
+    fun `notification permission is requested only when required by the platform and still denied`() {
+        assertFalse(shouldRequestNotificationPermission(apiLevel = 32, permissionGranted = false))
+        assertTrue(shouldRequestNotificationPermission(apiLevel = 33, permissionGranted = false))
+        assertFalse(shouldRequestNotificationPermission(apiLevel = 33, permissionGranted = true))
+    }
+
+    @Test
     fun `notification route waits for its routine then selects and consumes once`() {
         val pending = resolveNotificationRoute(
             targetRoutineId = "target",

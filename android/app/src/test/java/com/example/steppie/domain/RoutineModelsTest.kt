@@ -4,6 +4,7 @@ import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.Routine
+import java.time.Instant
 import java.time.LocalTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -66,5 +67,6 @@ class RoutineModelsTest {
         colorToken = colorToken,
         order = 0,
         scheduledTime = scheduledTime,
+        createdAt = Instant.parse("2026-01-02T00:00:00Z"),
     )
 }

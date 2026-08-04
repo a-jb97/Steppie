@@ -12,9 +12,11 @@ import com.example.steppie.data.local.SteppieDatabase
 import com.example.steppie.data.photo.RoutinePhotoStore
 import com.example.steppie.data.repository.DataStoreAppSettingsRepository
 import com.example.steppie.data.repository.RoomRoutineRepository
+import com.example.steppie.data.security.Pbkdf2PinCredentialService
 import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.domain.repository.RoutineRepository
 import com.example.steppie.notifications.AndroidRoutineNotificationScheduler
+import com.example.steppie.notifications.RoutineNotificationPlanner
 import com.example.steppie.notifications.RoutineNotificationScheduler
 import com.example.steppie.ui.tutorial.TutorialProgressRepository
 
@@ -31,7 +33,10 @@ class AppContainer(context: Context) {
         RoomRoutineRepository(database)
     }
     val appSettingsRepository: AppSettingsRepository by lazy {
-        DataStoreAppSettingsRepository(appContext)
+        DataStoreAppSettingsRepository(
+            context = appContext,
+            pinCredentials = Pbkdf2PinCredentialService(),
+        )
     }
     val tutorialProgressRepository: TutorialProgressRepository by lazy {
         TutorialProgressRepository(appContext)
@@ -43,9 +48,16 @@ class AppContainer(context: Context) {
         AndroidBackupRepository(
             context = appContext,
             dataSource = BackupDataSource(database, appSettingsRepository, routinePhotoStore),
+            clockProvider = clockProvider,
         )
     }
     val notificationScheduler: RoutineNotificationScheduler by lazy {
-        AndroidRoutineNotificationScheduler(appContext)
+        AndroidRoutineNotificationScheduler(
+            context = appContext,
+            planner = RoutineNotificationPlanner(
+                zoneId = clockProvider.zoneId,
+                localeProvider = localeProvider,
+            ),
+        )
     }
 }

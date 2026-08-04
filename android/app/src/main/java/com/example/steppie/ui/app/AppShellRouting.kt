@@ -87,6 +87,11 @@ internal data class PhotoImportRequest(
     val uri: String,
 )
 
+internal fun shouldRequestNotificationPermission(
+    apiLevel: Int,
+    permissionGranted: Boolean,
+): Boolean = apiLevel >= 33 && !permissionGranted
+
 internal fun resolvePhotoPickerResult(
     targetName: String?,
     uri: String?,

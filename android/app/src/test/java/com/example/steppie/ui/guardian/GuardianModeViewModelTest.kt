@@ -106,6 +106,59 @@ class GuardianModeViewModelTest {
     }
 
     @Test
+    fun `closing guardian resets session state while preserving observed routine data`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val routineSets = viewModel.uiState.value.routineSets
+            val selectedRoutineSetId = viewModel.uiState.value.selectedRoutineSetId
+            viewModel.openRoutineEdit()
+            viewModel.openNewRoutineEditor()
+            viewModel.updateDraftTitle("임시 활동")
+
+            viewModel.closeToChild()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.isActive)
+            assertFalse(state.isAuthenticated)
+            assertEquals(GuardianDestination.Pin, state.destination)
+            assertNull(state.draft)
+            assertEquals(routineSets, state.routineSets)
+            assertEquals(selectedRoutineSetId, state.selectedRoutineSetId)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `closing setup recovery code ends guardian session with pin configured`() = runTest {
+        val fixture = guardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            viewModel.openInitialSetup()
+            inputPin(viewModel, "1234")
+            inputPin(viewModel, "1234")
+            runCurrent()
+
+            assertEquals(GuardianRecoveryStep.ShowCode, viewModel.uiState.value.recoveryStep)
+
+            viewModel.closeRecoveryCode()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.isActive)
+            assertFalse(state.isAuthenticated)
+            assertTrue(state.hasGuardianPin)
+            assertEquals(GuardianDestination.Pin, state.destination)
+            assertNull(state.recoveryStep)
+            assertNull(state.recoveryCodeToShow)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
     fun `guardian navigation returns through its back stack and clears transient drafts`() = runTest {
         val fixture = authenticatedGuardianFixture()
         val viewModel = fixture.viewModel
@@ -170,6 +223,265 @@ class GuardianModeViewModelTest {
             assertEquals(GuardianDestination.RoutineEdit, state.destination)
             assertNull(state.draft)
             assertNull(state.draftError)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `existing routine save preserves identity and ordering while updating editable fields`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val existing = viewModel.uiState.value.routines.first()
+            viewModel.openRoutineEdit()
+            viewModel.openRoutineEditor(existing.id)
+            viewModel.updateDraftTitle("  수정한 활동  ")
+            viewModel.updateDraftScheduledTime("09:20")
+
+            viewModel.saveDraft()
+            runCurrent()
+
+            val saved = requireNotNull(fixture.routineRepository.getRoutine(existing.id))
+            assertEquals(existing.id, saved.id)
+            assertEquals(existing.createdAt, saved.createdAt)
+            assertEquals(existing.order, saved.order)
+            assertEquals(mapOf("ko" to "수정한 활동"), saved.title.values)
+            assertEquals("09:20", saved.scheduledTime.toString())
+            assertEquals(TestInstant, saved.updatedAt)
+            assertEquals(GuardianDestination.RoutineEdit, viewModel.uiState.value.destination)
+            assertNull(viewModel.uiState.value.draft)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `routine set save persists its steps then clears the editor`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            viewModel.openRoutineEdit()
+            viewModel.openRoutineSetCreate()
+            viewModel.updateRoutineSetName("  외출 준비  ")
+            viewModel.updateRoutineSetStepTitle("  가방 챙기기  ")
+            viewModel.updateRoutineSetStepScheduledTime("10:30")
+            viewModel.addRoutineSetStep()
+
+            viewModel.saveRoutineSetDraft()
+            runCurrent()
+
+            val saved = fixture.routineRepository.observeRoutineSets().first()
+                .single { it.name.values["ko"] == "외출 준비" }
+            assertFalse(saved.isActive)
+            assertEquals(1, saved.routines.size)
+            assertEquals("가방 챙기기", saved.routines.single().title.values["ko"])
+            assertEquals("10:30", saved.routines.single().scheduledTime.toString())
+            assertEquals(GuardianDestination.RoutineEdit, viewModel.uiState.value.destination)
+            assertNull(viewModel.uiState.value.routineSetDraft)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `routine move persists the requested adjacent ordering and ignores its boundary`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val initialIds = viewModel.uiState.value.routines.map { it.id }
+            assertTrue(initialIds.size >= 2)
+
+            viewModel.moveRoutine(initialIds.first(), direction = -1)
+            runCurrent()
+            assertEquals(
+                initialIds,
+                fixture.routineRepository.observeRoutineSets().first().single().routines.map { it.id },
+            )
+
+            viewModel.moveRoutine(initialIds.first(), direction = 1)
+            runCurrent()
+
+            val reorderedIds = fixture.routineRepository.observeRoutineSets().first().single().routines.map { it.id }
+            assertEquals(initialIds[1], reorderedIds[0])
+            assertEquals(initialIds[0], reorderedIds[1])
+            assertEquals(initialIds.drop(2), reorderedIds.drop(2))
+            assertTrue(
+                fixture.routineRepository.observeRoutineSets().first().single().routines
+                    .all { it.updatedAt == TestInstant },
+            )
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `template save invokes callback before success state and persists routine set`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val callbackDestinations = mutableListOf<GuardianDestination>()
+            viewModel.openRoutineEdit()
+            viewModel.openTemplateSelect()
+
+            viewModel.saveTemplatePreview {
+                callbackDestinations += viewModel.uiState.value.destination
+            }
+            runCurrent()
+
+            val routineSets = fixture.routineRepository.observeRoutineSets().first()
+            val state = viewModel.uiState.value
+
+            assertEquals(listOf(GuardianDestination.TemplateSelect), callbackDestinations)
+            assertEquals(2, routineSets.size)
+            assertEquals(1, routineSets.count { it.isActive })
+            assertEquals(GuardianDestination.RoutineEdit, state.destination)
+            assertNull(state.selectedTemplate)
+            assertEquals("템플릿으로 새 루틴 세트를 저장했습니다.", state.notice)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `only active routine set cannot be removed from daily participation`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val routineSet = viewModel.uiState.value.routineSets.single()
+
+            viewModel.setRoutineSetForToday(routineSet.id)
+
+            val persisted = fixture.routineRepository.observeRoutineSets().first().single()
+            assertTrue(persisted.isActive)
+            assertEquals("최소 한 개의 루틴 세트는 매일 진행해야 합니다.", viewModel.uiState.value.notice)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `routine set start time validates input then persists a valid time`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val routineSetId = viewModel.uiState.value.routineSets.single().id
+
+            viewModel.updateRoutineSetStartTime(routineSetId, "8시")
+
+            assertEquals("시작 시각은 HH:mm 형식으로 입력해 주세요.", viewModel.uiState.value.draftError)
+            assertNull(fixture.routineRepository.observeRoutineSets().first().single().startTime)
+
+            viewModel.updateRoutineSetStartTime(routineSetId, "08:15")
+            runCurrent()
+
+            assertEquals("08:15", fixture.routineRepository.observeRoutineSets().first().single().startTime.toString())
+            assertNull(viewModel.uiState.value.draftError)
+            assertEquals("루틴 세트 시작 시간을 저장했습니다.", viewModel.uiState.value.notice)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `routine set name edit resolves locale and persists the trimmed name`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val routineSet = viewModel.uiState.value.routineSets.single()
+
+            viewModel.requestEditRoutineSetName(routineSet.id)
+            assertEquals(routineSet.name.resolve(null, "ko"), viewModel.uiState.value.editingRoutineSetName)
+
+            viewModel.updateEditingRoutineSetName("  새 루틴 이름  ")
+            viewModel.saveEditingRoutineSetName()
+            runCurrent()
+
+            val persisted = fixture.routineRepository.observeRoutineSets().first().single()
+            assertEquals(mapOf("ko" to "새 루틴 이름"), persisted.name.values)
+            assertNull(viewModel.uiState.value.editingRoutineSetId)
+            assertEquals("", viewModel.uiState.value.editingRoutineSetName)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `routine deletion clears the request after repository deletion`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            viewModel.openRoutineEdit()
+            val routineId = requireNotNull(viewModel.uiState.value.routines.firstOrNull()).id
+
+            viewModel.requestDelete(routineId)
+            assertEquals(routineId, viewModel.uiState.value.pendingDeleteRoutineId)
+
+            viewModel.confirmDelete()
+            runCurrent()
+
+            val routineSet = fixture.routineRepository.observeRoutineSetsForRecords().first().single()
+            val deletedRoutine = routineSet.routines.single { it.id == routineId }
+            assertEquals(TestInstant, deletedRoutine.updatedAt)
+            assertEquals(TestInstant, deletedRoutine.deletedAt)
+            assertNull(viewModel.uiState.value.pendingDeleteRoutineId)
+            assertEquals(GuardianDestination.RoutineEdit, viewModel.uiState.value.destination)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `last routine set deletion is rejected without repository mutation`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val routineSetId = viewModel.uiState.value.routineSets.single().id
+            viewModel.requestDeleteRoutineSet(routineSetId)
+            viewModel.confirmDeleteRoutineSet()
+
+            assertEquals(1, fixture.routineRepository.observeRoutineSets().first().size)
+            assertNull(viewModel.uiState.value.pendingDeleteRoutineSetId)
+            assertEquals("마지막 루틴 세트는 삭제할 수 없습니다.", viewModel.uiState.value.notice)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `deleting the only active routine set activates a replacement first`() = runTest {
+        val fixture = authenticatedGuardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            val activeId = viewModel.uiState.value.routineSets.single().id
+            val replacement = requireNotNull(RoutineTemplates.find(RoutineTemplateId.Bedtime))
+                .instantiate(TestInstant)
+            fixture.routineRepository.createRoutineSet(replacement)
+            runCurrent()
+
+            viewModel.requestDeleteRoutineSet(activeId)
+            viewModel.confirmDeleteRoutineSet()
+            runCurrent()
+
+            val remaining = fixture.routineRepository.observeRoutineSets().first().single()
+            assertEquals(replacement.id, remaining.id)
+            assertTrue(remaining.isActive)
+            val deleted = fixture.routineRepository.observeRoutineSetsForRecords().first()
+                .single { it.id == activeId }
+            assertEquals(TestInstant, deleted.updatedAt)
+            assertEquals(TestInstant, deleted.deletedAt)
+            assertNull(viewModel.uiState.value.pendingDeleteRoutineSetId)
+            assertTrue(viewModel.uiState.value.routineSetListEditing)
         } finally {
             viewModel.viewModelScope.cancel()
         }

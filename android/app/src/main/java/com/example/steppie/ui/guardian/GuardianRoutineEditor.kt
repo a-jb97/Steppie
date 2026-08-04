@@ -41,6 +41,7 @@ import com.example.steppie.R
 import com.example.steppie.domain.model.BuiltinIconNames
 import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.RoutineColorTokens
+import com.example.steppie.presentation.environment.currentPresentationLocale
 import com.example.steppie.presentation.formatting.formatLocalizedTime
 import com.example.steppie.ui.child.RoutineIcon
 import com.example.steppie.ui.components.SteppieButton
@@ -133,7 +134,7 @@ internal fun ScheduledTimePicker(
     val fallbackTime = selectedTime ?: LocalTime.NOON
     val normalizedTime = selectedTime?.toStorageString().orEmpty()
     val selectedText = normalizedTime.ifBlank { stringResource(R.string.guardian_time_none) }
-    val displayText = selectedTime?.let { formatLocalizedTime(it, Locale.getDefault()) }
+    val displayText = selectedTime?.let { formatLocalizedTime(it, currentPresentationLocale()) }
         ?: scheduledTime.ifBlank { stringResource(R.string.guardian_time_none) }
 
     fun showTimePicker() {
