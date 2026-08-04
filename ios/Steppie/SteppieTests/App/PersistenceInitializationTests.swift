@@ -28,4 +28,18 @@ struct PersistenceInitializationTests {
         #expect(initialization.modelContainer != nil)
         #expect(initialization.errorDescription == nil)
     }
+
+    @Test("영속 스키마는 데이터 계약 모델만 포함한다")
+    func persistenceSchemaContainsOnlyContractModels() {
+        let expectedModels: Set<ObjectIdentifier> = [
+            ObjectIdentifier(RoutineSetRecord.self),
+            ObjectIdentifier(RoutineRecord.self),
+            ObjectIdentifier(DailyLogRecord.self),
+            ObjectIdentifier(AppSettingsRecord.self),
+            ObjectIdentifier(DailyRoutineAssignmentRecord.self),
+        ]
+        let actualModels = Set(RoutinePersistenceSchema.models.map(ObjectIdentifier.init))
+
+        #expect(actualModels == expectedModels)
+    }
 }
