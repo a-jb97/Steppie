@@ -41,13 +41,3 @@ struct FileBackupAssetStore: BackupAssetStore {
         return directoryURL.appendingPathComponent(name, isDirectory: false)
     }
 }
-
-protocol BackupStorageProvider {
-    var name: String { get }
-}
-
-struct LocalFileBackupProvider: BackupStorageProvider {
-    let name = "local-file"
-}
-
-protocol CloudBackupProvider: BackupStorageProvider {}
