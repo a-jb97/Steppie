@@ -1091,6 +1091,38 @@
         }
       }
     },
+    "startup.persistence.error.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your data wasn't changed. Close Steppie and try opening it again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데이터는 변경되지 않았어요. Steppie를 종료한 뒤 다시 실행해 주세요."
+          }
+        }
+      }
+    },
+    "startup.persistence.error.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open your saved data"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장된 데이터를 열지 못했어요"
+          }
+        }
+      }
+    },
     "tutorial.action.skip" : {
       "localizations" : {
         "en" : {
