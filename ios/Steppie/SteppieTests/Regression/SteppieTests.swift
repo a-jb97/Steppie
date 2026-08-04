@@ -410,6 +410,10 @@ struct SteppieTests {
         let hash = try GuardianPinService.makeHash(for: "1234", salt: "test-salt")
 
         #expect(hash != "1234")
+        #expect(
+            hash
+                == "v2$pbkdf2-sha256$600000$dGVzdC1zYWx0$HzLoVydNMDdkCNZqutZgOlVPYF3p66E0mJw25XyHkeY="
+        )
         #expect(GuardianPinService.verify("1234", against: hash))
         #expect(!GuardianPinService.verify("0000", against: hash))
         #expect(throws: GuardianPinError.invalidPIN) {
@@ -425,11 +429,36 @@ struct SteppieTests {
         #expect(generatedCode.count == 6)
         #expect(generatedCode.allSatisfy { $0.isNumber })
         #expect(hash != "123456")
+        #expect(hash.hasPrefix("v2$pbkdf2-sha256$600000$"))
         #expect(GuardianPinService.verifyRecoveryCode("123456", against: hash))
         #expect(!GuardianPinService.verifyRecoveryCode("000000", against: hash))
         #expect(throws: GuardianPinError.invalidRecoveryCode) {
             try GuardianPinService.makeRecoveryCodeHash(for: "1234")
         }
+    }
+
+    @Test("기존 v1 PIN과 복구 코드는 인증 후 PBKDF2 형식으로 갱신한다")
+    func guardianLegacySecurityHashesUpgradeAfterVerification() throws {
+        let repository = try RoutinePreviewStore.makeSampleRepository()
+        let legacyPINHash = "v1$test-salt$dd565b46289eb4a5a2f160be63a156ef529913865d6648643f4cadaeee1f52ba"
+        let legacyRecoveryHash = "v1$recovery-test-salt$67dbccf7e4e69d52033f61450280082cd0d903d2b10ae1373303633bc789e2b8"
+        try repository.updateAppSettings(
+            try AppSettings(
+                guardianPinHash: legacyPINHash,
+                recoveryCodeHash: legacyRecoveryHash
+            )
+        )
+        let viewModel = GuardianModeViewModel(repository: repository) {}
+
+        #expect(viewModel.verifyPIN("1234"))
+        let upgradedPINHash = try #require(try repository.appSettings().guardianPinHash)
+        #expect(upgradedPINHash.hasPrefix("v2$pbkdf2-sha256$600000$"))
+        #expect(GuardianPinService.verify("1234", against: upgradedPINHash))
+
+        #expect(viewModel.verifyRecoveryCode("123456"))
+        let upgradedRecoveryHash = try #require(try repository.appSettings().recoveryCodeHash)
+        #expect(upgradedRecoveryHash.hasPrefix("v2$pbkdf2-sha256$600000$"))
+        #expect(GuardianPinService.verifyRecoveryCode("123456", against: upgradedRecoveryHash))
     }
 
     @Test("보호자 ViewModel은 PIN 설정과 검증을 AppSettings에 저장한다")

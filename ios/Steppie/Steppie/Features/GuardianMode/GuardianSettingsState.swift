@@ -114,8 +114,12 @@ final class GuardianSettingsState {
     }
 
     func verifyPIN(_ pin: String) -> Bool {
-        (try? repository.appSettings())
-            .map { GuardianPinService.verify(pin, against: $0.guardianPinHash) } ?? false
+        guard let current = try? repository.appSettings(),
+              GuardianPinService.verify(pin, against: current.guardianPinHash) else {
+            return false
+        }
+        upgradePINHashIfNeeded(pin, current: current)
+        return true
     }
 
     func updatePIN(oldPIN: String, newPIN: String) -> Bool {
@@ -127,10 +131,14 @@ final class GuardianSettingsState {
         let sanitizedCode = String(code.filter(\.isNumber).prefix(6))
         let isValid = (try? repository.appSettings())
             .map {
-                GuardianPinService.verifyRecoveryCode(
+                let isValid = GuardianPinService.verifyRecoveryCode(
                     sanitizedCode,
                     against: $0.recoveryCodeHash
                 )
+                if isValid {
+                    upgradeRecoveryCodeHashIfNeeded(sanitizedCode, current: $0)
+                }
+                return isValid
             } ?? false
         if isValid {
             recoveryCodeErrorMessage = nil
@@ -185,6 +193,41 @@ final class GuardianSettingsState {
             }
         }
         return GuardianPinService.generateRecoveryCode()
+    }
+
+    private func upgradePINHashIfNeeded(_ pin: String, current: AppSettings) {
+        guard GuardianPinService.needsHashUpgrade(current.guardianPinHash),
+              let upgradedHash = try? GuardianPinService.makeHash(for: pin) else {
+            return
+        }
+        updateSecurityHashesIfPossible(current, guardianPinHash: upgradedHash)
+    }
+
+    private func upgradeRecoveryCodeHashIfNeeded(_ code: String, current: AppSettings) {
+        guard GuardianPinService.needsHashUpgrade(current.recoveryCodeHash),
+              let upgradedHash = try? GuardianPinService.makeRecoveryCodeHash(for: code) else {
+            return
+        }
+        updateSecurityHashesIfPossible(current, recoveryCodeHash: upgradedHash)
+    }
+
+    private func updateSecurityHashesIfPossible(
+        _ current: AppSettings,
+        guardianPinHash: String? = nil,
+        recoveryCodeHash: String? = nil
+    ) {
+        do {
+            let updated = try copySettings(
+                current,
+                guardianPinHash: guardianPinHash,
+                recoveryCodeHash: recoveryCodeHash
+            )
+            try repository.updateAppSettings(updated)
+            settings = updated
+            onDataChanged()
+        } catch {
+            // Authentication remains valid even if a legacy hash cannot be upgraded yet.
+        }
     }
 
     private func copySettings(
