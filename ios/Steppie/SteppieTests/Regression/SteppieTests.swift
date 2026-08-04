@@ -1,3 +1,4 @@
+import AVFoundation
 import CryptoKit
 import Foundation
 import Testing
@@ -609,6 +610,34 @@ struct SteppieTests {
         #expect(settings.ttsVolume == 0.4)
         #expect(!settings.hapticEnabled)
         #expect(changeCount == 1)
+    }
+
+    @Test("효과음은 설정과 피드백 강도 정책을 따르고 재생 가능한 음원을 제공한다")
+    func routineFeedbackSoundFollowsSettingsAndIntensity() throws {
+        let soundPlayer = FakeRoutineSoundPlayer()
+        let performer = IOSRoutineFeedbackPerformer(soundPlayer: soundPlayer)
+        let normalSettings = try AppSettings(
+            feedbackIntensity: .normal,
+            soundEnabled: true,
+            hapticEnabled: false
+        )
+
+        performer.routineCompleted(settings: normalSettings)
+        performer.allRoutinesCompleted(settings: normalSettings)
+        #expect(soundPlayer.playedCues == [.routineCompleted, .allRoutinesCompleted])
+
+        performer.routineCompleted(settings: try normalSettings.replacing(soundEnabled: false))
+        performer.routineCompleted(settings: try normalSettings.replacing(feedbackIntensity: .quiet))
+        performer.routineCompleted(settings: try normalSettings.replacing(feedbackIntensity: .off))
+        #expect(soundPlayer.playedCues == [.routineCompleted, .allRoutinesCompleted])
+
+        performer.routineCompleted(settings: try normalSettings.replacing(feedbackIntensity: .strong))
+        #expect(soundPlayer.playedCues.last == .routineCompleted)
+
+        let routinePlayer = try IOSRoutineSoundPlayer.makePlayer(for: .routineCompleted)
+        let allDonePlayer = try IOSRoutineSoundPlayer.makePlayer(for: .allRoutinesCompleted)
+        #expect(routinePlayer.duration > 0 && routinePlayer.duration < 1)
+        #expect(allDonePlayer.duration > routinePlayer.duration && allDonePlayer.duration < 1)
     }
 
     @Test("보호자 환경 설정은 알림 리드타임 조합과 방해 금지 시간을 저장한다")

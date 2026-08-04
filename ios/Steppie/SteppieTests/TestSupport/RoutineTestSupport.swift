@@ -149,6 +149,15 @@ final class FakeRoutineNotificationScheduler: RoutineNotificationScheduling {
 }
 
 @MainActor
+final class FakeRoutineSoundPlayer: RoutineSoundPlaying {
+    var playedCues: [RoutineFeedbackSoundCue] = []
+
+    func play(_ cue: RoutineFeedbackSoundCue) {
+        playedCues.append(cue)
+    }
+}
+
+@MainActor
 final class FakeRoutineSpeechGuide: RoutineSpeechGuiding {
     var spokenTexts: [String] = []
     var stopCallCount = 0
