@@ -1760,22 +1760,24 @@ struct SteppieTests {
         #expect(restoredSnapshot.appSettings == sourceSnapshot.appSettings)
     }
 
-    @Test("복원 당일의 루틴 세트 배정은 복원하지 않고 아이 모드는 빈 상태를 표시한다")
-    func restoreClearsRoutineAssignmentForRestoreDate() throws {
+    @Test("복원 당일의 루틴 세트 배정을 유지하고 아이 모드에 활성 루틴을 표시한다")
+    func restorePreservesRoutineAssignmentForRestoreDate() throws {
         let now = Date(timeIntervalSince1970: 1_767_225_600)
         let today = DailyLog.localDateString(for: now)
         let source = try RoutinePreviewStore.makeSampleRepository()
         try assignActiveRoutineSet(in: source, on: now)
+        let sourceAssignment = try #require(try source.dailyRoutineAssignment(on: today))
         let package = try BackupService(repository: source, now: { now }).exportPackage()
         let target = try RoutinePreviewStore.makeRepository()
 
         try BackupService(repository: target, now: { now }).restorePackage(package.archiveData)
 
-        #expect(try target.dailyRoutineAssignment(on: today) == nil)
+        #expect(try target.dailyRoutineAssignment(on: today) == sourceAssignment)
         let childViewModel = ChildRoutineViewModel(repository: target, now: { now })
         childViewModel.load()
-        #expect(childViewModel.loadState == .empty)
-        #expect(childViewModel.selectedRoutine == nil)
+        #expect(childViewModel.loadState == .loaded)
+        #expect(childViewModel.activeRoutineSet?.id == sourceAssignment.routineSetID)
+        #expect(childViewModel.selectedRoutine != nil)
     }
 
     @Test("복원 중 DB replace가 실패하면 새로 저장한 사진 에셋을 정리한다")

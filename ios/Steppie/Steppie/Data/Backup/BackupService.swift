@@ -138,17 +138,7 @@ struct BackupService {
                 previousAssets.append((name, try assetStore.data(forBackupAssetName: name)))
                 try assetStore.saveAssetData(data, backupAssetName: name)
             }
-            let restoreDate = DailyLog.localDateString(for: now())
-            let snapshot = RoutineRepositorySnapshot(
-                routineSets: payload.snapshot.routineSets,
-                routines: payload.snapshot.routines,
-                dailyLogs: payload.snapshot.dailyLogs,
-                dailyRoutineAssignments: payload.snapshot.dailyRoutineAssignments.filter {
-                    $0.date != restoreDate
-                },
-                appSettings: payload.snapshot.appSettings
-            )
-            try repository.replaceAll(with: snapshot)
+            try repository.replaceAll(with: payload.snapshot)
         } catch {
             for previousAsset in previousAssets.reversed() {
                 if let data = previousAsset.data {
