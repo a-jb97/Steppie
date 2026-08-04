@@ -12,7 +12,7 @@ struct ChildRoutineWaitingView: View {
                     .foregroundStyle(Color.steppieFocusRing)
                     .accessibilityHidden(true)
 
-                Text("다음 루틴을 기다려요")
+                Text("screen.waiting.title")
                     .steppieTextStyle(.childScreenTitle)
                     .foregroundStyle(Color.steppieTextSecondary)
                     .multilineTextAlignment(.center)
@@ -25,7 +25,7 @@ struct ChildRoutineWaitingView: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let startTime = routineSet.dailyStartTime {
-                        Text(verbatim: "\(startTime.description)에 시작해요")
+                        Text("screen.routineSet.startsAt \(startTime.description)")
                             .steppieTextStyle(.childProgress)
                             .foregroundStyle(Color.steppieFocusRing)
                             .fixedSize(horizontal: false, vertical: true)

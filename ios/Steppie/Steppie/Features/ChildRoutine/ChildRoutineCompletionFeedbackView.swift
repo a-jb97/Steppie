@@ -153,8 +153,10 @@ struct ChildRoutineNextPreview: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Text(verbatim: "다음 루틴 \(localizedTitle(for: next.routineSet))"))
-                .accessibilityValue(Text("시작할 수 있음"))
+                .accessibilityLabel(
+                    Text("screen.feedback.nextRoutineSet.label \(localizedTitle(for: next.routineSet))")
+                )
+                .accessibilityValue(Text("screen.feedback.nextRoutineSet.available"))
             } else {
                 nextRoutineSetPreview(
                     routineSet: next.routineSet,
@@ -162,12 +164,10 @@ struct ChildRoutineNextPreview: View {
                     isLocked: true
                 )
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text(verbatim: "다음 루틴 \(localizedTitle(for: next.routineSet))"))
-                .accessibilityValue(
-                    Text(verbatim: next.routineSet.dailyStartTime.map {
-                        "\($0.description) 전에는 시작하거나 완료할 수 없음"
-                    } ?? "아직 시작할 수 없음")
+                .accessibilityLabel(
+                    Text("screen.feedback.nextRoutineSet.label \(localizedTitle(for: next.routineSet))")
                 )
+                .accessibilityValue(unavailableAccessibilityValue(for: next.routineSet))
             }
         } else if viewModel.isAllCompleted {
             Button(action: viewModel.proceedAfterCompletionFeedback) {
@@ -220,13 +220,9 @@ struct ChildRoutineNextPreview: View {
             VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
                 Text(verbatim: localizedTitle(for: routineSet))
                 if let startTime = routineSet.dailyStartTime {
-                    Text(
-                        verbatim: isLocked
-                            ? "\(startTime.description) 전에는 시작할 수 없어요"
-                            : "\(startTime.description)에 시작해요"
-                    )
-                    .steppieTextStyle(.childCaption)
-                    .foregroundStyle(Color.steppieTextSecondary)
+                    routineSetStartTimeText(startTime, isLocked: isLocked)
+                        .steppieTextStyle(.childCaption)
+                        .foregroundStyle(Color.steppieTextSecondary)
                 }
             }
 
@@ -254,6 +250,22 @@ struct ChildRoutineNextPreview: View {
                 )
         }
         .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
+    }
+
+    private func unavailableAccessibilityValue(for routineSet: RoutineSet) -> Text {
+        if let startTime = routineSet.dailyStartTime {
+            Text("screen.feedback.nextRoutineSet.lockedUntil \(startTime.description)")
+        } else {
+            Text("screen.feedback.nextRoutineSet.notAvailable")
+        }
+    }
+
+    private func routineSetStartTimeText(_ startTime: LocalTime, isLocked: Bool) -> Text {
+        if isLocked {
+            Text("screen.routineSet.cannotStartUntil \(startTime.description)")
+        } else {
+            Text("screen.routineSet.startsAt \(startTime.description)")
+        }
     }
 
     private func localizedTitle(for routine: Routine) -> String {

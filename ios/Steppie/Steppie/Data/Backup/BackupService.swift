@@ -132,26 +132,20 @@ struct BackupService {
     }
 
     func restorePayload(_ payload: BackupRestorePayload) throws {
-        var savedAssetNames: [String] = []
+        var previousAssets: [(name: String, data: Data?)] = []
         do {
             for (name, data) in payload.assets {
+                previousAssets.append((name, try assetStore.data(forBackupAssetName: name)))
                 try assetStore.saveAssetData(data, backupAssetName: name)
-                savedAssetNames.append(name)
             }
-            let restoreDate = DailyLog.localDateString(for: now())
-            let snapshot = RoutineRepositorySnapshot(
-                routineSets: payload.snapshot.routineSets,
-                routines: payload.snapshot.routines,
-                dailyLogs: payload.snapshot.dailyLogs,
-                dailyRoutineAssignments: payload.snapshot.dailyRoutineAssignments.filter {
-                    $0.date != restoreDate
-                },
-                appSettings: payload.snapshot.appSettings
-            )
-            try repository.replaceAll(with: snapshot)
+            try repository.replaceAll(with: payload.snapshot)
         } catch {
-            for name in savedAssetNames {
-                try? assetStore.removeAssetData(backupAssetName: name)
+            for previousAsset in previousAssets.reversed() {
+                if let data = previousAsset.data {
+                    try? assetStore.saveAssetData(data, backupAssetName: previousAsset.name)
+                } else {
+                    try? assetStore.removeAssetData(backupAssetName: previousAsset.name)
+                }
             }
             throw error
         }

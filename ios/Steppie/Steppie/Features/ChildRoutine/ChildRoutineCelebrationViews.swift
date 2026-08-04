@@ -204,19 +204,19 @@ private struct FireworkBurst: View {
                 .frame(width: centerRingSize, height: centerRingSize)
                 .position(center)
         }
-        .onAppear {
-            Task {
-                await sleep(for: spec.delay)
-                isVisible = true
-
-                await sleep(for: 0.08)
-                withAnimation(.easeOut(duration: 0.72)) {
-                    phase = 1
-                }
-
-                await sleep(for: 0.58)
-                withAnimation(.easeOut(duration: 0.28)) {
-                    isVisible = false
+        .task {
+            await FireworkBurstAnimationTimeline.run(initialDelay: spec.delay) { event in
+                switch event {
+                case .show:
+                    isVisible = true
+                case .expand:
+                    withAnimation(.easeOut(duration: 0.72)) {
+                        phase = 1
+                    }
+                case .hide:
+                    withAnimation(.easeOut(duration: 0.28)) {
+                        isVisible = false
+                    }
                 }
             }
         }
@@ -250,10 +250,40 @@ private struct FireworkBurst: View {
     private var centerRingSize: CGFloat {
         16 + phase * 36
     }
+}
 
-    private func sleep(for seconds: Double) async {
-        guard seconds > 0 else { return }
-        try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+enum FireworkBurstAnimationTimeline {
+    enum Event: Equatable {
+        case show
+        case expand
+        case hide
+    }
+
+    @MainActor
+    static func run(
+        initialDelay: Double,
+        apply: (Event) -> Void
+    ) async {
+        guard await wait(for: initialDelay) else { return }
+        apply(.show)
+
+        guard await wait(for: 0.08) else { return }
+        apply(.expand)
+
+        guard await wait(for: 0.58) else { return }
+        apply(.hide)
+    }
+
+    private static func wait(for seconds: Double) async -> Bool {
+        guard !Task.isCancelled else { return false }
+        guard seconds > 0 else { return true }
+
+        do {
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            return !Task.isCancelled
+        } catch {
+            return false
+        }
     }
 }
 

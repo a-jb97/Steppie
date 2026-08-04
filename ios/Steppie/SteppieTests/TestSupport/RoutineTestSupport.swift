@@ -109,6 +109,9 @@ final class FakeRoutineNotificationScheduler: RoutineNotificationScheduling {
 
     var authorizationRequestCount = 0
     var rescheduleCalls: [RescheduleCall] = []
+    var completedRescheduleCalls: [RescheduleCall] = []
+    var shouldSuspendFirstReschedule = false
+    private var firstRescheduleContinuation: CheckedContinuation<Void, Never>?
 
     func requestAuthorizationIfNeeded() async -> RoutineNotificationAuthorizationStatus {
         authorizationRequestCount += 1
@@ -124,12 +127,33 @@ final class FakeRoutineNotificationScheduler: RoutineNotificationScheduling {
         calendar: Calendar,
         locale: Locale
     ) async {
-        rescheduleCalls.append(
-            RescheduleCall(
-                completedRoutineIDs: completedRoutineIDs,
-                settings: settings
-            )
+        let call = RescheduleCall(
+            completedRoutineIDs: completedRoutineIDs,
+            settings: settings
         )
+        rescheduleCalls.append(call)
+
+        if shouldSuspendFirstReschedule, rescheduleCalls.count == 1 {
+            await withCheckedContinuation { continuation in
+                firstRescheduleContinuation = continuation
+            }
+        }
+
+        completedRescheduleCalls.append(call)
+    }
+
+    func resumeFirstReschedule() {
+        firstRescheduleContinuation?.resume()
+        firstRescheduleContinuation = nil
+    }
+}
+
+@MainActor
+final class FakeRoutineSoundPlayer: RoutineSoundPlaying {
+    var playedCues: [RoutineFeedbackSoundCue] = []
+
+    func play(_ cue: RoutineFeedbackSoundCue) {
+        playedCues.append(cue)
     }
 }
 
@@ -163,5 +187,15 @@ final class FakeRoutinePhotoStore: RoutinePhotoStoring {
     func savePhotoData(_ data: Data) throws -> IconRef {
         savedData = data
         return icon
+    }
+}
+
+struct NoopRoutinePhotoStore: RoutinePhotoStoring {
+    func data(forBackupAssetName name: String) throws -> Data? {
+        nil
+    }
+
+    func savePhotoData(_ data: Data) throws -> IconRef {
+        throw BackupError.invalidData
     }
 }

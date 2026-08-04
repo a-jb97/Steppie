@@ -307,27 +307,6 @@ struct GuardianModeView: View {
         }
     }
 
-    private func unavailableScreen(title: String, subtitle: String) -> some View {
-        VStack(spacing: SteppieSpacing.large) {
-            header(title: title, subtitle: subtitle)
-            VStack(spacing: SteppieSpacing.small) {
-                Image(systemName: "hammer")
-                    .font(.title)
-                    .foregroundStyle(Color.steppieTextSecondary)
-                    .accessibilityHidden(true)
-                Text("이번 Sprint 7 범위에서는 구현하지 않습니다.")
-                    .steppieTextStyle(.guardianBody)
-                    .foregroundStyle(Color.steppieTextPrimary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(SteppieSpacing.large)
-            SteppieButton("뒤로", role: .secondary) {
-                viewModel.selectedDestination = nil
-            }
-        }
-        .padding(SteppieLayout.guardianScreenPadding)
-    }
-
     private func header(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
             Text(title)

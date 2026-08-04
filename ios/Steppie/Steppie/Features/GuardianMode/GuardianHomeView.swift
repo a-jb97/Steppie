@@ -84,8 +84,8 @@ struct GuardianHomeView: View {
     }
 
     private func menuCard(
-        title: String,
-        subtitle: String,
+        title: LocalizedStringKey,
+        subtitle: LocalizedStringKey,
         assetName: String,
         destination: GuardianDestination,
         isEnabled: Bool

@@ -2,19 +2,9 @@ import SwiftUI
 import UIKit
 
 struct RoutineVisualView: View {
+    @Environment(\.routinePhotoReader) private var photoReader
     let icon: IconRef
     let size: SteppieRoutineIconSize
-    private let photoStore: any RoutinePhotoReading
-
-    init(
-        icon: IconRef,
-        size: SteppieRoutineIconSize,
-        photoStore: (any RoutinePhotoReading)? = nil
-    ) {
-        self.icon = icon
-        self.size = size
-        self.photoStore = photoStore ?? FileRoutinePhotoStore()
-    }
 
     var body: some View {
         if icon.type == .builtin,
@@ -35,7 +25,7 @@ struct RoutineVisualView: View {
     private var photoImage: UIImage? {
         guard icon.type == .photo,
               let backupAssetName = icon.backupAssetName,
-              let data = try? photoStore.data(forBackupAssetName: backupAssetName) else {
+              let data = try? photoReader.data(forBackupAssetName: backupAssetName) else {
             return nil
         }
         return UIImage(data: data)
@@ -62,4 +52,14 @@ struct RoutineVisualView: View {
     private var cornerRadius: CGFloat {
         size == .card ? 32 : SteppieCornerRadius.control
     }
+}
+
+private struct EmptyRoutinePhotoReader: RoutinePhotoReading {
+    func data(forBackupAssetName name: String) throws -> Data? {
+        nil
+    }
+}
+
+extension EnvironmentValues {
+    @Entry var routinePhotoReader: any RoutinePhotoReading = EmptyRoutinePhotoReader()
 }

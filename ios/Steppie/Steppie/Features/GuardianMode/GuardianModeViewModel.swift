@@ -12,133 +12,41 @@ enum GuardianDestination: Hashable {
     case backupRestore
 }
 
-enum GuardianLoadState: Equatable {
-    case idle
-    case loaded
-    case empty
-    case failed
-}
-
-enum GuardianPINPurpose: Equatable {
+nonisolated enum GuardianPINPurpose: Equatable {
     case enter
     case setup
     case change
 }
 
-struct RoutineDraft: Equatable, Identifiable {
-    let id: UUID?
-    var title: String
-    var icon: IconRef
-    var colorToken: String
-    var scheduledTime: LocalTime?
-
-    init(
-        id: UUID?,
-        title: String,
-        iconName: RoutineIconName,
-        colorToken: String,
-        scheduledTime: LocalTime?
-    ) {
-        self.id = id
-        self.title = title
-        self.icon = try! IconRef.builtin(name: iconName.rawValue)
-        self.colorToken = colorToken
-        self.scheduledTime = scheduledTime
-    }
-
-    init(
-        id: UUID?,
-        title: String,
-        icon: IconRef,
-        colorToken: String,
-        scheduledTime: LocalTime?
-    ) {
-        self.id = id
-        self.title = title
-        self.icon = icon
-        self.colorToken = colorToken
-        self.scheduledTime = scheduledTime
-    }
-
-    var isNew: Bool { id == nil }
-    var isValid: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && Routine.allowedColorTokens.contains(colorToken)
-    }
-
-    var iconName: RoutineIconName {
-        get {
-            guard icon.type == .builtin,
-                  let name = icon.name.flatMap(RoutineIconName.init(rawValue:)) else {
-                return .star
-            }
-            return name
-        }
-        set {
-            icon = try! IconRef.builtin(name: newValue.rawValue)
-        }
-    }
-}
-
-struct RoutineSetNameDraft: Equatable, Identifiable {
-    let id: UUID
-    var name: String
-
-    var isValid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-}
-
-struct RoutineSetScheduleDraft: Equatable, Identifiable {
-    let id: UUID
-    var startTime: LocalTime
-}
-
 @MainActor
 @Observable
 final class GuardianModeViewModel {
-    private let repository: any RoutineRepository
-    private let photoStore: any RoutinePhotoStoring
-    private let now: () -> Date
-    private let calendar: Calendar
     private let onDataChanged: () -> Void
+    private let routineManagementState: GuardianRoutineManagementState
     private let recordsState: GuardianRecordsState
     private let backupState: GuardianBackupState
     private let settingsState: GuardianSettingsState
     private let routineSetCreationState: GuardianRoutineSetCreationState
     private let routineTemplateState: GuardianRoutineTemplateState
 
-    private(set) var loadState: GuardianLoadState = .idle
-    private(set) var routineSets: [RoutineSet] = []
-    private(set) var activeRoutineSet: RoutineSet?
-    private(set) var todayRoutineAssignment: DailyRoutineAssignment?
-    private(set) var todayAssignedRoutineSetID: UUID?
-    private(set) var routines: [Routine] = []
     private(set) var errorMessage: String?
 
     var selectedDestination: GuardianDestination?
-    var selectedRoutineSetID: UUID?
-    var selectedRoutineID: UUID?
-    var draft: RoutineDraft?
-    var isEditingRoutineSets = false
-    var routineSetNameDraft: RoutineSetNameDraft?
-    var routineSetScheduleDraft: RoutineSetScheduleDraft?
-    var pendingDeleteRoutine: Routine?
-    var pendingDeleteRoutineSet: RoutineSet?
     var templateReturnDestination: GuardianDestination?
     init(
         repository: any RoutineRepository,
-        photoStore: (any RoutinePhotoStoring)? = nil,
+        photoStore: any RoutinePhotoStoring,
         now: @escaping () -> Date = Date.init,
         calendar: Calendar = .current,
         onDataChanged: @escaping () -> Void
     ) {
-        let resolvedPhotoStore = photoStore ?? FileRoutinePhotoStore()
-        self.repository = repository
-        self.photoStore = resolvedPhotoStore
-        self.now = now
-        self.calendar = calendar
         self.onDataChanged = onDataChanged
+        self.routineManagementState = GuardianRoutineManagementState(
+            repository: repository,
+            photoStore: photoStore,
+            now: now,
+            calendar: calendar
+        )
         self.recordsState = GuardianRecordsState(
             repository: repository,
             now: now,
@@ -155,7 +63,7 @@ final class GuardianModeViewModel {
         )
         self.routineSetCreationState = GuardianRoutineSetCreationState(
             repository: repository,
-            photoStore: resolvedPhotoStore,
+            photoStore: photoStore,
             now: now
         )
         self.routineTemplateState = GuardianRoutineTemplateState(
@@ -164,6 +72,44 @@ final class GuardianModeViewModel {
         )
     }
 
+    var loadState: GuardianLoadState { routineManagementState.loadState }
+    var routineSets: [RoutineSet] { routineManagementState.routineSets }
+    var activeRoutineSet: RoutineSet? { routineManagementState.activeRoutineSet }
+    var todayRoutineAssignment: DailyRoutineAssignment? { routineManagementState.todayRoutineAssignment }
+    var todayAssignedRoutineSetID: UUID? { routineManagementState.todayAssignedRoutineSetID }
+    var routines: [Routine] { routineManagementState.routines }
+    var selectedRoutineSetID: UUID? {
+        get { routineManagementState.selectedRoutineSetID }
+        set { routineManagementState.selectedRoutineSetID = newValue }
+    }
+    var selectedRoutineID: UUID? {
+        get { routineManagementState.selectedRoutineID }
+        set { routineManagementState.selectedRoutineID = newValue }
+    }
+    var draft: RoutineDraft? {
+        get { routineManagementState.draft }
+        set { routineManagementState.draft = newValue }
+    }
+    var isEditingRoutineSets: Bool {
+        get { routineManagementState.isEditingRoutineSets }
+        set { routineManagementState.isEditingRoutineSets = newValue }
+    }
+    var routineSetNameDraft: RoutineSetNameDraft? {
+        get { routineManagementState.routineSetNameDraft }
+        set { routineManagementState.routineSetNameDraft = newValue }
+    }
+    var routineSetScheduleDraft: RoutineSetScheduleDraft? {
+        get { routineManagementState.routineSetScheduleDraft }
+        set { routineManagementState.routineSetScheduleDraft = newValue }
+    }
+    var pendingDeleteRoutine: Routine? {
+        get { routineManagementState.pendingDeleteRoutine }
+        set { routineManagementState.pendingDeleteRoutine = newValue }
+    }
+    var pendingDeleteRoutineSet: RoutineSet? {
+        get { routineManagementState.pendingDeleteRoutineSet }
+        set { routineManagementState.pendingDeleteRoutineSet = newValue }
+    }
     var recordSummaries: [GuardianRecordSummary] { recordsState.summaries }
     var recordCalendarDates: Set<String> { recordsState.calendarDates }
     var selectedRecordDate: String? { recordsState.selectedDate }
@@ -199,45 +145,27 @@ final class GuardianModeViewModel {
     }
 
     var selectedRoutine: Routine? {
-        guard let selectedRoutineID else { return routines.first }
-        return routines.first { $0.id == selectedRoutineID } ?? routines.first
+        routineManagementState.selectedRoutine
     }
 
     var selectedRoutineSet: RoutineSet? {
-        guard let selectedRoutineSetID else { return routineSets.first }
-        return routineSets.first { $0.id == selectedRoutineSetID } ?? routineSets.first
+        routineManagementState.selectedRoutineSet
     }
 
     var hasRoutineSets: Bool {
-        !routineSets.isEmpty
+        routineManagementState.hasRoutineSets
     }
 
     var requiresTodayRoutineSelection: Bool {
-        hasRoutineSets
-            && !routineSets.contains(where: { $0.dailyStartTime != nil })
-            && todayAssignedRoutineSetID == nil
+        routineManagementState.requiresTodayRoutineSelection
     }
 
     var scheduledRoutineSets: [RoutineSet] {
-        routineSets
-            .filter { $0.dailyStartTime != nil }
-            .sorted {
-                guard let lhs = $0.dailyStartTime, let rhs = $1.dailyStartTime else {
-                    return $0.dailyStartTime != nil
-                }
-                if lhs == rhs { return $0.createdAt < $1.createdAt }
-                return (lhs.hour, lhs.minute) < (rhs.hour, rhs.minute)
-            }
+        routineManagementState.scheduledRoutineSets
     }
 
     var hasUnsavedDraft: Bool {
-        guard let draft else { return false }
-        if draft.isNew { return draft.isValid }
-        guard let original = selectedRoutine else { return true }
-        return draft.title != localizedTitle(for: original)
-            || draft.icon != original.icon
-            || draft.colorToken != original.colorToken
-            || draft.scheduledTime != original.scheduledTime
+        routineManagementState.hasUnsavedDraft
     }
 
     var canSaveRoutineSetDraft: Bool {
@@ -268,48 +196,11 @@ final class GuardianModeViewModel {
     func load() {
         do {
             try settingsState.load()
-            let fetchedRoutineSets = try repository.routineSets()
-            routineSets = fetchedRoutineSets
-            activeRoutineSet = fetchedRoutineSets.first(where: \.isActive)
-            let today = DailyLog.localDateString(for: now(), calendar: calendar)
-            todayRoutineAssignment = try repository.dailyRoutineAssignment(on: today)
-            if let todayRoutineAssignment,
-               fetchedRoutineSets.contains(where: { $0.id == todayRoutineAssignment.routineSetID }) {
-                todayAssignedRoutineSetID = todayRoutineAssignment.routineSetID
-            } else {
-                todayAssignedRoutineSetID = nil
-            }
-            recordsState.refresh()
-
-            guard !fetchedRoutineSets.isEmpty else {
-                activeRoutineSet = nil
-                routines = []
-                selectedRoutineSetID = nil
-                selectedRoutineID = nil
-                loadState = .empty
-                return
-            }
-
-            if selectedRoutineSetID.map({ id in !fetchedRoutineSets.contains { $0.id == id } }) != false {
-                selectedRoutineSetID = activeRoutineSet?.id ?? fetchedRoutineSets.first?.id
-            }
-
-            guard let selectedRoutineSetID else {
-                routines = []
-                selectedRoutineID = nil
-                loadState = .empty
-                return
-            }
-
-            routines = try repository.routines(in: selectedRoutineSetID)
-            if selectedRoutineID.map({ id in !routines.contains { $0.id == id } }) != false {
-                selectedRoutineID = routines.first?.id
-            }
-            loadState = .loaded
+            try routineManagementState.load()
             recordsState.refresh()
         } catch {
             errorMessage = "정보를 불러오지 못했어요."
-            loadState = .failed
+            routineManagementState.markLoadFailed()
         }
     }
 
@@ -405,68 +296,20 @@ final class GuardianModeViewModel {
     }
 
     func beginAddRoutine() {
-        guard selectedRoutineSet != nil else { return }
-        selectedRoutineID = nil
-        draft = RoutineDraft(
-            id: nil,
-            title: "",
-            iconName: .star,
-            colorToken: Routine.defaultColorToken,
-            scheduledTime: nil
-        )
+        routineManagementState.beginAddRoutine()
     }
 
     func beginEditRoutine(_ routine: Routine) {
-        selectedRoutineID = routine.id
-        draft = RoutineDraft(
-            id: routine.id,
-            title: localizedTitle(for: routine),
-            icon: routine.icon,
-            colorToken: routine.colorToken,
-            scheduledTime: routine.scheduledTime
-        )
+        routineManagementState.beginEditRoutine(routine)
     }
 
     func cancelDraft() {
-        draft = nil
+        routineManagementState.cancelDraft()
     }
 
     func saveDraft(localeIdentifier: String) {
-        guard let selectedRoutineSet, let draft, draft.isValid else { return }
         do {
-            let updatedAt = now()
-            let title = try LocalizedText([localeIdentifier: draft.title])
-            if let id = draft.id, let original = try repository.routine(id: id) {
-                let updated = try Routine(
-                    id: original.id,
-                    routineSetID: original.routineSetID,
-                    titleKey: original.titleKey,
-                    title: title,
-                    icon: draft.icon,
-                    colorToken: draft.colorToken,
-                    order: original.order,
-                    scheduledTime: draft.scheduledTime,
-                    isActive: original.isActive,
-                    createdAt: original.createdAt,
-                    updatedAt: updatedAt,
-                    deletedAt: original.deletedAt
-                )
-                try repository.updateRoutine(updated)
-            } else {
-                let routine = try Routine(
-                    routineSetID: selectedRoutineSet.id,
-                    title: title,
-                    icon: draft.icon,
-                    colorToken: draft.colorToken,
-                    order: routines.count,
-                    scheduledTime: draft.scheduledTime,
-                    createdAt: updatedAt,
-                    updatedAt: updatedAt
-                )
-                try repository.createRoutine(routine)
-                selectedRoutineID = routine.id
-            }
-            self.draft = nil
+            guard try routineManagementState.saveDraft(localeIdentifier: localeIdentifier) else { return }
             load()
             onDataChanged()
         } catch {
@@ -475,16 +318,15 @@ final class GuardianModeViewModel {
     }
 
     func updateDraftPhoto(data: Data) {
-        guard draft != nil else { return }
         do {
-            draft?.icon = try photoStore.savePhotoData(data)
+            try routineManagementState.updateDraftPhoto(data: data)
         } catch {
             errorMessage = "사진을 저장하지 못했어요."
         }
     }
 
     func resetDraftIconToDefault() {
-        draft?.icon = try! IconRef.builtin(name: RoutineIconName.star.rawValue)
+        routineManagementState.resetDraftIconToDefault()
     }
 
     func updateRoutineSetStepDraftPhoto(data: Data) {
@@ -500,15 +342,12 @@ final class GuardianModeViewModel {
     }
 
     func requestDelete(_ routine: Routine) {
-        pendingDeleteRoutine = routine
+        routineManagementState.requestDelete(routine)
     }
 
     func confirmDelete() {
-        guard let routine = pendingDeleteRoutine else { return }
         do {
-            try repository.deleteRoutine(id: routine.id, at: now())
-            pendingDeleteRoutine = nil
-            draft = nil
+            guard try routineManagementState.confirmDelete() else { return }
             load()
             onDataChanged()
         } catch {
@@ -517,82 +356,66 @@ final class GuardianModeViewModel {
     }
 
     func toggleRoutineSetEditing() {
-        isEditingRoutineSets.toggle()
-        routineSetNameDraft = nil
-        pendingDeleteRoutineSet = nil
+        routineManagementState.toggleRoutineSetEditing()
     }
 
     func moveRoutines(from source: IndexSet, to destination: Int) {
-        guard let selectedRoutineSet else { return }
-        var moved = routines
-        let moving = source.sorted().map { moved[$0] }
-        for index in source.sorted(by: >) {
-            moved.remove(at: index)
+        do {
+            guard try routineManagementState.moveRoutines(from: source, to: destination) else { return }
+            load()
+            onDataChanged()
+        } catch {
+            errorMessage = "순서를 바꾸지 못했어요."
         }
-        let adjustedDestination = destination - source.filter { $0 < destination }.count
-        moved.insert(contentsOf: moving, at: adjustedDestination)
-        saveRoutineOrder(moved, in: selectedRoutineSet.id)
     }
 
     func moveRoutine(_ routine: Routine, direction: Int) {
-        guard let selectedRoutineSet,
-              let index = routines.firstIndex(where: { $0.id == routine.id }) else { return }
-        let destination = index + direction
-        guard routines.indices.contains(destination) else { return }
-        var moved = routines
-        moved.swapAt(index, destination)
-        saveRoutineOrder(moved, in: selectedRoutineSet.id)
+        do {
+            guard try routineManagementState.moveRoutine(routine, direction: direction) else { return }
+            load()
+            onDataChanged()
+        } catch {
+            errorMessage = "순서를 바꾸지 못했어요."
+        }
     }
 
     func moveRoutine(_ routine: Routine, to destination: Int) {
-        guard let selectedRoutineSet,
-              let index = routines.firstIndex(where: { $0.id == routine.id }),
-              routines.indices.contains(destination),
-              index != destination else { return }
-        var moved = routines
-        let item = moved.remove(at: index)
-        moved.insert(item, at: destination)
-        saveRoutineOrder(moved, in: selectedRoutineSet.id)
+        do {
+            guard try routineManagementState.moveRoutine(routine, to: destination) else { return }
+            load()
+            onDataChanged()
+        } catch {
+            errorMessage = "순서를 바꾸지 못했어요."
+        }
     }
 
     func saveRoutineOrder(orderedIDs: [UUID]) {
-        guard let selectedRoutineSet,
-              orderedIDs.count == routines.count,
-              Set(orderedIDs) == Set(routines.map(\.id)) else { return }
-        let routinesByID = Dictionary(uniqueKeysWithValues: routines.map { ($0.id, $0) })
-        let moved = orderedIDs.compactMap { routinesByID[$0] }
-        guard moved.count == routines.count else { return }
-        saveRoutineOrder(moved, in: selectedRoutineSet.id)
+        do {
+            guard try routineManagementState.saveRoutineOrder(orderedIDs: orderedIDs) else { return }
+            load()
+            onDataChanged()
+        } catch {
+            errorMessage = "순서를 바꾸지 못했어요."
+        }
     }
 
     func selectRoutineSet(_ routineSet: RoutineSet) {
-        guard routineSets.contains(where: { $0.id == routineSet.id }) else { return }
-        selectedRoutineSetID = routineSet.id
-        selectedRoutineID = nil
-        draft = nil
+        guard routineManagementState.selectRoutineSet(routineSet) else { return }
         load()
     }
 
     func selectTodayAssignedRoutineSet() {
-        guard let todayAssignedRoutineSetID,
-              let routineSet = routineSets.first(where: { $0.id == todayAssignedRoutineSetID }) else { return }
-        selectRoutineSet(routineSet)
+        guard routineManagementState.selectTodayAssignedRoutineSet() else { return }
+        load()
     }
 
     func isRoutineSetAssignedToday(_ routineSet: RoutineSet) -> Bool {
-        todayAssignedRoutineSetID == routineSet.id
+        routineManagementState.isRoutineSetAssignedToday(routineSet)
     }
 
     func assignRoutineSetForToday(_ routineSet: RoutineSet) {
-        guard routineSets.contains(where: { $0.id == routineSet.id }) else { return }
-        let today = DailyLog.localDateString(for: now(), calendar: calendar)
         do {
-            todayRoutineAssignment = try repository.assignRoutineSet(
-                routineSet.id,
-                on: today,
-                at: now()
-            )
-            todayAssignedRoutineSetID = routineSet.id
+            guard try routineManagementState.assignRoutineSetForToday(routineSet) else { return }
             load()
             onDataChanged()
         } catch {
@@ -601,62 +424,32 @@ final class GuardianModeViewModel {
     }
 
     func isRoutineSetScheduledDaily(_ routineSet: RoutineSet) -> Bool {
-        routineSet.dailyStartTime != nil
+        routineManagementState.isRoutineSetScheduledDaily(routineSet)
     }
 
     func beginScheduleRoutineSet(_ routineSet: RoutineSet) {
-        let proposedTime = routineSet.dailyStartTime ?? nextAvailableDailyStartTime()
-        routineSetScheduleDraft = RoutineSetScheduleDraft(
-            id: routineSet.id,
-            startTime: proposedTime
-        )
+        routineManagementState.beginScheduleRoutineSet(routineSet)
     }
 
     func cancelRoutineSetSchedule() {
-        routineSetScheduleDraft = nil
+        routineManagementState.cancelRoutineSetSchedule()
     }
 
     func saveRoutineSetSchedule() {
-        guard let draft = routineSetScheduleDraft,
-              let original = routineSets.first(where: { $0.id == draft.id }) else { return }
-        guard !routineSets.contains(where: {
-            $0.id != draft.id && $0.dailyStartTime == draft.startTime
-        }) else {
-            errorMessage = "같은 시작 시각을 사용하는 루틴 세트가 있어요. 다른 시간을 선택해 주세요."
-            return
-        }
         do {
-            let updated = try RoutineSet(
-                id: original.id,
-                name: original.name,
-                isActive: original.isActive,
-                dailyStartTime: draft.startTime,
-                createdAt: original.createdAt,
-                updatedAt: now(),
-                deletedAt: original.deletedAt
-            )
-            try repository.updateRoutineSet(updated)
-            routineSetScheduleDraft = nil
+            guard try routineManagementState.saveRoutineSetSchedule() else { return }
             load()
             onDataChanged()
+        } catch GuardianRoutineManagementError.duplicateDailyStartTime {
+            errorMessage = "같은 시작 시각을 사용하는 루틴 세트가 있어요. 다른 시간을 선택해 주세요."
         } catch {
             errorMessage = "매일 루틴 시간을 저장하지 못했어요."
         }
     }
 
     func removeRoutineSetFromDailySchedule(_ routineSet: RoutineSet) {
-        guard routineSet.dailyStartTime != nil else { return }
         do {
-            let updated = try RoutineSet(
-                id: routineSet.id,
-                name: routineSet.name,
-                isActive: routineSet.isActive,
-                dailyStartTime: nil,
-                createdAt: routineSet.createdAt,
-                updatedAt: now(),
-                deletedAt: routineSet.deletedAt
-            )
-            try repository.updateRoutineSet(updated)
+            guard try routineManagementState.removeRoutineSetFromDailySchedule(routineSet) else { return }
             load()
             onDataChanged()
         } catch {
@@ -664,44 +457,19 @@ final class GuardianModeViewModel {
         }
     }
 
-    private func nextAvailableDailyStartTime() -> LocalTime {
-        let used = Set(routineSets.compactMap(\.dailyStartTime))
-        for hour in 0..<24 {
-            if let candidate = try? LocalTime(hour: hour, minute: 0),
-               !used.contains(candidate) {
-                return candidate
-            }
-        }
-        return try! LocalTime(hour: 8, minute: 0)
-    }
-
     func beginRenameRoutineSet(_ routineSet: RoutineSet) {
-        routineSetNameDraft = RoutineSetNameDraft(
-            id: routineSet.id,
-            name: localizedTitle(for: routineSet)
-        )
+        routineManagementState.beginRenameRoutineSet(routineSet)
     }
 
     func cancelRoutineSetRename() {
-        routineSetNameDraft = nil
+        routineManagementState.cancelRoutineSetRename()
     }
 
     func saveRoutineSetName(localeIdentifier: String) {
-        guard let routineSetNameDraft,
-              routineSetNameDraft.isValid,
-              let original = try? repository.routineSet(id: routineSetNameDraft.id) else { return }
         do {
-            let updated = try RoutineSet(
-                id: original.id,
-                name: LocalizedText([localeIdentifier: routineSetNameDraft.name]),
-                isActive: original.isActive,
-                dailyStartTime: original.dailyStartTime,
-                createdAt: original.createdAt,
-                updatedAt: now(),
-                deletedAt: original.deletedAt
-            )
-            try repository.updateRoutineSet(updated)
-            self.routineSetNameDraft = nil
+            guard try routineManagementState.saveRoutineSetName(
+                localeIdentifier: localeIdentifier
+            ) else { return }
             load()
             onDataChanged()
         } catch {
@@ -710,65 +478,22 @@ final class GuardianModeViewModel {
     }
 
     func requestDeleteRoutineSet(_ routineSet: RoutineSet) {
-        pendingDeleteRoutineSet = routineSet
+        routineManagementState.requestDeleteRoutineSet(routineSet)
     }
 
     func confirmDeleteRoutineSet() {
-        guard let routineSet = pendingDeleteRoutineSet else { return }
         do {
-            if routineSet.dailyStartTime != nil {
-                errorMessage = "매일 사용하는 루틴 세트는 바로 삭제할 수 없어요. 먼저 매일 루틴에서 제외해 주세요."
-                pendingDeleteRoutineSet = nil
-                return
-            }
-            if todayAssignedRoutineSetID == routineSet.id {
-                errorMessage = "현재 사용 중인 루틴 세트는 삭제할 수 없어요. 먼저 다른 루틴 세트를 오늘 루틴으로 설정해 주세요."
-                pendingDeleteRoutineSet = nil
-                return
-            }
-            let visibleSets = try repository.routineSets()
-            if routineSet.isActive {
-                guard let nextActiveSet = visibleSets.first(where: { $0.id != routineSet.id }) else {
-                    errorMessage = "마지막 루틴 세트는 삭제할 수 없어요."
-                    pendingDeleteRoutineSet = nil
-                    return
-                }
-                let activated = try RoutineSet(
-                    id: nextActiveSet.id,
-                    name: nextActiveSet.name,
-                    isActive: true,
-                    dailyStartTime: nextActiveSet.dailyStartTime,
-                    createdAt: nextActiveSet.createdAt,
-                    updatedAt: now(),
-                    deletedAt: nextActiveSet.deletedAt
-                )
-                try repository.updateRoutineSet(activated)
-            }
-
-            try repository.deleteRoutineSet(id: routineSet.id, at: now())
-            if selectedRoutineSetID == routineSet.id {
-                selectedRoutineSetID = nil
-            }
-            pendingDeleteRoutineSet = nil
-            draft = nil
+            guard try routineManagementState.confirmDeleteRoutineSet() else { return }
             load()
             onDataChanged()
+        } catch GuardianRoutineManagementError.scheduledRoutineSetDeletion {
+            errorMessage = "매일 사용하는 루틴 세트는 바로 삭제할 수 없어요. 먼저 매일 루틴에서 제외해 주세요."
+        } catch GuardianRoutineManagementError.assignedRoutineSetDeletion {
+            errorMessage = "현재 사용 중인 루틴 세트는 삭제할 수 없어요. 먼저 다른 루틴 세트를 오늘 루틴으로 설정해 주세요."
+        } catch GuardianRoutineManagementError.lastRoutineSetDeletion {
+            errorMessage = "마지막 루틴 세트는 삭제할 수 없어요."
         } catch {
             errorMessage = "루틴 세트를 삭제하지 못했어요."
-        }
-    }
-
-    private func saveRoutineOrder(_ moved: [Routine], in routineSetID: UUID) {
-        do {
-            try repository.reorderRoutines(
-                in: routineSetID,
-                orderedIDs: moved.map(\.id),
-                at: now()
-            )
-            load()
-            onDataChanged()
-        } catch {
-            errorMessage = "순서를 바꾸지 못했어요."
         }
     }
 
@@ -865,17 +590,11 @@ final class GuardianModeViewModel {
     }
 
     func localizedTitle(for routine: Routine) -> String {
-        routine.title.resolved(
-            appLocale: Locale.autoupdatingCurrent.identifier,
-            systemLanguages: Locale.preferredLanguages
-        )
+        routineManagementState.localizedTitle(for: routine)
     }
 
     func localizedTitle(for routineSet: RoutineSet) -> String {
-        routineSet.name.resolved(
-            appLocale: Locale.autoupdatingCurrent.identifier,
-            systemLanguages: Locale.preferredLanguages
-        )
+        routineManagementState.localizedTitle(for: routineSet)
     }
 
 }
