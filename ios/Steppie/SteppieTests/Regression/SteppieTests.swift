@@ -1,11 +1,24 @@
 import AVFoundation
 import CryptoKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Steppie
 
 @MainActor
 struct SteppieTests {
+    @Test("루틴 사진 reader는 SwiftUI environment에서 주입된다")
+    func routinePhotoReaderUsesEnvironmentInjection() throws {
+        let expectedData = Data([0xff, 0xd8, 0xff])
+        let photoStore = FakeRoutinePhotoStore(icon: try IconRef.builtin(name: "star"))
+        _ = try photoStore.savePhotoData(expectedData)
+        var environment = EnvironmentValues()
+
+        environment.routinePhotoReader = photoStore
+
+        #expect(try environment.routinePhotoReader.data(forBackupAssetName: "photo.jpg") == expectedData)
+    }
+
     @Test("아이 모드가 활성 루틴을 순서대로 불러오고 첫 항목을 current로 선택한다")
     func childRoutineViewModelLoadsActiveRoutines() throws {
         let repository = try RoutinePreviewStore.makeSampleRepository()

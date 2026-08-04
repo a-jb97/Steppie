@@ -20,12 +20,14 @@ struct SteppieApp: App {
     private let isPreview: Bool
     private let notificationRouter: RoutineNotificationRouter
     private let notificationDelegate: RoutineNotificationDelegate
+    private let routinePhotoStore: FileRoutinePhotoStore
 
     init() {
         SteppieFontRegistrar.registerBundledFonts()
         let router = RoutineNotificationRouter()
         notificationRouter = router
         notificationDelegate = RoutineNotificationDelegate(router: router)
+        routinePhotoStore = FileRoutinePhotoStore()
 
         isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
         if isPreview {
@@ -41,6 +43,7 @@ struct SteppieApp: App {
     var body: some Scene {
         WindowGroup {
             rootView
+                .environment(\.routinePhotoReader, routinePhotoStore)
         }
     }
 
