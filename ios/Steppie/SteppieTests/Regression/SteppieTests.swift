@@ -1208,13 +1208,13 @@ struct SteppieTests {
         let routines = try repository.routines(in: routineSet.id)
         let logDate = "2026-01-01"
         let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
-        try repository.setRoutineCompleted(
+        _ = try repository.setRoutineCompleted(
             routineID: routines[0].id,
             routineSetID: routineSet.id,
             on: logDate,
             at: completedAt
         )
-        try repository.setRoutineCompleted(
+        _ = try repository.setRoutineCompleted(
             routineID: routines[1].id,
             routineSetID: routineSet.id,
             on: logDate,
@@ -1254,19 +1254,19 @@ struct SteppieTests {
         let routineSet = try #require(try repository.routineSets().first)
         let routines = try repository.routines(in: routineSet.id)
         let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
-        try repository.setRoutineCompleted(
+        _ = try repository.setRoutineCompleted(
             routineID: routines[0].id,
             routineSetID: routineSet.id,
             on: "2025-12-20",
             at: completedAt
         )
-        try repository.setRoutineCompleted(
+        _ = try repository.setRoutineCompleted(
             routineID: routines[1].id,
             routineSetID: routineSet.id,
             on: "2026-01-01",
             at: completedAt
         )
-        try repository.setRoutineCompleted(
+        _ = try repository.setRoutineCompleted(
             routineID: routines[2].id,
             routineSetID: routineSet.id,
             on: "2026-01-01",
@@ -1293,7 +1293,7 @@ struct SteppieTests {
         let routineSet = try #require(try repository.routineSets().first)
         let routine = try #require(try repository.routines(in: routineSet.id).first)
         let today = "2026-01-21"
-        try repository.setRoutineCompleted(
+        _ = try repository.setRoutineCompleted(
             routineID: routine.id,
             routineSetID: routineSet.id,
             on: today,
@@ -1318,7 +1318,7 @@ struct SteppieTests {
         let routines = try repository.routines(in: routineSet.id)
         let oldLogDate = "2026-01-01"
         let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
-        try repository.setRoutineCompleted(
+        _ = try repository.setRoutineCompleted(
             routineID: routines[0].id,
             routineSetID: routineSet.id,
             on: oldLogDate,
@@ -1346,7 +1346,7 @@ struct SteppieTests {
         let repository = try RoutinePreviewStore.makeSampleRepository()
         let routineSet = try #require(try repository.routineSets().first)
         let routine = try #require(try repository.routines(in: routineSet.id).first)
-        try repository.setRoutineCompleted(
+        _ = try repository.setRoutineCompleted(
             routineID: routine.id,
             routineSetID: routineSet.id,
             on: "2026-01-01",
@@ -1372,7 +1372,7 @@ struct SteppieTests {
         let routine = try #require(try repository.routines(in: routineSet.id).first)
         let logDate = "2026-01-01"
         let completedAt = Date(timeIntervalSince1970: 1_767_229_200)
-        try repository.setRoutineCompleted(
+        _ = try repository.setRoutineCompleted(
             routineID: routine.id,
             routineSetID: routineSet.id,
             on: logDate,
