@@ -12,6 +12,7 @@ import com.example.steppie.data.photo.RoutinePhotoStore
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.DailyLog
 import com.example.steppie.domain.model.FeedbackIntensity
+import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.LocalizedText
 import com.example.steppie.domain.model.LogStatus
 import com.example.steppie.domain.model.Routine
@@ -55,6 +56,7 @@ class GuardianModeViewModel(
     private var recordRoutineSetsCache: List<RoutineSet> = emptyList()
     private var dailyLogsCache: List<DailyLog> = emptyList()
     private var allDailyLogsCache: List<DailyLog> = emptyList()
+    private var photoAssetsReconciled = false
 
     private fun initialState(): GuardianModeUiState {
         val today = clockProvider.today()
@@ -102,6 +104,14 @@ class GuardianModeViewModel(
                     recordsEndDate = endDate,
                 )
             }.collect { snapshot ->
+                if (!photoAssetsReconciled) {
+                    photoAssetsReconciled = true
+                    val referencedPhotoIds = snapshot.recordRoutineSets
+                        .flatMap(RoutineSet::routines)
+                        .mapNotNull { (it.icon as? IconRef.Photo)?.localAssetId }
+                        .toSet()
+                    runCatching { routinePhotoStore?.deleteUnreferencedAssets(referencedPhotoIds) }
+                }
                 recordRoutineSetsCache = snapshot.recordRoutineSets
                 dailyLogsCache = snapshot.dailyLogs
                 allDailyLogsCache = snapshot.allDailyLogs

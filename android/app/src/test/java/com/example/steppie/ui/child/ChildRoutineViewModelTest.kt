@@ -16,13 +16,17 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
+import java.util.Locale
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -383,6 +387,65 @@ class ChildRoutineViewModelTest {
     }
 
     @Test
+    fun `completion failure rolls back optimistic state and does not emit feedback`() = runTest {
+        val target = RoutineSampleData.morning.routines.first()
+        val (viewModel, repository) = childViewModel()
+        val events = mutableListOf<ChildRoutineFeedbackEvent>()
+        val collector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.feedbackEvents.collect(events::add)
+        }
+        repository.completeFailure = IllegalStateException("complete failed")
+
+        try {
+            viewModel.completeSelectedRoutine()
+            runCurrent()
+
+            val state = viewModel.uiState.value
+            val logs = repository.observeDailyLogs(TestDate).first()
+
+            assertEquals(listOf(target.id), repository.completeCalls.map { it.routineId })
+            assertTrue(logs.isEmpty())
+            assertEquals(target.id, state.selectedRoutineId)
+            assertNull(state.feedbackRoutineId)
+            assertNull(state.undoRoutineId)
+            assertFalse(target.id in state.completedRoutineIds)
+            assertTrue(state.isSelectedRoutineCompletable)
+            assertTrue(events.isEmpty())
+        } finally {
+            collector.cancel()
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `undo failure restores completed feedback state`() = runTest {
+        val target = RoutineSampleData.morning.routines.first()
+        val (viewModel, repository) = childViewModel()
+
+        try {
+            viewModel.completeSelectedRoutine()
+            runCurrent()
+            repository.undoFailure = IllegalStateException("undo failed")
+
+            viewModel.undoLastCompletion()
+            runCurrent()
+
+            val state = viewModel.uiState.value
+            val log = repository.observeDailyLogs(TestDate).first().single()
+
+            assertEquals(listOf(target.id), repository.undoCalls.map { it.routineId })
+            assertEquals(LogStatus.Completed, log.status)
+            assertEquals(target.id, state.selectedRoutineId)
+            assertEquals(target.id, state.feedbackRoutineId)
+            assertEquals(target.id, state.undoRoutineId)
+            assertTrue(target.id in state.completedRoutineIds)
+            assertFalse(state.isSelectedRoutineCompletable)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
     fun `advancing feedback selects the next routine without another repository write`() = runTest {
         val routines = RoutineSampleData.morning.routines
         val (viewModel, repository) = childViewModel()
@@ -436,6 +499,12 @@ class ChildRoutineViewModelTest {
                 sound = false,
             ),
             FeedbackCase(
+                settings = AppSettings(feedbackIntensity = FeedbackIntensity.Normal, locale = "en"),
+                spokenText = "Wake up done. Great job!",
+                vibrate = true,
+                sound = true,
+            ),
+            FeedbackCase(
                 settings = AppSettings(
                     feedbackIntensity = FeedbackIntensity.Strong,
                     soundEnabled = false,
@@ -485,6 +554,13 @@ class ChildRoutineViewModelTest {
             appSettingsRepository = FakeAppSettingsRepository(settings),
             clockProvider = TestClockProvider(TestInstant, ZoneOffset.UTC),
             localeProvider = TestLocaleProvider("ko"),
+            completionTextProvider = RoutineCompletionTextProvider { title, languageTag ->
+                if (Locale.forLanguageTag(languageTag).language == "en") {
+                    "$title done. Great job!"
+                } else {
+                    "$title 완료! 잘했어요!"
+                }
+            },
         ) to repository
     }
 }
@@ -510,6 +586,8 @@ private class RecordingRoutineRepository(
 ) : RoutineRepository by delegate {
     val completeCalls = mutableListOf<RoutineWrite>()
     val undoCalls = mutableListOf<RoutineWrite>()
+    var completeFailure: Throwable? = null
+    var undoFailure: Throwable? = null
 
     override suspend fun completeRoutine(
         routineId: String,
@@ -517,6 +595,7 @@ private class RecordingRoutineRepository(
         completedAt: Instant,
     ): DailyLog {
         completeCalls += RoutineWrite(routineId, date, completedAt)
+        completeFailure?.let { throw it }
         return delegate.completeRoutine(routineId, date, completedAt)
     }
 
@@ -526,6 +605,7 @@ private class RecordingRoutineRepository(
         updatedAt: Instant,
     ): DailyLog {
         undoCalls += RoutineWrite(routineId, date, updatedAt)
+        undoFailure?.let { throw it }
         return delegate.undoRoutine(routineId, date, updatedAt)
     }
 }

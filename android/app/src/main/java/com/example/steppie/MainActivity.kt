@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
                         appContainer.appSettingsRepository,
                         appContainer.clockProvider,
                         appContainer.localeProvider,
+                        appContainer.routineCompletionTextProvider,
                     ),
                 )
                 val guardianViewModel: GuardianModeViewModel = viewModel(

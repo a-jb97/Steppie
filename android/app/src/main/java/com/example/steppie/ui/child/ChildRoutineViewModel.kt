@@ -16,6 +16,7 @@ import com.example.steppie.domain.repository.RoutineRepository
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +44,7 @@ class ChildRoutineViewModel(
     private val appSettingsRepository: AppSettingsRepository,
     private val clockProvider: ClockProvider,
     private val localeProvider: LocaleProvider,
+    private val completionTextProvider: RoutineCompletionTextProvider,
 ) : ViewModel() {
     private val currentDate = MutableStateFlow(clockProvider.today())
     private val _uiState = MutableStateFlow(ChildRoutineUiState())
@@ -54,6 +56,7 @@ class ChildRoutineViewModel(
     private var latestRoutineSets: List<RoutineSet> = emptyList()
     private var latestCompletedIds: Set<String> = emptySet()
     private var lastGuidedRoutineId: String? = null
+    private var routineWriteInProgress = false
 
     init {
         val routineDataForDate = currentDate.flatMapLatest { date ->
@@ -129,6 +132,7 @@ class ChildRoutineViewModel(
     }
 
     fun completeSelectedRoutine() {
+        if (routineWriteInProgress) return
         val previousDate = currentDate.value
         val actionDate = refreshCurrentDate()
         if (actionDate != previousDate) return
@@ -136,6 +140,8 @@ class ChildRoutineViewModel(
         val routine = state.selectedRoutine ?: return
         if (!state.isSelectedRoutineCompletable || routine.id in state.completedRoutineIds) return
 
+        val previousCompletedIds = latestCompletedIds
+        routineWriteInProgress = true
         _uiState.value = state.copy(
             feedbackRoutineId = routine.id,
             undoRoutineId = routine.id,
@@ -144,21 +150,33 @@ class ChildRoutineViewModel(
         latestCompletedIds = latestCompletedIds + routine.id
 
         viewModelScope.launch {
-            repository.completeRoutine(routine.id, actionDate, clockProvider.now())
-            val appSettings = settings.value
-            _feedbackEvents.emit(
-                ChildRoutineFeedbackEvent(
-                    spokenText = if (appSettings.ttsEnabled) {
-                        "${routine.localizedTitleForDevice(appSettings)} 완료! 잘했어요!"
-                    } else {
-                        null
-                    },
-                    vibrate = appSettings.hapticEnabled && appSettings.feedbackIntensity.allowsHaptic(),
-                    sound = appSettings.soundEnabled && appSettings.feedbackIntensity.allowsSound(),
-                    ttsRate = appSettings.ttsRate.toFloat(),
-                    ttsVolume = appSettings.ttsVolume.toFloat(),
-                ),
-            )
+            try {
+                repository.completeRoutine(routine.id, actionDate, clockProvider.now())
+                val appSettings = settings.value
+                _feedbackEvents.emit(
+                    ChildRoutineFeedbackEvent(
+                        spokenText = if (appSettings.ttsEnabled) {
+                            completionTextProvider.completionText(
+                                routineTitle = routine.localizedTitleForDevice(appSettings),
+                                languageTag = appSettings.locale ?: localeProvider.languageTag(),
+                            )
+                        } else {
+                            null
+                        },
+                        vibrate = appSettings.hapticEnabled && appSettings.feedbackIntensity.allowsHaptic(),
+                        sound = appSettings.soundEnabled && appSettings.feedbackIntensity.allowsSound(),
+                        ttsRate = appSettings.ttsRate.toFloat(),
+                        ttsVolume = appSettings.ttsVolume.toFloat(),
+                    ),
+                )
+            } catch (error: CancellationException) {
+                rollbackRoutineWrite(state, previousCompletedIds)
+                throw error
+            } catch (_: Exception) {
+                rollbackRoutineWrite(state, previousCompletedIds)
+            } finally {
+                routineWriteInProgress = false
+            }
         }
     }
 
@@ -179,19 +197,32 @@ class ChildRoutineViewModel(
     }
 
     fun undoLastCompletion() {
+        if (routineWriteInProgress) return
         val previousDate = currentDate.value
         val actionDate = refreshCurrentDate()
         if (actionDate != previousDate) return
-        val routineId = _uiState.value.undoRoutineId ?: return
+        val state = _uiState.value
+        val routineId = state.undoRoutineId ?: return
+        val previousCompletedIds = latestCompletedIds
+        routineWriteInProgress = true
         latestCompletedIds = latestCompletedIds - routineId
-        _uiState.value = _uiState.value.copy(
+        _uiState.value = state.copy(
             selectedRoutineId = routineId,
             feedbackRoutineId = null,
             undoRoutineId = null,
             singlePane = ChildSinglePane.Focus,
         )
         viewModelScope.launch {
-            repository.undoRoutine(routineId, actionDate, clockProvider.now())
+            try {
+                repository.undoRoutine(routineId, actionDate, clockProvider.now())
+            } catch (error: CancellationException) {
+                rollbackRoutineWrite(state, previousCompletedIds)
+                throw error
+            } catch (_: Exception) {
+                rollbackRoutineWrite(state, previousCompletedIds)
+            } finally {
+                routineWriteInProgress = false
+            }
         }
     }
 
@@ -226,6 +257,19 @@ class ChildRoutineViewModel(
         }
     }
 
+    private fun rollbackRoutineWrite(
+        previousState: ChildRoutineUiState,
+        previousCompletedIds: Set<String>,
+    ) {
+        latestCompletedIds = previousCompletedIds
+        _uiState.value = _uiState.value.copy(
+            selectedRoutineId = previousState.selectedRoutineId,
+            singlePane = previousState.singlePane,
+            feedbackRoutineId = previousState.feedbackRoutineId,
+            undoRoutineId = previousState.undoRoutineId,
+        )
+    }
+
     private fun Routine.localizedTitleForDevice(settings: AppSettings): String =
         title.resolve(appLocale = settings.locale, systemLocale = localeProvider.languageTag())
 
@@ -244,6 +288,7 @@ class ChildRoutineViewModel(
             appSettingsRepository: AppSettingsRepository,
             clockProvider: ClockProvider,
             localeProvider: LocaleProvider,
+            completionTextProvider: RoutineCompletionTextProvider,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -254,6 +299,7 @@ class ChildRoutineViewModel(
                         appSettingsRepository,
                         clockProvider,
                         localeProvider,
+                        completionTextProvider,
                     ) as T
                 }
             }

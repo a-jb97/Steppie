@@ -157,6 +157,29 @@ class BackupArchiveTest {
     }
 
     @Test
+    fun archive_oversizedAsset_doesNotWritePartialZipToDestination() {
+        val output = ByteArrayOutputStream()
+        val original = byteArrayOf(9, 8, 7)
+        output.write(original)
+
+        val result = runCatching {
+            BackupArchive.write(
+                snapshot = testSnapshot(),
+                appVersion = "1.0",
+                zoneId = zoneId,
+                output = output,
+                assets = mapOf(
+                    "routine-photo-10000000-0000-4000-8000-000000000001.jpg" to
+                        ByteArray(5 * 1024 * 1024 + 1),
+                ),
+            )
+        }
+
+        assertTrue(result.exceptionOrNull() is BackupValidationException)
+        assertTrue(original.contentEquals(output.toByteArray()))
+    }
+
+    @Test
     fun dataJson_doesNotContainRawPinFields() {
         val dataJson = BackupJson.encodeData(testSnapshot(), zoneId)
 

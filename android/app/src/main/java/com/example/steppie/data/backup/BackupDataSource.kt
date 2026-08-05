@@ -42,23 +42,35 @@ class BackupDataSource(
 
     suspend fun replaceAll(newSnapshot: BackupSnapshot, assets: Map<String, ByteArray> = emptyMap()) {
         val previous = currentData()
-        val previousAssets = routinePhotoStore?.snapshotFiles().orEmpty()
-        try {
-            replaceRoomData(
-                routineSets = newSnapshot.routineSets,
-                routines = newSnapshot.routines,
-                dailyLogs = newSnapshot.dailyLogs,
+        val steps = mutableListOf(
+            BackupRestoreStep(
+                name = "room",
+                apply = {
+                    replaceRoomData(
+                        routineSets = newSnapshot.routineSets,
+                        routines = newSnapshot.routines,
+                        dailyLogs = newSnapshot.dailyLogs,
+                    )
+                },
+                rollback = {
+                    replaceRoomData(previous.routineSets, previous.routines, previous.dailyLogs)
+                },
+            ),
+            BackupRestoreStep(
+                name = "settings",
+                apply = { appSettingsRepository.updateAppSettings(newSnapshot.appSettings) },
+                rollback = { appSettingsRepository.updateAppSettings(previous.appSettings) },
+            ),
+        )
+        routinePhotoStore?.let { store ->
+            val previousAssets = store.snapshotFiles()
+            steps += BackupRestoreStep(
+                name = "photos",
+                apply = { store.replaceAllFromBackup(assets) },
+                rollback = { store.replaceAllFiles(previousAssets) },
             )
-            appSettingsRepository.updateAppSettings(newSnapshot.appSettings)
-            routinePhotoStore?.replaceAllFromBackup(assets)
-        } catch (error: Throwable) {
-            runCatching {
-                replaceRoomData(previous.routineSets, previous.routines, previous.dailyLogs)
-                appSettingsRepository.updateAppSettings(previous.appSettings)
-                routinePhotoStore?.replaceAllFiles(previousAssets)
-            }
-            throw error
         }
+        runBackupRestoreTransaction(steps)
     }
 
     private suspend fun replaceRoomData(

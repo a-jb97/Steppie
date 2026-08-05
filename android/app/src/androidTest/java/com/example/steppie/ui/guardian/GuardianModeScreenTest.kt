@@ -11,7 +11,11 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import com.example.steppie.R
 import com.example.steppie.data.sample.RoutineSampleData
+import com.example.steppie.testing.testString
+import com.example.steppie.testing.testText
 import com.example.steppie.ui.theme.SteppieTheme
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
@@ -41,6 +45,13 @@ private fun TestGuardianModeScreen(
     )
 }
 
+private fun guardianMenuDescription(titleResourceId: Int, bodyResourceId: Int): String =
+    testString(
+        R.string.a11y_guardian_menu_card,
+        testString(titleResourceId),
+        testString(bodyResourceId),
+    )
+
 class GuardianModeScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -63,8 +74,8 @@ class GuardianModeScreenTest {
         }
 
         composeRule.onNodeWithTag("guardian_pin").assertIsDisplayed()
-        composeRule.onNodeWithText("1").performClick()
-        composeRule.onNodeWithText("⌫").performClick()
+        composeRule.onNodeWithContentDescription("1").performClick()
+        composeRule.onNodeWithContentDescription(testString(R.string.a11y_pin_delete)).performClick()
 
         composeRule.runOnIdle {
             assertEquals(listOf(1), digits)
@@ -103,10 +114,18 @@ class GuardianModeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("루틴 관리").performClick()
-        composeRule.onNodeWithText("환경 설정").performClick()
-        composeRule.onNodeWithText("진행 기록").performClick()
-        composeRule.onNodeWithText("보안").performClick()
+        composeRule.onNodeWithContentDescription(
+            guardianMenuDescription(R.string.guardian_menu_routine, R.string.guardian_menu_routine_desc),
+        ).performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription(
+            guardianMenuDescription(R.string.guardian_menu_feedback, R.string.guardian_menu_feedback_desc),
+        ).performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription(
+            guardianMenuDescription(R.string.guardian_menu_records, R.string.guardian_menu_records_desc),
+        ).performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription(
+            guardianMenuDescription(R.string.guardian_menu_security, R.string.guardian_menu_security_desc),
+        ).performScrollTo().performClick()
 
         composeRule.runOnIdle {
             assertEquals(1, routineClicks)
@@ -135,7 +154,9 @@ class GuardianModeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("복구 코드 확인").performClick()
+        composeRule.onNodeWithContentDescription(
+            guardianMenuDescription(R.string.guardian_recovery_code, R.string.guardian_recovery_code_desc),
+        ).performScrollTo().performClick()
 
         composeRule.runOnIdle {
             assertEquals(1, recoveryClicks)
@@ -163,9 +184,11 @@ class GuardianModeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("복구 코드").assertIsDisplayed()
-        composeRule.onNodeWithText("6").assertIsDisplayed()
-        composeRule.onNodeWithText("확인했습니다").performClick()
+        composeRule.onNodeWithText(testString(R.string.guardian_recovery_show_title)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(
+            testString(R.string.a11y_recovery_code_value, "654321"),
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_recovery_acknowledge)).performClick()
 
         composeRule.runOnIdle {
             assertEquals(1, closeClicks)
@@ -217,11 +240,23 @@ class GuardianModeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("진행 기록").assertIsDisplayed()
-        composeRule.onNodeWithText("2/3 완료 · 66%").assertIsDisplayed()
-        composeRule.onNodeWithText("양치하기").assertIsDisplayed()
-        composeRule.onNodeWithText("가방 챙기기").assertIsDisplayed()
-        composeRule.onNodeWithText("미완료 · 삭제된 활동").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_records_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_records_summary, 2, 3, 66)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(
+            testString(
+                R.string.a11y_guardian_record_routine,
+                "양치하기",
+                testString(R.string.guardian_records_completed),
+            ),
+        ).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(
+            testString(
+                R.string.a11y_guardian_record_routine_with_lifecycle,
+                "가방 챙기기",
+                testString(R.string.guardian_records_not_completed),
+                testString(R.string.guardian_records_deleted_routine),
+            ),
+        ).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -243,7 +278,9 @@ class GuardianModeScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("전체 기록 캘린더 열기").performClick()
+        composeRule.onNodeWithContentDescription(
+            testString(R.string.a11y_guardian_records_calendar),
+        ).performClick()
 
         composeRule.runOnIdle {
             assertEquals(1, calendarClicks)
@@ -286,12 +323,18 @@ class GuardianModeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("전체 기록").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_records_calendar_title)).assertIsDisplayed()
         composeRule.onNodeWithTag("guardian_records_calendar_date_$dateWithRecords").performClick()
         composeRule.onNodeWithTag("guardian_records_calendar_date_$emptyDate")
             .assertIsDisplayed()
             .assertHasNoClickAction()
-        composeRule.onNodeWithText("양치하기").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(
+            testString(
+                R.string.a11y_guardian_record_routine,
+                "양치하기",
+                testString(R.string.guardian_records_completed),
+            ),
+        ).performScrollTo().assertIsDisplayed()
 
         composeRule.runOnIdle {
             assertEquals(dateWithRecords, selectedDate)
@@ -312,14 +355,16 @@ class GuardianModeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("칭찬 애니메이션").assertIsDisplayed()
-        composeRule.onNodeWithText("음성 안내").assertIsDisplayed()
-        composeRule.onNodeWithText("효과음").assertIsDisplayed()
-        composeRule.onNodeWithText("햅틱/진동").assertIsDisplayed()
-        composeRule.onNodeWithText("음성 속도").assertIsDisplayed()
-        composeRule.onNodeWithText("음성 볼륨").assertIsDisplayed()
-        composeRule.onNodeWithText("예고 알림").assertIsDisplayed()
-        composeRule.onNodeWithText("방해 금지 시간").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_setting_feedback_intensity)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_setting_tts_enabled)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_setting_sound_enabled)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_setting_haptic_enabled)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_setting_tts_rate)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_setting_tts_volume)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_setting_notification_lead_times)).assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.guardian_setting_quiet_hours))
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test
@@ -341,7 +386,12 @@ class GuardianModeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("루틴 세트 생성").performClick()
+        composeRule.onNodeWithContentDescription(
+            guardianMenuDescription(
+                R.string.guardian_menu_create_routine_set,
+                R.string.guardian_menu_create_routine_set_desc,
+            ),
+        ).performScrollTo().performClick()
 
         composeRule.runOnIdle {
             assertEquals(1, createClicks)
@@ -362,8 +412,8 @@ class GuardianModeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("아직 루틴 세트가 없어요").assertIsDisplayed()
-        composeRule.onAllNodesWithText("루틴 세트 생성").assertCountEquals(2)
+        composeRule.onNodeWithText(testString(R.string.guardian_empty_routine_set_title)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.guardian_menu_create_routine_set)).assertCountEquals(2)
     }
 
     @Test
@@ -390,12 +440,12 @@ class GuardianModeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("아침 루틴").assertIsDisplayed()
-        composeRule.onNodeWithText("학교 루틴").assertIsDisplayed()
-        composeRule.onNodeWithText("취침 루틴").assertIsDisplayed()
-        composeRule.onAllNodesWithText("진행 제외").assertCountEquals(1)
-        composeRule.onAllNodesWithText("매일 진행").assertCountEquals(2)
-        composeRule.onNodeWithText("학교 루틴").performClick()
+        composeRule.onAllNodesWithText(RoutineSampleData.morning.name.testText()).assertCountEquals(2)
+        composeRule.onNodeWithText(RoutineSampleData.school.name.testText()).assertIsDisplayed()
+        composeRule.onNodeWithText(RoutineSampleData.bedtime.name.testText()).assertIsDisplayed()
+        composeRule.onAllNodesWithText(testString(R.string.guardian_routine_set_disable_daily)).assertCountEquals(1)
+        composeRule.onAllNodesWithText(testString(R.string.guardian_routine_set_enable_daily)).assertCountEquals(2)
+        composeRule.onNodeWithText(RoutineSampleData.school.name.testText()).performClick()
 
         composeRule.runOnIdle {
             assertEquals(RoutineSampleData.school.id, selectedRoutineSetId)
@@ -451,8 +501,12 @@ class GuardianModeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("저장").assertIsNotEnabled()
-        composeRule.onNodeWithText("저장하려면 최소 1개 단계가 필요합니다.").assertIsDisplayed()
+        composeRule.onNodeWithText(testString(R.string.action_save))
+            .performScrollTo()
+            .assertIsNotEnabled()
+        composeRule.onNodeWithText(testString(R.string.guardian_step_list_empty))
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test

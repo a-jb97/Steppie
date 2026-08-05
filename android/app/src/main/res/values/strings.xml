@@ -17,6 +17,7 @@
     <string name="child_next_routine">다음 : %1$s</string>
     <string name="child_all_complete_title">오늘 할 일 완료!</string>
     <string name="child_all_complete_subtitle">모든 활동을 차례대로 끝냈어요</string>
+    <string name="tts_routine_completed">%1$s 완료! 잘했어요!</string>
     <string name="child_list_title">오늘의 순서</string>
     <string name="child_list_subtitle">위아래로만 움직여요</string>
     <string name="child_empty_title">오늘 할 일이 없어요</string>

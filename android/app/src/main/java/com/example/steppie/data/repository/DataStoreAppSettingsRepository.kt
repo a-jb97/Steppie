@@ -1,6 +1,7 @@
 package com.example.steppie.data.repository
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -24,28 +25,7 @@ class DataStoreAppSettingsRepository(
 ) : AppSettingsRepository {
     private val dataStore = context.applicationContext.appSettingsDataStore
 
-    override fun observeAppSettings(): Flow<AppSettings> = dataStore.data.map { preferences ->
-        val default = AppSettings()
-        AppSettings(
-            guardianPinHash = preferences[Keys.GuardianPinHash],
-            recoveryCodeHash = preferences[Keys.RecoveryCodeHash],
-            feedbackIntensity = preferences[Keys.FeedbackIntensity]
-                ?.let(FeedbackIntensity::fromStorageValue)
-                ?: default.feedbackIntensity,
-            soundEnabled = preferences[Keys.SoundEnabled] ?: default.soundEnabled,
-            ttsEnabled = preferences[Keys.TtsEnabled] ?: default.ttsEnabled,
-            ttsRate = preferences[Keys.TtsRate] ?: default.ttsRate,
-            ttsVolume = preferences[Keys.TtsVolume] ?: default.ttsVolume,
-            hapticEnabled = preferences[Keys.HapticEnabled] ?: default.hapticEnabled,
-            undoDurationSeconds = preferences[Keys.UndoDurationSeconds] ?: default.undoDurationSeconds,
-            notificationLeadTimes = preferences[Keys.NotificationLeadTimes]
-                ?.toLeadTimes()
-                ?: default.notificationLeadTimes,
-            quietHoursStart = preferences[Keys.QuietHoursStart]?.let(LocalTime::parse),
-            quietHoursEnd = preferences[Keys.QuietHoursEnd]?.let(LocalTime::parse),
-            locale = preferences[Keys.Locale],
-        )
-    }
+    override fun observeAppSettings(): Flow<AppSettings> = dataStore.data.map(Preferences::toAppSettings)
 
     suspend fun getAppSettings(): AppSettings = observeAppSettings().first()
 
@@ -56,19 +36,19 @@ class DataStoreAppSettingsRepository(
     suspend fun replaceAppSettings(settings: AppSettings) {
         dataStore.edit { preferences ->
             preferences.clear()
-            settings.guardianPinHash?.let { preferences[Keys.GuardianPinHash] = it }
-            settings.recoveryCodeHash?.let { preferences[Keys.RecoveryCodeHash] = it }
-            preferences[Keys.FeedbackIntensity] = settings.feedbackIntensity.storageValue
-            preferences[Keys.SoundEnabled] = settings.soundEnabled
-            preferences[Keys.TtsEnabled] = settings.ttsEnabled
-            preferences[Keys.TtsRate] = settings.ttsRate
-            preferences[Keys.TtsVolume] = settings.ttsVolume
-            preferences[Keys.HapticEnabled] = settings.hapticEnabled
-            preferences[Keys.UndoDurationSeconds] = settings.undoDurationSeconds
-            preferences[Keys.NotificationLeadTimes] = settings.notificationLeadTimes.joinToString(",")
-            settings.quietHoursStart?.let { preferences[Keys.QuietHoursStart] = it.toString() }
-            settings.quietHoursEnd?.let { preferences[Keys.QuietHoursEnd] = it.toString() }
-            settings.locale?.let { preferences[Keys.Locale] = it }
+            settings.guardianPinHash?.let { preferences[AppSettingsKeys.GuardianPinHash] = it }
+            settings.recoveryCodeHash?.let { preferences[AppSettingsKeys.RecoveryCodeHash] = it }
+            preferences[AppSettingsKeys.FeedbackIntensity] = settings.feedbackIntensity.storageValue
+            preferences[AppSettingsKeys.SoundEnabled] = settings.soundEnabled
+            preferences[AppSettingsKeys.TtsEnabled] = settings.ttsEnabled
+            preferences[AppSettingsKeys.TtsRate] = settings.ttsRate
+            preferences[AppSettingsKeys.TtsVolume] = settings.ttsVolume
+            preferences[AppSettingsKeys.HapticEnabled] = settings.hapticEnabled
+            preferences[AppSettingsKeys.UndoDurationSeconds] = settings.undoDurationSeconds
+            preferences[AppSettingsKeys.NotificationLeadTimes] = settings.notificationLeadTimes.joinToString(",")
+            settings.quietHoursStart?.let { preferences[AppSettingsKeys.QuietHoursStart] = it.toString() }
+            settings.quietHoursEnd?.let { preferences[AppSettingsKeys.QuietHoursEnd] = it.toString() }
+            settings.locale?.let { preferences[AppSettingsKeys.Locale] = it }
         }
     }
 
@@ -76,21 +56,21 @@ class DataStoreAppSettingsRepository(
         require(pinCredentials.isValidPin(pin)) { "Guardian PIN must be exactly 4 digits." }
         val recoveryCode = pinCredentials.generateRecoveryCode()
         dataStore.edit { preferences ->
-            preferences[Keys.GuardianPinHash] = pinCredentials.hash(pin)
-            preferences[Keys.RecoveryCodeHash] = pinCredentials.hash(recoveryCode)
+            preferences[AppSettingsKeys.GuardianPinHash] = pinCredentials.hash(pin)
+            preferences[AppSettingsKeys.RecoveryCodeHash] = pinCredentials.hash(recoveryCode)
         }
         return recoveryCode
     }
 
     override suspend fun verifyGuardianPin(pin: String): Boolean {
         if (!pinCredentials.isValidPin(pin)) return false
-        val storedHash = dataStore.data.first()[Keys.GuardianPinHash] ?: return false
+        val storedHash = dataStore.data.first()[AppSettingsKeys.GuardianPinHash] ?: return false
         return pinCredentials.verify(pin, storedHash)
     }
 
     override suspend fun verifyRecoveryCode(recoveryCode: String): Boolean {
         if (!pinCredentials.isValidRecoveryCode(recoveryCode)) return false
-        val storedHash = dataStore.data.first()[Keys.RecoveryCodeHash] ?: return false
+        val storedHash = dataStore.data.first()[AppSettingsKeys.RecoveryCodeHash] ?: return false
         return pinCredentials.verify(recoveryCode, storedHash)
     }
 
@@ -104,7 +84,7 @@ class DataStoreAppSettingsRepository(
         if (!verifyGuardianPin(currentPin)) return null
         val recoveryCode = pinCredentials.generateRecoveryCode()
         dataStore.edit { preferences ->
-            preferences[Keys.RecoveryCodeHash] = pinCredentials.hash(recoveryCode)
+            preferences[AppSettingsKeys.RecoveryCodeHash] = pinCredentials.hash(recoveryCode)
         }
         return recoveryCode
     }
@@ -115,28 +95,57 @@ class DataStoreAppSettingsRepository(
         if (!verifyRecoveryCode(recoveryCode)) return null
         return setGuardianPin(newPin)
     }
+}
 
-    private object Keys {
-        val GuardianPinHash = stringPreferencesKey("guardian_pin_hash")
-        val RecoveryCodeHash = stringPreferencesKey("recovery_code_hash")
-        val FeedbackIntensity = stringPreferencesKey("feedback_intensity")
-        val SoundEnabled = booleanPreferencesKey("sound_enabled")
-        val TtsEnabled = booleanPreferencesKey("tts_enabled")
-        val TtsRate = doublePreferencesKey("tts_rate")
-        val TtsVolume = doublePreferencesKey("tts_volume")
-        val HapticEnabled = booleanPreferencesKey("haptic_enabled")
-        val UndoDurationSeconds = intPreferencesKey("undo_duration_seconds")
-        val NotificationLeadTimes = stringPreferencesKey("notification_lead_times")
-        val QuietHoursStart = stringPreferencesKey("quiet_hours_start")
-        val QuietHoursEnd = stringPreferencesKey("quiet_hours_end")
-        val Locale = stringPreferencesKey("locale")
+private object AppSettingsKeys {
+    val GuardianPinHash = stringPreferencesKey("guardian_pin_hash")
+    val RecoveryCodeHash = stringPreferencesKey("recovery_code_hash")
+    val FeedbackIntensity = stringPreferencesKey("feedback_intensity")
+    val SoundEnabled = booleanPreferencesKey("sound_enabled")
+    val TtsEnabled = booleanPreferencesKey("tts_enabled")
+    val TtsRate = doublePreferencesKey("tts_rate")
+    val TtsVolume = doublePreferencesKey("tts_volume")
+    val HapticEnabled = booleanPreferencesKey("haptic_enabled")
+    val UndoDurationSeconds = intPreferencesKey("undo_duration_seconds")
+    val NotificationLeadTimes = stringPreferencesKey("notification_lead_times")
+    val QuietHoursStart = stringPreferencesKey("quiet_hours_start")
+    val QuietHoursEnd = stringPreferencesKey("quiet_hours_end")
+    val Locale = stringPreferencesKey("locale")
+}
+
+internal fun Preferences.toAppSettings(): AppSettings {
+    val default = AppSettings()
+    return AppSettings(
+        guardianPinHash = this[AppSettingsKeys.GuardianPinHash]?.takeIf(String::isNotBlank),
+        recoveryCodeHash = this[AppSettingsKeys.RecoveryCodeHash]?.takeIf(String::isNotBlank),
+        feedbackIntensity = this[AppSettingsKeys.FeedbackIntensity]
+            ?.let { stored -> FeedbackIntensity.entries.firstOrNull { it.storageValue == stored } }
+            ?: default.feedbackIntensity,
+        soundEnabled = this[AppSettingsKeys.SoundEnabled] ?: default.soundEnabled,
+        ttsEnabled = this[AppSettingsKeys.TtsEnabled] ?: default.ttsEnabled,
+        ttsRate = this[AppSettingsKeys.TtsRate]?.takeIf { it in 0.5..1.5 } ?: default.ttsRate,
+        ttsVolume = this[AppSettingsKeys.TtsVolume]?.takeIf { it in 0.0..1.0 } ?: default.ttsVolume,
+        hapticEnabled = this[AppSettingsKeys.HapticEnabled] ?: default.hapticEnabled,
+        undoDurationSeconds = this[AppSettingsKeys.UndoDurationSeconds]
+            ?.takeIf { it in setOf(3, 5, 10) }
+            ?: default.undoDurationSeconds,
+        notificationLeadTimes = this[AppSettingsKeys.NotificationLeadTimes]
+            ?.toLeadTimesOrNull()
+            ?: default.notificationLeadTimes,
+        quietHoursStart = this[AppSettingsKeys.QuietHoursStart]?.toLocalTimeOrNull(),
+        quietHoursEnd = this[AppSettingsKeys.QuietHoursEnd]?.toLocalTimeOrNull(),
+        locale = this[AppSettingsKeys.Locale]?.takeIf(String::isNotBlank),
+    )
+}
+
+private fun String.toLeadTimesOrNull(): List<Int>? {
+    if (isBlank()) return emptyList()
+    val values = split(',').map { token -> token.trim().toIntOrNull() ?: return null }
+    return values.takeIf { leadTimes ->
+        leadTimes.all { it > 0 } && leadTimes.distinct().size == leadTimes.size
     }
 }
 
-private fun String.toLeadTimes(): List<Int> {
-    if (isBlank()) return emptyList()
-    return split(',')
-        .mapNotNull { it.trim().takeIf(String::isNotEmpty)?.toIntOrNull() }
-        .distinct()
-        .filter { it > 0 }
-}
+private fun String.toLocalTimeOrNull(): LocalTime? = runCatching { LocalTime.parse(this) }
+    .getOrNull()
+    ?.takeIf { it.second == 0 && it.nano == 0 }
