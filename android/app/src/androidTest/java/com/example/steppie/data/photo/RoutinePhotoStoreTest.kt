@@ -2,6 +2,8 @@ package com.example.steppie.data.photo
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.ExifInterface
 import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -17,6 +19,22 @@ import org.junit.runner.RunWith
 class RoutinePhotoStoreTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val store = RoutinePhotoStore(context)
+
+    @Test
+    fun encodingExifRotatedPhotoRecyclesOwnedSourceBitmap() {
+        val source = Bitmap.createBitmap(2, 3, Bitmap.Config.ARGB_8888)
+
+        val bytes = store.encodeImportedPhoto(source, ExifInterface.ORIENTATION_ROTATE_90)
+
+        assertTrue(source.isRecycled)
+        val encoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        try {
+            assertEquals(3, encoded.width)
+            assertEquals(2, encoded.height)
+        } finally {
+            encoded.recycle()
+        }
+    }
 
     @Test
     fun importingCameraPhotoDeletesTemporarySourceAfterCopy() = runBlocking {

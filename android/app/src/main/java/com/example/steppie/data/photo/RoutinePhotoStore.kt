@@ -38,7 +38,7 @@ class RoutinePhotoStore(context: Context) {
             val bytes = appContext.contentResolver.openInputStream(uri)?.use { input ->
                 val original = BitmapFactory.decodeStream(input)
                     ?: throw IllegalArgumentException("사진 파일을 읽을 수 없습니다.")
-                original.applyExifOrientation(exifOrientation).toRoutinePhotoJpegBytes()
+                encodeImportedPhoto(original, exifOrientation)
             } ?: throw IllegalArgumentException("사진 파일을 열 수 없습니다.")
 
             destination.writeBytes(bytes)
@@ -129,6 +129,18 @@ class RoutinePhotoStore(context: Context) {
         return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
     }
 
+    internal fun encodeImportedPhoto(original: Bitmap, exifOrientation: Int): ByteArray {
+        var oriented: Bitmap? = null
+        return try {
+            val normalized = original.applyExifOrientation(exifOrientation)
+            oriented = normalized
+            normalized.toRoutinePhotoJpegBytes()
+        } finally {
+            oriented?.takeIf { it !== original }?.recycle()
+            original.recycle()
+        }
+    }
+
     private fun Bitmap.toRoutinePhotoJpegBytes(): ByteArray {
         val maxSide = 1200
         val longest = maxOf(width, height)
@@ -139,18 +151,24 @@ class RoutinePhotoStore(context: Context) {
             Bitmap.createScaledBitmap(this, (width * scale).toInt(), (height * scale).toInt(), true)
         }
         var current = initial
-        var bytes = current.toJpegBytes()
-        while (bytes.size > BackupMaxAssetBytes && maxOf(current.width, current.height) > MinPhotoSide) {
-            current = Bitmap.createScaledBitmap(
-                current,
-                (current.width * 0.8f).toInt().coerceAtLeast(1),
-                (current.height * 0.8f).toInt().coerceAtLeast(1),
-                true,
-            )
-            bytes = current.toJpegBytes()
+        return try {
+            var bytes = current.toJpegBytes()
+            while (bytes.size > BackupMaxAssetBytes && maxOf(current.width, current.height) > MinPhotoSide) {
+                val previous = current
+                current = Bitmap.createScaledBitmap(
+                    previous,
+                    (previous.width * 0.8f).toInt().coerceAtLeast(1),
+                    (previous.height * 0.8f).toInt().coerceAtLeast(1),
+                    true,
+                )
+                if (previous !== this) previous.recycle()
+                bytes = current.toJpegBytes()
+            }
+            require(bytes.size <= BackupMaxAssetBytes) { "사진 파일은 5MB 이하여야 합니다." }
+            bytes
+        } finally {
+            if (current !== this) current.recycle()
         }
-        require(bytes.size <= BackupMaxAssetBytes) { "사진 파일은 5MB 이하여야 합니다." }
-        return bytes
     }
 
     private fun Bitmap.toJpegBytes(): ByteArray {
