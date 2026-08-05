@@ -15,7 +15,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -53,5 +55,23 @@ class AppActivityResultActionsTest {
         assertEquals(MediaStore.ACTION_PICK_IMAGES, intent.action)
         assertNotEquals(Intent.ACTION_PICK, intent.action)
         assertEquals("image/*", intent.type)
+    }
+
+    @Test
+    fun newCameraCaptureRemovesAbandonedFileAndCancelRemovesCurrentFile() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val directory = context.cacheDir.resolve("camera_photos").apply { deleteRecursively() }
+
+        context.createCameraImageUri()
+        val abandonedFile = directory.listFiles().orEmpty().single()
+        val currentUri = context.createCameraImageUri()
+        val currentFile = directory.listFiles().orEmpty().single()
+
+        assertFalse(abandonedFile.exists())
+        assertTrue(currentFile.exists())
+
+        context.discardCameraImage(currentUri.toString())
+
+        assertTrue(directory.listFiles().orEmpty().isEmpty())
     }
 }

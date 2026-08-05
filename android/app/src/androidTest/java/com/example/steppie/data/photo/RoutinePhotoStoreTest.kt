@@ -1,0 +1,102 @@
+package com.example.steppie.data.photo
+
+import android.content.Context
+import android.graphics.Bitmap
+import androidx.core.content.FileProvider
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import java.io.File
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class RoutinePhotoStoreTest {
+    private val context = ApplicationProvider.getApplicationContext<Context>()
+    private val store = RoutinePhotoStore(context)
+
+    @Test
+    fun importingCameraPhotoDeletesTemporarySourceAfterCopy() = runBlocking {
+        val previousFiles = store.snapshotFiles()
+        val cameraDirectory = File(context.cacheDir, "camera_photos").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val source = File(cameraDirectory, "routine-photo-test.jpg")
+        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        try {
+            source.outputStream().use { output ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)
+            }
+        } finally {
+            bitmap.recycle()
+        }
+        val sourceUri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            source,
+        )
+
+        try {
+            val imported = store.importPhoto(sourceUri)
+
+            assertFalse(source.exists())
+            assertTrue(store.fileFor(imported).isFile)
+        } finally {
+            store.replaceAllFiles(previousFiles)
+            cameraDirectory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun failedCameraImportDeletesTemporarySourceWithoutLeavingPhotoAsset() = runBlocking {
+        val previousFiles = store.snapshotFiles()
+        val cameraDirectory = File(context.cacheDir, "camera_photos").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val source = File(cameraDirectory, "routine-photo-invalid.jpg").apply {
+            writeText("not an image")
+        }
+        val sourceUri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            source,
+        )
+
+        try {
+            val failure = runCatching { store.importPhoto(sourceUri) }.exceptionOrNull()
+
+            assertTrue(failure is IllegalArgumentException)
+            assertFalse(source.exists())
+            assertEquals(previousFiles.keys, store.snapshotFiles().keys)
+        } finally {
+            store.replaceAllFiles(previousFiles)
+            cameraDirectory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun reconciliationDeletesOnlyAssetsWithoutPersistedReferences() = runBlocking {
+        val previousFiles = store.snapshotFiles()
+        val referencedId = "10000000-0000-4000-8000-000000000001"
+        val orphanedId = "10000000-0000-4000-8000-000000000002"
+        store.replaceAllFiles(
+            mapOf(
+                "$referencedId.jpg" to byteArrayOf(1),
+                "$orphanedId.jpg" to byteArrayOf(2),
+            ),
+        )
+
+        try {
+            store.deleteUnreferencedAssets(setOf(referencedId))
+
+            assertEquals(setOf("$referencedId.jpg"), store.snapshotFiles().keys)
+        } finally {
+            store.replaceAllFiles(previousFiles)
+        }
+    }
+}

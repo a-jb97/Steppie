@@ -58,14 +58,19 @@ internal fun rememberPhotoActivityActions(
     val cameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture(),
     ) { succeeded ->
+        val sourceUriString = cameraUriString
         val request = resolveCameraResult(
             targetName = cameraTargetName,
-            uri = cameraUriString,
+            uri = sourceUriString,
             succeeded = succeeded,
         )
         cameraTargetName = null
         cameraUriString = null
-        request?.let(onPhotoImport)
+        if (request != null) {
+            onPhotoImport(request)
+        } else {
+            context.discardCameraImage(sourceUriString)
+        }
     }
 
     return remember(context, pickerLauncher, cameraLauncher) {
@@ -143,8 +148,23 @@ internal fun rememberNotificationPermissionActions(
     }
 }
 
-private fun Context.createCameraImageUri(): Uri {
-    val directory = File(cacheDir, "camera_photos").apply { mkdirs() }
+internal fun Context.createCameraImageUri(): Uri {
+    val directory = File(cacheDir, CameraPhotoDirectoryName).apply {
+        mkdirs()
+        listFiles()?.forEach(File::delete)
+    }
     val file = File.createTempFile("routine-photo-", ".jpg", directory)
     return FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
 }
+
+internal fun Context.discardCameraImage(uriString: String?) {
+    val uri = uriString?.let(Uri::parse) ?: return
+    if (uri.authority != "$packageName.fileprovider" ||
+        uri.pathSegments.firstOrNull() != CameraPhotoDirectoryName
+    ) {
+        return
+    }
+    runCatching { contentResolver.delete(uri, null, null) }
+}
+
+private const val CameraPhotoDirectoryName = "camera_photos"

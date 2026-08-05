@@ -19,30 +19,46 @@ class RoutinePhotoStore(context: Context) {
     private val photoDirectory: File = File(appContext.filesDir, PhotoDirectoryName)
 
     suspend fun importPhoto(uri: Uri): IconRef.Photo = withContext(Dispatchers.IO) {
-        val assetId = newUuidV4()
-        val backupAssetName = backupAssetName(assetId)
-        val outputFile = fileForAssetId(assetId)
-        photoDirectory.mkdirs()
+        var outputFile: File? = null
+        try {
+            val assetId = newUuidV4()
+            val backupAssetName = backupAssetName(assetId)
+            val destination = fileForAssetId(assetId)
+            outputFile = destination
+            photoDirectory.mkdirs()
 
-        val exifOrientation = appContext.contentResolver.openInputStream(uri)?.use { input ->
-            runCatching {
-                ExifInterface(input).getAttributeInt(
-                    ExifInterface.TAG_ORIENTATION,
-                    ExifInterface.ORIENTATION_NORMAL,
-                )
-            }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
-        } ?: ExifInterface.ORIENTATION_NORMAL
-        val bytes = appContext.contentResolver.openInputStream(uri)?.use { input ->
-            val original = BitmapFactory.decodeStream(input)
-                ?: throw IllegalArgumentException("사진 파일을 읽을 수 없습니다.")
-            original.applyExifOrientation(exifOrientation).toRoutinePhotoJpegBytes()
-        } ?: throw IllegalArgumentException("사진 파일을 열 수 없습니다.")
+            val exifOrientation = appContext.contentResolver.openInputStream(uri)?.use { input ->
+                runCatching {
+                    ExifInterface(input).getAttributeInt(
+                        ExifInterface.TAG_ORIENTATION,
+                        ExifInterface.ORIENTATION_NORMAL,
+                    )
+                }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+            } ?: ExifInterface.ORIENTATION_NORMAL
+            val bytes = appContext.contentResolver.openInputStream(uri)?.use { input ->
+                val original = BitmapFactory.decodeStream(input)
+                    ?: throw IllegalArgumentException("사진 파일을 읽을 수 없습니다.")
+                original.applyExifOrientation(exifOrientation).toRoutinePhotoJpegBytes()
+            } ?: throw IllegalArgumentException("사진 파일을 열 수 없습니다.")
 
-        outputFile.writeBytes(bytes)
-        IconRef.Photo(localAssetId = assetId, backupAssetName = backupAssetName)
+            destination.writeBytes(bytes)
+            IconRef.Photo(localAssetId = assetId, backupAssetName = backupAssetName)
+        } catch (error: Exception) {
+            outputFile?.delete()
+            throw error
+        } finally {
+            deleteOwnedCameraSource(uri)
+        }
     }
 
     fun fileFor(icon: IconRef.Photo): File = fileForAssetId(icon.localAssetId)
+
+    suspend fun deleteUnreferencedAssets(referencedAssetIds: Set<String>) = withContext(Dispatchers.IO) {
+        photoDirectory.listFiles()
+            ?.filter { it.isFile && it.extension == "jpg" }
+            ?.filter { it.nameWithoutExtension !in referencedAssetIds }
+            ?.forEach(File::delete)
+    }
 
     fun readBackupAssets(photoRefs: List<IconRef.Photo>): Map<String, ByteArray> =
         photoRefs.mapNotNull { photo ->
@@ -81,6 +97,15 @@ class RoutinePhotoStore(context: Context) {
     }
 
     private fun fileForAssetId(assetId: String): File = File(photoDirectory, "$assetId.jpg")
+
+    private fun deleteOwnedCameraSource(uri: Uri) {
+        if (uri.authority != "${appContext.packageName}.fileprovider" ||
+            uri.pathSegments.firstOrNull() != CameraPhotoPathName
+        ) {
+            return
+        }
+        runCatching { appContext.contentResolver.delete(uri, null, null) }
+    }
 
     private fun Bitmap.applyExifOrientation(orientation: Int): Bitmap {
         val matrix = Matrix().apply {
@@ -142,6 +167,7 @@ class RoutinePhotoStore(context: Context) {
 
     companion object {
         private const val PhotoDirectoryName = "routine_photos"
+        private const val CameraPhotoPathName = "camera_photos"
         private const val MinPhotoSide = 320
 
         fun backupAssetName(assetId: String): String = "routine-photo-$assetId.jpg"
