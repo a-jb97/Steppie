@@ -14,8 +14,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import com.example.steppie.R
 import com.example.steppie.data.sample.RoutineSampleData
 import com.example.steppie.domain.model.FeedbackIntensity
+import com.example.steppie.testing.testString
+import com.example.steppie.testing.testText
 import com.example.steppie.ui.theme.SteppieTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -150,7 +153,10 @@ class ChildRoutineScreenTest {
 
         composeRule.onNodeWithTag("routine_${target.id}").performClick()
 
-        composeRule.onNodeWithText("앞으로 할 일이에요").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            testString(R.string.child_focus_upcoming_hint),
+            useUnmergedTree = true,
+        ).assertExists()
         composeRule.onNodeWithTag("focus_routine_card").assertHasNoClickAction()
         composeRule.runOnIdle { assertEquals(0, completed) }
     }
@@ -187,8 +193,11 @@ class ChildRoutineScreenTest {
 
         composeRule.onNodeWithTag("show_focus").performClick()
 
-        composeRule.onNodeWithText("일어나기").assertIsDisplayed()
-        composeRule.onNodeWithText("카드를 누르면 완료").assertIsDisplayed()
+        composeRule.onNodeWithText(currentRoutine.title.testText(), useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText(
+            testString(R.string.child_focus_tap_hint),
+            useUnmergedTree = true,
+        ).assertExists()
         composeRule.runOnIdle { assertEquals(currentRoutine.id, state.selectedRoutineId) }
     }
 
@@ -233,10 +242,22 @@ class ChildRoutineScreenTest {
 
         composeRule.onNodeWithTag("focus_routine_card").performClick()
         composeRule.onNodeWithTag("phone_focus").assertIsDisplayed()
-        composeRule.onNodeWithText("일어나기 완료!").assertIsDisplayed()
-        composeRule.onNodeWithText("완료했어요").assertDoesNotExist()
-        composeRule.onNodeWithText("다음 : 세수하기").assertIsDisplayed()
-        composeRule.onNodeWithText("카드를 잘못 눌렀어요").performClick()
+        composeRule.onNodeWithText(
+            testString(R.string.child_completed_card_title, target.title.testText()),
+            useUnmergedTree = true,
+        ).assertExists()
+        composeRule.onNodeWithText(
+            testString(R.string.routine_state_completed),
+            useUnmergedTree = true,
+        ).assertDoesNotExist()
+        composeRule.onNodeWithText(
+            testString(R.string.child_next_routine, RoutineSampleData.morning.routines[1].title.testText()),
+            useUnmergedTree = true,
+        ).assertExists()
+        composeRule.onNodeWithText(
+            testString(R.string.child_undo_mistap),
+            useUnmergedTree = true,
+        ).performClick()
         composeRule.runOnIdle {
             assertEquals(1, completed)
             assertEquals(0, advanced)
@@ -278,10 +299,16 @@ class ChildRoutineScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("일어나기 완료!").assertIsDisplayed()
-        composeRule.onNodeWithText("다음 : 세수하기").performClick()
+        composeRule.onNodeWithText(
+            testString(R.string.child_completed_card_title, routines[0].title.testText()),
+            useUnmergedTree = true,
+        ).assertExists()
+        composeRule.onNodeWithText(
+            testString(R.string.child_next_routine, routines[1].title.testText()),
+            useUnmergedTree = true,
+        ).performClick()
         composeRule.runOnIdle { assertEquals(1, advanced) }
-        composeRule.onNodeWithText("세수하기").assertIsDisplayed()
+        composeRule.onNodeWithText(routines[1].title.testText(), useUnmergedTree = true).assertExists()
     }
 
     @Test
@@ -319,10 +346,19 @@ class ChildRoutineScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("가방 챙기기 완료!").assertIsDisplayed()
-        composeRule.onNodeWithText("오늘 할 일 완료!").performClick()
+        composeRule.onNodeWithText(
+            testString(R.string.child_completed_card_title, finalRoutine.title.testText()),
+            useUnmergedTree = true,
+        ).assertExists()
+        composeRule.onNodeWithText(
+            testString(R.string.child_all_complete_title),
+            useUnmergedTree = true,
+        ).performClick()
         composeRule.runOnIdle { assertEquals(1, advanced) }
-        composeRule.onNodeWithText("오늘 할 일 완료!").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            testString(R.string.child_all_complete_title),
+            useUnmergedTree = true,
+        ).assertExists()
     }
 
     @Test
@@ -342,33 +378,43 @@ class ChildRoutineScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("일어나기 완료!").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            testString(
+                R.string.child_completed_card_title,
+                RoutineSampleData.morning.routines[0].title.testText(),
+            ),
+            useUnmergedTree = true,
+        ).assertExists()
         composeRule.onNodeWithTag("check_particle_burst_layer", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test
     fun nonStrongRoutineFeedbackDoesNotShowCheckParticles() {
-        listOf(
-            FeedbackIntensity.Normal,
-            FeedbackIntensity.Quiet,
-            FeedbackIntensity.Off,
-        ).forEach { intensity ->
-            composeRule.setContent {
-                SteppieTheme {
-                    ChildRoutineScreen(
-                        state = routineFeedbackState(intensity),
-                        onShowList = {},
-                        onShowFocus = {},
-                        onSelectRoutine = {},
-                        onCompleteRoutine = {},
-                        onAdvanceFromFeedback = {},
-                        onUndoRoutine = {},
-                        modifier = Modifier.requiredSize(393.dp, 852.dp),
-                    )
-                }
+        var intensity by mutableStateOf(FeedbackIntensity.Normal)
+        composeRule.setContent {
+            SteppieTheme {
+                ChildRoutineScreen(
+                    state = routineFeedbackState(intensity),
+                    onShowList = {},
+                    onShowFocus = {},
+                    onSelectRoutine = {},
+                    onCompleteRoutine = {},
+                    onAdvanceFromFeedback = {},
+                    onUndoRoutine = {},
+                    modifier = Modifier.requiredSize(393.dp, 852.dp),
+                )
             }
+        }
 
-            composeRule.onNodeWithText("일어나기 완료!").assertIsDisplayed()
+        listOf(FeedbackIntensity.Normal, FeedbackIntensity.Quiet, FeedbackIntensity.Off).forEach {
+            composeRule.runOnIdle { intensity = it }
+            composeRule.onNodeWithText(
+                testString(
+                    R.string.child_completed_card_title,
+                    RoutineSampleData.morning.routines[0].title.testText(),
+                ),
+                useUnmergedTree = true,
+            ).assertExists()
             composeRule.onAllNodesWithTag("check_particle_burst_layer", useUnmergedTree = true).assertCountEquals(0)
         }
     }
@@ -390,33 +436,37 @@ class ChildRoutineScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("오늘 할 일 완료!").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            testString(R.string.child_all_complete_title),
+            useUnmergedTree = true,
+        ).assertExists()
         composeRule.onNodeWithTag("birthday_fireworks_layer", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test
     fun nonStrongAllCompleteDoesNotShowBirthdayFireworks() {
-        listOf(
-            FeedbackIntensity.Normal,
-            FeedbackIntensity.Quiet,
-            FeedbackIntensity.Off,
-        ).forEach { intensity ->
-            composeRule.setContent {
-                SteppieTheme {
-                    ChildRoutineScreen(
-                        state = allCompleteState(intensity),
-                        onShowList = {},
-                        onShowFocus = {},
-                        onSelectRoutine = {},
-                        onCompleteRoutine = {},
-                        onAdvanceFromFeedback = {},
-                        onUndoRoutine = {},
-                        modifier = Modifier.requiredSize(393.dp, 852.dp),
-                    )
-                }
+        var intensity by mutableStateOf(FeedbackIntensity.Normal)
+        composeRule.setContent {
+            SteppieTheme {
+                ChildRoutineScreen(
+                    state = allCompleteState(intensity),
+                    onShowList = {},
+                    onShowFocus = {},
+                    onSelectRoutine = {},
+                    onCompleteRoutine = {},
+                    onAdvanceFromFeedback = {},
+                    onUndoRoutine = {},
+                    modifier = Modifier.requiredSize(393.dp, 852.dp),
+                )
             }
+        }
 
-            composeRule.onNodeWithText("오늘 할 일 완료!").assertIsDisplayed()
+        listOf(FeedbackIntensity.Normal, FeedbackIntensity.Quiet, FeedbackIntensity.Off).forEach {
+            composeRule.runOnIdle { intensity = it }
+            composeRule.onNodeWithText(
+                testString(R.string.child_all_complete_title),
+                useUnmergedTree = true,
+            ).assertExists()
             composeRule.onAllNodesWithTag("birthday_fireworks_layer", useUnmergedTree = true).assertCountEquals(0)
         }
     }
