@@ -17,6 +17,7 @@ import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.domain.repository.RoutineRepository
 import com.example.steppie.notifications.AndroidRoutineNotificationScheduler
 import com.example.steppie.notifications.RoutineNotificationPlanner
+import com.example.steppie.notifications.RoutineNotificationRescheduler
 import com.example.steppie.notifications.RoutineNotificationScheduler
 import com.example.steppie.ui.child.AndroidRoutineCompletionTextProvider
 import com.example.steppie.ui.child.RoutineCompletionTextProvider
@@ -62,6 +63,14 @@ class AppContainer(context: Context) {
                 zoneId = clockProvider.zoneId,
                 localeProvider = localeProvider,
             ),
+        )
+    }
+    val notificationRescheduler: RoutineNotificationRescheduler by lazy {
+        RoutineNotificationRescheduler(
+            routineRepository = routineRepository,
+            appSettingsRepository = appSettingsRepository,
+            scheduler = notificationScheduler,
+            clockProvider = clockProvider,
         )
     }
 }
