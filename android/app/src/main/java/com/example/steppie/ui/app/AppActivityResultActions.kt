@@ -1,12 +1,12 @@
 package com.example.steppie.ui.app
 
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -46,11 +46,11 @@ internal fun rememberPhotoActivityActions(
     var cameraTargetName by rememberSaveable { mutableStateOf<String?>(null) }
     var cameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
     val pickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
+        photoPickerContract(),
+    ) { uri ->
         val request = resolvePhotoPickerResult(
             targetName = pickerTargetName,
-            uri = result.data?.data?.toString(),
+            uri = uri?.toString(),
         )
         pickerTargetName = null
         request?.let(onPhotoImport)
@@ -72,7 +72,9 @@ internal fun rememberPhotoActivityActions(
         object : PhotoActivityActions {
             override fun pick(target: PhotoTarget) {
                 pickerTargetName = target.name
-                pickerLauncher.launch(imageGalleryIntent())
+                pickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
             }
 
             override fun capture(target: PhotoTarget) {
@@ -84,6 +86,9 @@ internal fun rememberPhotoActivityActions(
         }
     }
 }
+
+internal fun photoPickerContract(): ActivityResultContract<PickVisualMediaRequest, Uri?> =
+    ActivityResultContracts.PickVisualMedia()
 
 @Composable
 internal fun rememberBackupDocumentActions(
@@ -136,10 +141,6 @@ internal fun rememberNotificationPermissionActions(
             }
         }
     }
-}
-
-private fun imageGalleryIntent(): Intent = Intent(Intent.ACTION_PICK).apply {
-    setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*")
 }
 
 private fun Context.createCameraImageUri(): Uri {
