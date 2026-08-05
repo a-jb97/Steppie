@@ -18,6 +18,8 @@ import com.example.steppie.domain.repository.RoutineRepository
 import com.example.steppie.notifications.AndroidRoutineNotificationScheduler
 import com.example.steppie.notifications.RoutineNotificationPlanner
 import com.example.steppie.notifications.RoutineNotificationScheduler
+import com.example.steppie.ui.child.AndroidRoutineCompletionTextProvider
+import com.example.steppie.ui.child.RoutineCompletionTextProvider
 import com.example.steppie.ui.tutorial.TutorialProgressRepository
 
 class AppContainer(context: Context) {
@@ -28,6 +30,8 @@ class AppContainer(context: Context) {
 
     val clockProvider: ClockProvider = SystemClockProvider
     val localeProvider: LocaleProvider = SystemLocaleProvider
+    val routineCompletionTextProvider: RoutineCompletionTextProvider =
+        AndroidRoutineCompletionTextProvider(appContext)
 
     val routineRepository: RoutineRepository by lazy {
         RoomRoutineRepository(database)

@@ -16,6 +16,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
+import java.util.Locale
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -498,6 +499,12 @@ class ChildRoutineViewModelTest {
                 sound = false,
             ),
             FeedbackCase(
+                settings = AppSettings(feedbackIntensity = FeedbackIntensity.Normal, locale = "en"),
+                spokenText = "Wake up done. Great job!",
+                vibrate = true,
+                sound = true,
+            ),
+            FeedbackCase(
                 settings = AppSettings(
                     feedbackIntensity = FeedbackIntensity.Strong,
                     soundEnabled = false,
@@ -547,6 +554,13 @@ class ChildRoutineViewModelTest {
             appSettingsRepository = FakeAppSettingsRepository(settings),
             clockProvider = TestClockProvider(TestInstant, ZoneOffset.UTC),
             localeProvider = TestLocaleProvider("ko"),
+            completionTextProvider = RoutineCompletionTextProvider { title, languageTag ->
+                if (Locale.forLanguageTag(languageTag).language == "en") {
+                    "$title done. Great job!"
+                } else {
+                    "$title 완료! 잘했어요!"
+                }
+            },
         ) to repository
     }
 }

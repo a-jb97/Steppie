@@ -44,6 +44,7 @@ class ChildRoutineViewModel(
     private val appSettingsRepository: AppSettingsRepository,
     private val clockProvider: ClockProvider,
     private val localeProvider: LocaleProvider,
+    private val completionTextProvider: RoutineCompletionTextProvider,
 ) : ViewModel() {
     private val currentDate = MutableStateFlow(clockProvider.today())
     private val _uiState = MutableStateFlow(ChildRoutineUiState())
@@ -155,7 +156,10 @@ class ChildRoutineViewModel(
                 _feedbackEvents.emit(
                     ChildRoutineFeedbackEvent(
                         spokenText = if (appSettings.ttsEnabled) {
-                            "${routine.localizedTitleForDevice(appSettings)} 완료! 잘했어요!"
+                            completionTextProvider.completionText(
+                                routineTitle = routine.localizedTitleForDevice(appSettings),
+                                languageTag = appSettings.locale ?: localeProvider.languageTag(),
+                            )
                         } else {
                             null
                         },
@@ -284,6 +288,7 @@ class ChildRoutineViewModel(
             appSettingsRepository: AppSettingsRepository,
             clockProvider: ClockProvider,
             localeProvider: LocaleProvider,
+            completionTextProvider: RoutineCompletionTextProvider,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -294,6 +299,7 @@ class ChildRoutineViewModel(
                         appSettingsRepository,
                         clockProvider,
                         localeProvider,
+                        completionTextProvider,
                     ) as T
                 }
             }
