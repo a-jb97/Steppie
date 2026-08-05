@@ -5,6 +5,8 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.steppie.data.local.SteppieDatabase
+import com.example.steppie.data.local.toEntity
+import com.example.steppie.data.sample.RoutineSampleData
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.repository.AppSettingsRepository
 import java.time.Instant
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,17 +50,49 @@ class BackupDataSourceTest {
         assertEquals(exportedAt, snapshot.exportedAt)
         assertEquals("ko", snapshot.appSettings.locale)
     }
+
+    @Test
+    fun settingsFailureRestoresPreviousRoomDataAndSettings() = runBlocking {
+        val exportedAt = Instant.parse("2026-06-17T00:00:00Z")
+        val previousSettings = AppSettings(locale = "ko")
+        val settingsRepository = FixedAppSettingsRepository(previousSettings)
+        val dataSource = BackupDataSource(database, settingsRepository)
+        val previousSet = RoutineSampleData.morning
+        database.routineDao().insertRoutineSet(previousSet.toEntity())
+        database.routineDao().insertRoutines(previousSet.routines.map { it.toEntity() })
+        val before = dataSource.snapshot(exportedAt)
+        val replacementSet = RoutineSampleData.school
+        val replacement = BackupSnapshot(
+            exportedAt = exportedAt,
+            routineSets = listOf(replacementSet.toEntity()),
+            routines = replacementSet.routines.map { it.toEntity() },
+            dailyLogs = emptyList(),
+            appSettings = AppSettings(locale = "en"),
+        )
+        val failure = IllegalStateException("settings restore failed")
+        settingsRepository.failNextUpdateAfterWrite = failure
+
+        val thrown = runCatching { dataSource.replaceAll(replacement) }.exceptionOrNull()
+
+        assertSame(failure, thrown)
+        assertEquals(before, dataSource.snapshot(exportedAt))
+    }
 }
 
 private class FixedAppSettingsRepository(
     settings: AppSettings,
 ) : AppSettingsRepository {
     private val state = MutableStateFlow(settings)
+    var failNextUpdateAfterWrite: Throwable? = null
 
     override fun observeAppSettings(): Flow<AppSettings> = state
 
     override suspend fun updateAppSettings(settings: AppSettings) {
         state.value = settings
+        failNextUpdateAfterWrite?.let { failure ->
+            failNextUpdateAfterWrite = null
+            throw failure
+        }
     }
 
     override suspend fun setGuardianPin(pin: String): String = unsupported()
