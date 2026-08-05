@@ -1,101 +1,46 @@
 package com.example.steppie.data
 
 import android.content.Context
-import androidx.room.Room
+import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.SupportSQLiteDatabase
-import androidx.sqlite.db.SupportSQLiteOpenHelper
-import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.example.steppie.data.local.SteppieDatabase
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SteppieDatabaseMigrationTest {
+    @get:Rule
+    val migrationHelper = MigrationTestHelper(
+        InstrumentationRegistry.getInstrumentation(),
+        SteppieDatabase::class.java,
+    )
+
     private lateinit var context: Context
-    private val databaseName = "steppie-migration-test.db"
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
-        context.deleteDatabase(databaseName)
+        (1..3).forEach { context.deleteDatabase(databaseName(it)) }
     }
 
     @After
     fun tearDown() {
-        context.deleteDatabase(databaseName)
+        (1..3).forEach { context.deleteDatabase(databaseName(it)) }
     }
 
     @Test
     fun migrationFrom1To4_preservesExistingDataAndCreatesCurrentSchema() {
-        createVersion1Database()
-
-        val database = Room.databaseBuilder(context, SteppieDatabase::class.java, databaseName)
-            .addMigrations(
-                SteppieDatabase.MIGRATION_1_2,
-                SteppieDatabase.MIGRATION_2_3,
-                SteppieDatabase.MIGRATION_3_4,
-            )
-            .allowMainThreadQueries()
-            .build()
-
-        database.openHelper.writableDatabase.useQuery(
-            "SELECT id, localizedName, startTime FROM routine_sets WHERE id = ?",
-            arrayOf(ROUTINE_SET_ID),
-        ) { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertEquals(ROUTINE_SET_ID, cursor.getString(0))
-            assertEquals("v1-localized-name", cursor.getString(1))
-            assertNull(cursor.getString(2))
-        }
-        database.openHelper.writableDatabase.useQuery(
-            "SELECT id, routineSetId, localizedTitle FROM routines WHERE id = ?",
-            arrayOf(ROUTINE_ID),
-        ) { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertEquals(ROUTINE_ID, cursor.getString(0))
-            assertEquals(ROUTINE_SET_ID, cursor.getString(1))
-            assertEquals("v1-localized-title", cursor.getString(2))
-        }
-
-        val tables = database.openHelper.writableDatabase.useQuery(
-            "SELECT name FROM sqlite_master WHERE type = 'table'",
-        ) { cursor ->
-            buildSet {
-                while (cursor.moveToNext()) add(cursor.getString(0))
-            }
-        }
-        assertTrue("daily_logs" in tables)
-        assertTrue("daily_routine_selections" in tables)
-
-        database.close()
-    }
-
-    private fun createVersion1Database() {
-        val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(databaseName)
-            .callback(
-                object : SupportSQLiteOpenHelper.Callback(1) {
-                    override fun onCreate(db: SupportSQLiteDatabase) {
-                        createVersion1Schema(db)
-                    }
-
-                    override fun onUpgrade(
-                        db: SupportSQLiteDatabase,
-                        oldVersion: Int,
-                        newVersion: Int,
-                    ) = Unit
-                },
-            )
-            .build()
-        val helper = FrameworkSQLiteOpenHelperFactory().create(configuration)
-        helper.writableDatabase.apply {
+        val databaseName = databaseName(1)
+        migrationHelper.createDatabase(databaseName, 1).apply {
             execSQL(
                 """
                 INSERT INTO routine_sets (
@@ -116,60 +61,70 @@ class SteppieDatabaseMigrationTest {
                 """.trimIndent(),
                 arrayOf(ROUTINE_ID, ROUTINE_SET_ID, "v1-localized-title"),
             )
+            close()
         }
-        helper.close()
+
+        val database = migrationHelper.runMigrationsAndValidate(
+            databaseName,
+            4,
+            true,
+            SteppieDatabase.MIGRATION_1_2,
+            SteppieDatabase.MIGRATION_2_3,
+            SteppieDatabase.MIGRATION_3_4,
+        )
+
+        database.useQuery(
+            "SELECT id, localizedName, startTime FROM routine_sets WHERE id = ?",
+            arrayOf(ROUTINE_SET_ID),
+        ) { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(ROUTINE_SET_ID, cursor.getString(0))
+            assertEquals("v1-localized-name", cursor.getString(1))
+            assertNull(cursor.getString(2))
+        }
+        database.useQuery(
+            "SELECT id, routineSetId, localizedTitle FROM routines WHERE id = ?",
+            arrayOf(ROUTINE_ID),
+        ) { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(ROUTINE_ID, cursor.getString(0))
+            assertEquals(ROUTINE_SET_ID, cursor.getString(1))
+            assertEquals("v1-localized-title", cursor.getString(2))
+        }
+
+        val tables = database.useQuery(
+            "SELECT name FROM sqlite_master WHERE type = 'table'",
+        ) { cursor ->
+            buildSet {
+                while (cursor.moveToNext()) add(cursor.getString(0))
+            }
+        }
+        assertTrue("daily_logs" in tables)
+        assertTrue("daily_routine_selections" in tables)
+
+        database.close()
     }
 
-    private fun createVersion1Schema(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            """
-            CREATE TABLE IF NOT EXISTS routine_sets (
-                id TEXT NOT NULL,
-                localizedName TEXT NOT NULL,
-                isActive INTEGER NOT NULL,
-                createdAtEpochMillis INTEGER NOT NULL,
-                updatedAtEpochMillis INTEGER NOT NULL,
-                deletedAtEpochMillis INTEGER,
-                PRIMARY KEY(id)
+    @Test
+    fun migrationsFrom2And3To4_createCurrentSchema() {
+        listOf(
+            2 to arrayOf(SteppieDatabase.MIGRATION_2_3, SteppieDatabase.MIGRATION_3_4),
+            3 to arrayOf(SteppieDatabase.MIGRATION_3_4),
+        ).forEach { (startVersion, migrations) ->
+            val databaseName = databaseName(startVersion)
+            migrationHelper.createDatabase(databaseName, startVersion).close()
+
+            migrationHelper.runMigrationsAndValidate(
+                databaseName,
+                4,
+                true,
+                *migrations,
             )
-            """.trimIndent(),
-        )
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS index_routine_sets_isActive_deletedAtEpochMillis " +
-                "ON routine_sets (isActive, deletedAtEpochMillis)",
-        )
-        db.execSQL(
-            """
-            CREATE TABLE IF NOT EXISTS routines (
-                id TEXT NOT NULL,
-                routineSetId TEXT NOT NULL,
-                titleKey TEXT,
-                localizedTitle TEXT NOT NULL,
-                iconType TEXT NOT NULL,
-                iconName TEXT,
-                localAssetId TEXT,
-                backupAssetName TEXT,
-                colorToken TEXT NOT NULL,
-                sortOrder INTEGER NOT NULL,
-                scheduledTime TEXT,
-                isActive INTEGER NOT NULL,
-                createdAtEpochMillis INTEGER NOT NULL,
-                updatedAtEpochMillis INTEGER NOT NULL,
-                deletedAtEpochMillis INTEGER,
-                PRIMARY KEY(id),
-                FOREIGN KEY(routineSetId) REFERENCES routine_sets(id)
-                    ON UPDATE NO ACTION ON DELETE RESTRICT
-            )
-            """.trimIndent(),
-        )
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS index_routines_routineSetId ON routines (routineSetId)",
-        )
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS index_routines_routineSetId_sortOrder_deletedAtEpochMillis " +
-                "ON routines (routineSetId, sortOrder, deletedAtEpochMillis)",
-        )
+                .close()
+        }
     }
+
+    private fun databaseName(version: Int): String = "steppie-migration-v$version-test.db"
 
     private inline fun <T> SupportSQLiteDatabase.useQuery(
         sql: String,
