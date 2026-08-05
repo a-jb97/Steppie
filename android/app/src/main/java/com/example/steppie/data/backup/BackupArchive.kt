@@ -17,6 +17,9 @@ internal object BackupArchive {
         output: OutputStream,
         assets: Map<String, ByteArray> = emptyMap(),
     ) {
+        if (assets.values.any { it.size > BackupMaxAssetBytes }) {
+            throw BackupValidationException("백업 사진 에셋이 5MB를 초과합니다.")
+        }
         val dataJson = BackupJson.encodeData(snapshot, zoneId)
         val checksum = sha256(dataJson.toByteArray(Charsets.UTF_8))
         val manifestJson = BackupJson.encodeManifest(
@@ -38,9 +41,6 @@ internal object BackupArchive {
             zip.closeEntry()
 
             assets.forEach { (name, bytes) ->
-                if (bytes.size > BackupMaxAssetBytes) {
-                    throw BackupValidationException("백업 사진 에셋이 5MB를 초과합니다.")
-                }
                 zip.putNextEntry(ZipEntry("$BackupAssetDirectory/$name"))
                 zip.write(bytes)
                 zip.closeEntry()
