@@ -341,20 +341,8 @@ class GuardianModeViewModel(
         }
     }
 
-    fun inputRecoveryDigit(digit: Int) {
-        require(digit in 0..9)
-        val current = _uiState.value
-        if (current.recoveryStep != GuardianRecoveryStep.EnterCodeForPinReset) return
-        if (current.recoveryDigits.length >= 6) return
-        updateRecoveryCodeInput(current.recoveryDigits + digit.toString())
-    }
-
     fun updateRecoveryCodeInput(value: String) {
         _uiState.update { GuardianRecoveryReducer.updateCodeInput(it, value) }
-    }
-
-    fun deleteRecoveryDigit() {
-        updateRecoveryCodeInput(_uiState.value.recoveryDigits.dropLast(1))
     }
 
     fun confirmRecoveryCodeForPinReset() {

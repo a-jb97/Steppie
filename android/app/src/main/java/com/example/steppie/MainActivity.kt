@@ -311,8 +311,6 @@ class MainActivity : ComponentActivity() {
                             onRestorePinDigit = guardianViewModel::inputRestorePinDigit,
                             onDeleteRestorePinDigit = guardianViewModel::deleteRestorePinDigit,
                             onCancelRestore = guardianViewModel::cancelRestore,
-                            onRecoveryDigit = guardianViewModel::inputRecoveryDigit,
-                            onDeleteRecoveryDigit = guardianViewModel::deleteRecoveryDigit,
                             onRecoveryCodeChange = guardianViewModel::updateRecoveryCodeInput,
                             onConfirmRecoveryCode = guardianViewModel::confirmRecoveryCodeForPinReset,
                             onCancelRecoveryPinReset = guardianViewModel::cancelRecoveryPinReset,

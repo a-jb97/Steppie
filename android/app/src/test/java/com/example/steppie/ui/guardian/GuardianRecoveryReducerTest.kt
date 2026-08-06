@@ -35,6 +35,15 @@ class GuardianRecoveryReducerTest {
     }
 
     @Test
+    fun `recovery input replaces existing value when text field deletes a digit`() {
+        val result = GuardianRecoveryReducer.updateCodeInput(populatedState(), "12345")
+
+        assertEquals("12345", result.recoveryDigits)
+        assertNull(result.recoveryError)
+        assertEquals(18L, result.interactionToken)
+    }
+
+    @Test
     fun `closing recovery returns to the recorded destination`() {
         val result = GuardianRecoveryReducer.close(
             populatedState().copy(recoveryReturnDestination = GuardianDestination.Home),
