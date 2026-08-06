@@ -209,8 +209,6 @@ interface GuardianSecurityActions {
     val onRestorePinDigit: (Int) -> Unit
     val onDeleteRestorePinDigit: () -> Unit
     val onCancelRestore: () -> Unit
-    val onRecoveryDigit: (Int) -> Unit
-    val onDeleteRecoveryDigit: () -> Unit
     val onRecoveryCodeChange: (String) -> Unit
     val onConfirmRecoveryCode: () -> Unit
     val onCancelRecoveryPinReset: () -> Unit
@@ -229,8 +227,6 @@ data class GuardianSecurityActionCallbacks(
     override val onRestorePinDigit: (Int) -> Unit = NoIntAction,
     override val onDeleteRestorePinDigit: () -> Unit = NoAction,
     override val onCancelRestore: () -> Unit = NoAction,
-    override val onRecoveryDigit: (Int) -> Unit = NoIntAction,
-    override val onDeleteRecoveryDigit: () -> Unit = NoAction,
     override val onRecoveryCodeChange: (String) -> Unit = NoStringAction,
     override val onConfirmRecoveryCode: () -> Unit = NoAction,
     override val onCancelRecoveryPinReset: () -> Unit = NoAction,

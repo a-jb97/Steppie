@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import com.example.steppie.R
 import com.example.steppie.data.sample.RoutineSampleData
 import com.example.steppie.testing.testString
@@ -192,6 +193,34 @@ class GuardianModeScreenTest {
 
         composeRule.runOnIdle {
             assertEquals(1, closeClicks)
+        }
+    }
+
+    @Test
+    fun recoveryCodeInputRoutesTextChangesThroughSingleCallback() {
+        var recoveryCode = ""
+
+        composeRule.setContent {
+            SteppieTheme {
+                TestGuardianModeScreen(
+                    state = GuardianModeUiState(
+                        isActive = true,
+                        isAuthenticated = true,
+                        destination = GuardianDestination.RecoveryCode,
+                        recoveryStep = GuardianRecoveryStep.EnterCodeForPinReset,
+                    ),
+                    securityActions = GuardianSecurityActionCallbacks(
+                        onRecoveryCodeChange = { recoveryCode = it },
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(testString(R.string.a11y_recovery_code_input))
+            .performTextInput("12345")
+
+        composeRule.runOnIdle {
+            assertEquals("12345", recoveryCode)
         }
     }
 
