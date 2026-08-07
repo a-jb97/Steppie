@@ -115,11 +115,21 @@ internal object GuardianBackupReducer {
     fun restoreSucceeded(
         previousState: GuardianModeUiState,
         initialState: GuardianModeUiState,
-    ): GuardianModeUiState = initialState.copy(
-        backupMessage = "백업 파일에서 복원했습니다.",
-        interactionToken = previousState.interactionToken + 1,
-        restoreCompletedToken = previousState.restoreCompletedToken + 1,
-    )
+        requiresGuardianPinSetup: Boolean,
+    ): GuardianModeUiState {
+        val restoredState = initialState.copy(
+            backupMessage = "백업 파일에서 복원했습니다.",
+            interactionToken = previousState.interactionToken + 1,
+            restoreCompletedToken = previousState.restoreCompletedToken + 1,
+        )
+        return if (requiresGuardianPinSetup) {
+            GuardianPinReducer.openInitialSetup(restoredState).copy(
+                interactionToken = restoredState.interactionToken,
+            )
+        } else {
+            restoredState
+        }
+    }
 
     fun restoreFailed(
         state: GuardianModeUiState,

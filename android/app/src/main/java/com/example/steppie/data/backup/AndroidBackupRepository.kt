@@ -37,9 +37,12 @@ class AndroidBackupRepository(
         )
     }
 
-    override suspend fun restoreReplace(uri: Uri) {
+    override suspend fun restoreReplace(uri: Uri): BackupRestoreResult {
         val read = readBackup(uri)
         dataSource.replaceAll(read.snapshot, read.assets)
+        return BackupRestoreResult(
+            requiresGuardianPinSetup = read.requiresGuardianPinSetup,
+        )
     }
 
     private fun readBackup(uri: Uri): ReadBackup {

@@ -44,6 +44,36 @@ class BackupArchiveTest {
         assertEquals(1, read.snapshot.dailyLogs.size)
         assertEquals("pin-hash", read.snapshot.appSettings.guardianPinHash)
         assertEquals("08:00", read.snapshot.routineSets.single().startTime)
+        assertFalse(read.requiresGuardianPinSetup)
+    }
+
+    @Test
+    fun crossPlatformRestore_removesPlatformSpecificCredentialHashes() {
+        val archive = writeArchive(testSnapshot(), emptyMap())
+        val iosArchive = rewriteManifestSourcePlatform(archive, IosBackupPlatform)
+
+        val read = BackupArchive.read(ByteArrayInputStream(iosArchive))
+
+        assertNull(read.snapshot.appSettings.guardianPinHash)
+        assertNull(read.snapshot.appSettings.recoveryCodeHash)
+        assertEquals(testSnapshot().appSettings.locale, read.snapshot.appSettings.locale)
+        assertTrue(read.requiresGuardianPinSetup)
+    }
+
+    @Test(expected = BackupValidationException::class)
+    fun manifest_rejectsUnknownSourcePlatform() {
+        val manifest = JSONObject(
+            BackupJson.encodeManifest(
+                createdAt = now,
+                appVersion = "1.0",
+                dataChecksum = "checksum",
+                zoneId = zoneId,
+            ),
+        ).apply {
+            put("sourcePlatform", "unknown")
+        }
+
+        BackupJson.decodeManifest(manifest.toString())
     }
 
     @Test
@@ -227,6 +257,32 @@ class BackupArchiveTest {
                 generateSequence { input.nextEntry }.forEach { source ->
                     zip.putNextEntry(ZipEntry(source.name).apply { time = timeMillis })
                     if (!source.isDirectory) input.copyTo(zip)
+                    zip.closeEntry()
+                    input.closeEntry()
+                }
+            }
+        }
+        return output.toByteArray()
+    }
+
+    private fun rewriteManifestSourcePlatform(bytes: ByteArray, sourcePlatform: String): ByteArray {
+        val output = ByteArrayOutputStream()
+        ZipInputStream(ByteArrayInputStream(bytes)).use { input ->
+            ZipOutputStream(output).use { zip ->
+                generateSequence { input.nextEntry }.forEach { source ->
+                    zip.putNextEntry(ZipEntry(source.name))
+                    if (!source.isDirectory) {
+                        val content = input.readBytes()
+                        val rewritten = if (source.name == "manifest.json") {
+                            JSONObject(content.toString(Charsets.UTF_8))
+                                .put("sourcePlatform", sourcePlatform)
+                                .toString()
+                                .toByteArray(Charsets.UTF_8)
+                        } else {
+                            content
+                        }
+                        zip.write(rewritten)
+                    }
                     zip.closeEntry()
                     input.closeEntry()
                 }

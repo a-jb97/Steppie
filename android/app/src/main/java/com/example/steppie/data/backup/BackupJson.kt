@@ -66,7 +66,7 @@ internal object BackupJson {
         .put("app", BackupAppName)
         .put("backupSchemaVersion", BackupSchemaVersion)
         .put("createdAt", formatInstant(createdAt, zoneId))
-        .put("sourcePlatform", "android")
+        .put("sourcePlatform", AndroidBackupPlatform)
         .put("appVersion", appVersion)
         .put("dataFile", BackupDataFileName)
         .put("assetDirectory", BackupAssetDirectory)
@@ -98,9 +98,13 @@ internal object BackupJson {
         if (checksum.optString("algorithm") != "sha256") {
             throw BackupValidationException("지원하지 않는 checksum 방식입니다.")
         }
+        val sourcePlatform = root.requiredString("sourcePlatform")
+        if (sourcePlatform !in setOf(AndroidBackupPlatform, IosBackupPlatform)) {
+            throw BackupValidationException("지원하지 않는 백업 플랫폼입니다.")
+        }
         return BackupManifest(
             createdAt = parseInstant(root.requiredString("createdAt"), "createdAt"),
-            sourcePlatform = root.requiredString("sourcePlatform"),
+            sourcePlatform = sourcePlatform,
             dataChecksum = checksum.requiredString("dataJson"),
         )
     }

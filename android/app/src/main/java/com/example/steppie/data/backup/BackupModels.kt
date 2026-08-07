@@ -11,6 +11,8 @@ internal const val BackupSchemaVersion = 2
 internal const val BackupDataFileName = "data.json"
 internal const val BackupAssetDirectory = "assets"
 internal const val BackupMaxAssetBytes = 5 * 1024 * 1024
+internal const val AndroidBackupPlatform = "android"
+internal const val IosBackupPlatform = "ios"
 
 data class BackupSnapshot(
     val exportedAt: Instant,
@@ -26,6 +28,10 @@ data class BackupImportPreview(
     val routineSetCount: Int,
     val routineCount: Int,
     val dailyLogCount: Int,
+)
+
+data class BackupRestoreResult(
+    val requiresGuardianPinSetup: Boolean,
 )
 
 class BackupValidationException(message: String) : Exception(message)
