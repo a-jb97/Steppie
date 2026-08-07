@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct ChildRoutineAllDoneView: View {
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let viewModel: ChildRoutineViewModel
 
@@ -9,7 +8,7 @@ struct ChildRoutineAllDoneView: View {
         ChildRoutineStateScreenContainer {
             VStack(spacing: SteppieSpacing.large) {
                 PraiseFeedbackMark(
-                    imageName: allDoneStampImageName,
+                    imageName: "routine-all-done-great-job-stmap",
                     size: CGSize(width: 168, height: 164),
                     intensity: effectiveFeedbackIntensity,
                     reduceMotion: reduceMotion,
@@ -43,10 +42,6 @@ struct ChildRoutineAllDoneView: View {
             .clipShape(.rect(cornerRadius: SteppieCornerRadius.sheet))
             .accessibilityElement(children: .combine)
         }
-    }
-
-    private var allDoneStampImageName: String {
-        colorScheme == .dark ? "routine-all-done-stamp-dark" : "routine-all-done-stamp"
     }
 
     private var effectiveFeedbackIntensity: FeedbackIntensity {

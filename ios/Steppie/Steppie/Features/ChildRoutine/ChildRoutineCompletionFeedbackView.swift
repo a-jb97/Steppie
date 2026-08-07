@@ -172,7 +172,7 @@ struct ChildRoutineNextPreview: View {
         } else if viewModel.isAllCompleted {
             Button(action: viewModel.proceedAfterCompletionFeedback) {
                 adaptivePreviewStack {
-                    Image("routine-all-done-stamp")
+                    Image("routine-all-done-great-job-stmap")
                         .resizable()
                         .scaledToFit()
                         .frame(
