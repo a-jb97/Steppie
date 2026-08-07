@@ -839,9 +839,13 @@ class GuardianModeViewModel(
                 return@launch
             }
             runCatching { provider.restoreReplace(uri) }
-                .onSuccess {
+                .onSuccess { result ->
                     _uiState.update {
-                        GuardianBackupReducer.restoreSucceeded(it, initialState())
+                        GuardianBackupReducer.restoreSucceeded(
+                            previousState = it,
+                            initialState = initialState(),
+                            requiresGuardianPinSetup = result.requiresGuardianPinSetup,
+                        )
                     }
                 }
                 .onFailure { error ->

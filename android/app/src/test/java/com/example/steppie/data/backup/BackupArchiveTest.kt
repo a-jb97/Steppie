@@ -10,6 +10,9 @@ import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.OutputStream
+import java.nio.file.Files
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -17,6 +20,7 @@ import java.time.ZoneId
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,6 +48,36 @@ class BackupArchiveTest {
         assertEquals(1, read.snapshot.dailyLogs.size)
         assertEquals("pin-hash", read.snapshot.appSettings.guardianPinHash)
         assertEquals("08:00", read.snapshot.routineSets.single().startTime)
+        assertFalse(read.requiresGuardianPinSetup)
+    }
+
+    @Test
+    fun crossPlatformRestore_removesPlatformSpecificCredentialHashes() {
+        val archive = writeArchive(testSnapshot(), emptyMap())
+        val iosArchive = rewriteManifestSourcePlatform(archive, IosBackupPlatform)
+
+        val read = BackupArchive.read(ByteArrayInputStream(iosArchive))
+
+        assertNull(read.snapshot.appSettings.guardianPinHash)
+        assertNull(read.snapshot.appSettings.recoveryCodeHash)
+        assertEquals(testSnapshot().appSettings.locale, read.snapshot.appSettings.locale)
+        assertTrue(read.requiresGuardianPinSetup)
+    }
+
+    @Test(expected = BackupValidationException::class)
+    fun manifest_rejectsUnknownSourcePlatform() {
+        val manifest = JSONObject(
+            BackupJson.encodeManifest(
+                createdAt = now,
+                appVersion = "1.0",
+                dataChecksum = "checksum",
+                zoneId = zoneId,
+            ),
+        ).apply {
+            put("sourcePlatform", "unknown")
+        }
+
+        BackupJson.decodeManifest(manifest.toString())
     }
 
     @Test
@@ -180,6 +214,67 @@ class BackupArchiveTest {
     }
 
     @Test
+    fun stagedExport_writesCompletedArchiveWithoutDeletingDestination() = runBlocking {
+        val tempDirectory = Files.createTempDirectory("steppie-backup-test").toFile()
+        val destination = ByteArrayOutputStream()
+        var destinationDeleted = false
+
+        try {
+            stageAndCopyBackup(
+                tempDirectory = tempDirectory,
+                writeStagedArchive = { output ->
+                    BackupArchive.write(testSnapshot(), "1.0", zoneId, output)
+                },
+                openDestination = { destination },
+                deleteDestination = { destinationDeleted = true },
+            )
+
+            val read = BackupArchive.read(ByteArrayInputStream(destination.toByteArray()))
+            assertEquals(testSnapshot(), read.snapshot)
+            assertFalse(destinationDeleted)
+            assertTrue(tempDirectory.listFiles().orEmpty().isEmpty())
+        } finally {
+            tempDirectory.delete()
+        }
+    }
+
+    @Test
+    fun stagedExport_destinationWriteFailureDeletesDestinationAndTemporaryArchive() = runBlocking {
+        val tempDirectory = Files.createTempDirectory("steppie-backup-test").toFile()
+        val partialDestination = ByteArrayOutputStream()
+        var destinationDeleted = false
+        val failingDestination = object : OutputStream() {
+            private var writtenBytes = 0
+
+            override fun write(value: Int) {
+                if (writtenBytes >= 32) throw IOException("destination write failed")
+                partialDestination.write(value)
+                writtenBytes += 1
+            }
+        }
+
+        try {
+            val failure = runCatching {
+                stageAndCopyBackup(
+                    tempDirectory = tempDirectory,
+                    writeStagedArchive = { output ->
+                        BackupArchive.write(testSnapshot(), "1.0", zoneId, output)
+                    },
+                    openDestination = { failingDestination },
+                    deleteDestination = { destinationDeleted = true },
+                )
+            }.exceptionOrNull()
+
+            assertTrue(failure is IOException)
+            assertTrue(partialDestination.size() > 0)
+            assertTrue(destinationDeleted)
+            assertTrue(tempDirectory.listFiles().orEmpty().isEmpty())
+        } finally {
+            tempDirectory.delete()
+        }
+    }
+
+    @Test
     fun dataJson_doesNotContainRawPinFields() {
         val dataJson = BackupJson.encodeData(testSnapshot(), zoneId)
 
@@ -227,6 +322,32 @@ class BackupArchiveTest {
                 generateSequence { input.nextEntry }.forEach { source ->
                     zip.putNextEntry(ZipEntry(source.name).apply { time = timeMillis })
                     if (!source.isDirectory) input.copyTo(zip)
+                    zip.closeEntry()
+                    input.closeEntry()
+                }
+            }
+        }
+        return output.toByteArray()
+    }
+
+    private fun rewriteManifestSourcePlatform(bytes: ByteArray, sourcePlatform: String): ByteArray {
+        val output = ByteArrayOutputStream()
+        ZipInputStream(ByteArrayInputStream(bytes)).use { input ->
+            ZipOutputStream(output).use { zip ->
+                generateSequence { input.nextEntry }.forEach { source ->
+                    zip.putNextEntry(ZipEntry(source.name))
+                    if (!source.isDirectory) {
+                        val content = input.readBytes()
+                        val rewritten = if (source.name == "manifest.json") {
+                            JSONObject(content.toString(Charsets.UTF_8))
+                                .put("sourcePlatform", sourcePlatform)
+                                .toString()
+                                .toByteArray(Charsets.UTF_8)
+                        } else {
+                            content
+                        }
+                        zip.write(rewritten)
+                    }
                     zip.closeEntry()
                     input.closeEntry()
                 }

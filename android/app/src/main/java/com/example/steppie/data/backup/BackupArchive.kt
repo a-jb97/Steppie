@@ -71,7 +71,10 @@ internal object BackupArchive {
         if (!actualChecksum.equals(manifest.dataChecksum, ignoreCase = true)) {
             throw BackupValidationException("백업 checksum이 일치하지 않습니다.")
         }
-        val snapshot = BackupJson.decodeData(dataBytes.toString(Charsets.UTF_8))
+        val snapshot = prepareSnapshotForRestore(
+            snapshot = BackupJson.decodeData(dataBytes.toString(Charsets.UTF_8)),
+            sourcePlatform = manifest.sourcePlatform,
+        )
         val assets = entries
             .filterKeys { it.startsWith("$BackupAssetDirectory/") }
             .mapKeys { it.key.removePrefix("$BackupAssetDirectory/") }
@@ -94,8 +97,25 @@ internal object BackupArchive {
     }
 }
 
+internal fun prepareSnapshotForRestore(
+    snapshot: BackupSnapshot,
+    sourcePlatform: String,
+): BackupSnapshot = if (sourcePlatform == AndroidBackupPlatform) {
+    snapshot
+} else {
+    snapshot.copy(
+        appSettings = snapshot.appSettings.copy(
+            guardianPinHash = null,
+            recoveryCodeHash = null,
+        ),
+    )
+}
+
 internal data class ReadBackup(
     val manifest: BackupManifest,
     val snapshot: BackupSnapshot,
     val assets: Map<String, ByteArray>,
-)
+) {
+    val requiresGuardianPinSetup: Boolean
+        get() = manifest.sourcePlatform != AndroidBackupPlatform
+}

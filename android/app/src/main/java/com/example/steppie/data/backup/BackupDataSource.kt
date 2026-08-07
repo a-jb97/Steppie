@@ -2,6 +2,7 @@ package com.example.steppie.data.backup
 
 import androidx.room.withTransaction
 import com.example.steppie.data.local.DailyLogEntity
+import com.example.steppie.data.local.DailyRoutineSelectionEntity
 import com.example.steppie.data.local.RoutineDao
 import com.example.steppie.data.local.RoutineEntity
 import com.example.steppie.data.local.RoutineSetEntity
@@ -50,10 +51,16 @@ class BackupDataSource(
                         routineSets = newSnapshot.routineSets,
                         routines = newSnapshot.routines,
                         dailyLogs = newSnapshot.dailyLogs,
+                        dailyRoutineSelections = emptyList(),
                     )
                 },
                 rollback = {
-                    replaceRoomData(previous.routineSets, previous.routines, previous.dailyLogs)
+                    replaceRoomData(
+                        routineSets = previous.routineSets,
+                        routines = previous.routines,
+                        dailyLogs = previous.dailyLogs,
+                        dailyRoutineSelections = previous.dailyRoutineSelections,
+                    )
                 },
             ),
             BackupRestoreStep(
@@ -77,6 +84,7 @@ class BackupDataSource(
         routineSets: List<RoutineSetEntity>,
         routines: List<RoutineEntity>,
         dailyLogs: List<DailyLogEntity>,
+        dailyRoutineSelections: List<DailyRoutineSelectionEntity>,
     ) = database.withTransaction {
         dao.deleteAllDailyRoutineSelections()
         dao.deleteAllDailyLogs()
@@ -85,12 +93,14 @@ class BackupDataSource(
         dao.insertRoutineSets(routineSets)
         dao.insertRoutines(routines)
         dao.insertDailyLogs(dailyLogs)
+        dao.insertDailyRoutineSelections(dailyRoutineSelections)
     }
 
     private suspend fun currentData(): RestorableBackupData = RestorableBackupData(
         routineSets = dao.getAllRoutineSetEntities(),
         routines = dao.getAllRoutineEntities(),
         dailyLogs = dao.getAllDailyLogEntities(),
+        dailyRoutineSelections = dao.getAllDailyRoutineSelectionEntities(),
         appSettings = appSettingsRepository.observeAppSettings().first(),
     )
 }
@@ -99,5 +109,6 @@ private data class RestorableBackupData(
     val routineSets: List<RoutineSetEntity>,
     val routines: List<RoutineEntity>,
     val dailyLogs: List<DailyLogEntity>,
+    val dailyRoutineSelections: List<DailyRoutineSelectionEntity>,
     val appSettings: AppSettings,
 )

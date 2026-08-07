@@ -29,6 +29,9 @@ interface RoutineDao {
     @Query("SELECT * FROM daily_routine_selections WHERE date = :date LIMIT 1")
     suspend fun getDailyRoutineSelection(date: String): DailyRoutineSelectionEntity?
 
+    @Query("SELECT * FROM daily_routine_selections ORDER BY date")
+    suspend fun getAllDailyRoutineSelectionEntities(): List<DailyRoutineSelectionEntity>
+
     @Transaction
     @Query("SELECT * FROM routine_sets WHERE id = :id AND deletedAtEpochMillis IS NULL")
     suspend fun getRoutineSet(id: String): RoutineSetWithRoutines?
@@ -109,6 +112,9 @@ interface RoutineDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertDailyLogs(entities: List<DailyLogEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertDailyRoutineSelections(entities: List<DailyRoutineSelectionEntity>)
 
     @Query("DELETE FROM daily_logs")
     suspend fun deleteAllDailyLogs()

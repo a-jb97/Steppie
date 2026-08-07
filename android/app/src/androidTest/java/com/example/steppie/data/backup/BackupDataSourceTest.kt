@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.steppie.data.local.DailyRoutineSelectionEntity
 import com.example.steppie.data.local.SteppieDatabase
 import com.example.steppie.data.local.toEntity
 import com.example.steppie.data.sample.RoutineSampleData
@@ -60,6 +61,12 @@ class BackupDataSourceTest {
         val previousSet = RoutineSampleData.morning
         database.routineDao().insertRoutineSet(previousSet.toEntity())
         database.routineDao().insertRoutines(previousSet.routines.map { it.toEntity() })
+        val previousSelection = DailyRoutineSelectionEntity(
+            date = "2026-06-17",
+            routineSetId = previousSet.id,
+            selectedAtEpochMillis = exportedAt.toEpochMilli(),
+        )
+        database.routineDao().upsertDailyRoutineSelection(previousSelection)
         val before = dataSource.snapshot(exportedAt)
         val replacementSet = RoutineSampleData.school
         val replacement = BackupSnapshot(
@@ -76,6 +83,10 @@ class BackupDataSourceTest {
 
         assertSame(failure, thrown)
         assertEquals(before, dataSource.snapshot(exportedAt))
+        assertEquals(
+            previousSelection,
+            database.routineDao().getDailyRoutineSelection(previousSelection.date),
+        )
     }
 }
 

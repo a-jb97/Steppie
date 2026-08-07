@@ -103,12 +103,34 @@ class GuardianBackupReducerTest {
     @Test
     fun `restore success resets state and increments completion token from previous state`() {
         val initial = GuardianModeUiState(interactionToken = 2L, restoreCompletedToken = 3L)
-        val result = GuardianBackupReducer.restoreSucceeded(populatedState(), initial)
+        val result = GuardianBackupReducer.restoreSucceeded(
+            previousState = populatedState(),
+            initialState = initial,
+            requiresGuardianPinSetup = false,
+        )
 
         assertEquals("백업 파일에서 복원했습니다.", result.backupMessage)
         assertEquals(24L, result.interactionToken)
         assertEquals(10L, result.restoreCompletedToken)
         assertEquals(GuardianDestination.Pin, result.destination)
+    }
+
+    @Test
+    fun `cross platform restore requires a new guardian pin`() {
+        val initial = GuardianModeUiState(interactionToken = 2L, restoreCompletedToken = 3L)
+
+        val result = GuardianBackupReducer.restoreSucceeded(
+            previousState = populatedState(),
+            initialState = initial,
+            requiresGuardianPinSetup = true,
+        )
+
+        assertTrue(result.isActive)
+        assertFalse(result.isAuthenticated)
+        assertEquals(GuardianDestination.Pin, result.destination)
+        assertEquals(GuardianPinMode.Setup, result.pinMode)
+        assertEquals(24L, result.interactionToken)
+        assertEquals(10L, result.restoreCompletedToken)
     }
 
     private fun populatedState() = GuardianModeUiState(
