@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ChildRoutineAllDoneView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.locale) private var locale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let viewModel: ChildRoutineViewModel
 
@@ -8,7 +10,7 @@ struct ChildRoutineAllDoneView: View {
         ChildRoutineStateScreenContainer {
             VStack(spacing: SteppieSpacing.large) {
                 PraiseFeedbackMark(
-                    imageName: "routine-all-done-great-job-stmap",
+                    imageName: allDoneStampImageName,
                     size: CGSize(width: 168, height: 164),
                     intensity: effectiveFeedbackIntensity,
                     reduceMotion: reduceMotion,
@@ -49,5 +51,15 @@ struct ChildRoutineAllDoneView: View {
             settings: viewModel.settings,
             reduceMotion: reduceMotion
         )
+    }
+
+    private var allDoneStampImageName: String {
+        guard locale.language.languageCode?.identifier == "ko" else {
+            return "routine-all-done-great-job-stmap"
+        }
+
+        return colorScheme == .dark
+            ? "routine-all-done-stamp-dark"
+            : "routine-all-done-stamp"
     }
 }
