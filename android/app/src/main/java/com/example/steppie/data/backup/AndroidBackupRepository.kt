@@ -12,18 +12,21 @@ class AndroidBackupRepository(
     private val appContext = context.applicationContext
 
     override suspend fun exportTo(uri: Uri) {
-        val snapshot = dataSource.snapshot(clockProvider.now())
-        val output = appContext.contentResolver.openOutputStream(uri)
-            ?: throw BackupValidationException("백업 파일을 만들 수 없습니다.")
-        output.use {
-            BackupArchive.write(
-                snapshot = snapshot,
-                appVersion = appVersionName(),
-                zoneId = clockProvider.zoneId,
-                output = it,
-                assets = dataSource.photoBackupAssets(snapshot),
-            )
-        }
+        stageAndCopyBackup(
+            tempDirectory = appContext.cacheDir,
+            writeStagedArchive = { output ->
+                val snapshot = dataSource.snapshot(clockProvider.now())
+                BackupArchive.write(
+                    snapshot = snapshot,
+                    appVersion = appVersionName(),
+                    zoneId = clockProvider.zoneId,
+                    output = output,
+                    assets = dataSource.photoBackupAssets(snapshot),
+                )
+            },
+            openDestination = { appContext.contentResolver.openOutputStream(uri, "w") },
+            deleteDestination = { appContext.contentResolver.delete(uri, null, null) },
+        )
     }
 
     override suspend fun previewImport(uri: Uri): BackupImportPreview {

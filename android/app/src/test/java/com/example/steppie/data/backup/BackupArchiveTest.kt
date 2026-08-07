@@ -10,6 +10,9 @@ import com.example.steppie.domain.model.Routine
 import com.example.steppie.domain.model.RoutineSet
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.OutputStream
+import java.nio.file.Files
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -17,6 +20,7 @@ import java.time.ZoneId
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -207,6 +211,67 @@ class BackupArchiveTest {
 
         assertTrue(result.exceptionOrNull() is BackupValidationException)
         assertTrue(original.contentEquals(output.toByteArray()))
+    }
+
+    @Test
+    fun stagedExport_writesCompletedArchiveWithoutDeletingDestination() = runBlocking {
+        val tempDirectory = Files.createTempDirectory("steppie-backup-test").toFile()
+        val destination = ByteArrayOutputStream()
+        var destinationDeleted = false
+
+        try {
+            stageAndCopyBackup(
+                tempDirectory = tempDirectory,
+                writeStagedArchive = { output ->
+                    BackupArchive.write(testSnapshot(), "1.0", zoneId, output)
+                },
+                openDestination = { destination },
+                deleteDestination = { destinationDeleted = true },
+            )
+
+            val read = BackupArchive.read(ByteArrayInputStream(destination.toByteArray()))
+            assertEquals(testSnapshot(), read.snapshot)
+            assertFalse(destinationDeleted)
+            assertTrue(tempDirectory.listFiles().orEmpty().isEmpty())
+        } finally {
+            tempDirectory.delete()
+        }
+    }
+
+    @Test
+    fun stagedExport_destinationWriteFailureDeletesDestinationAndTemporaryArchive() = runBlocking {
+        val tempDirectory = Files.createTempDirectory("steppie-backup-test").toFile()
+        val partialDestination = ByteArrayOutputStream()
+        var destinationDeleted = false
+        val failingDestination = object : OutputStream() {
+            private var writtenBytes = 0
+
+            override fun write(value: Int) {
+                if (writtenBytes >= 32) throw IOException("destination write failed")
+                partialDestination.write(value)
+                writtenBytes += 1
+            }
+        }
+
+        try {
+            val failure = runCatching {
+                stageAndCopyBackup(
+                    tempDirectory = tempDirectory,
+                    writeStagedArchive = { output ->
+                        BackupArchive.write(testSnapshot(), "1.0", zoneId, output)
+                    },
+                    openDestination = { failingDestination },
+                    deleteDestination = { destinationDeleted = true },
+                )
+            }.exceptionOrNull()
+
+            assertTrue(failure is IOException)
+            assertTrue(partialDestination.size() > 0)
+            assertTrue(destinationDeleted)
+            assertTrue(tempDirectory.listFiles().orEmpty().isEmpty())
+        } finally {
+            tempDirectory.delete()
+        }
     }
 
     @Test
