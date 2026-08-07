@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChildRoutineAllDoneView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.locale) private var locale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let viewModel: ChildRoutineViewModel
 
@@ -45,14 +46,20 @@ struct ChildRoutineAllDoneView: View {
         }
     }
 
-    private var allDoneStampImageName: String {
-        colorScheme == .dark ? "routine-all-done-stamp-dark" : "routine-all-done-stamp"
-    }
-
     private var effectiveFeedbackIntensity: FeedbackIntensity {
         ChildRoutineFeedbackPresentationPolicy.effectiveIntensity(
             settings: viewModel.settings,
             reduceMotion: reduceMotion
         )
+    }
+
+    private var allDoneStampImageName: String {
+        guard locale.language.languageCode?.identifier == "ko" else {
+            return "routine-all-done-great-job-stmap"
+        }
+
+        return colorScheme == .dark
+            ? "routine-all-done-stamp-dark"
+            : "routine-all-done-stamp"
     }
 }

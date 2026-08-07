@@ -73,8 +73,8 @@ struct GuardianSecurityView: View {
     }
 
     private func securityCard(
-        title: String,
-        subtitle: String,
+        title: LocalizedStringKey,
+        subtitle: LocalizedStringKey,
         assetName: String,
         iconSize: CGFloat,
         action: @escaping () -> Void

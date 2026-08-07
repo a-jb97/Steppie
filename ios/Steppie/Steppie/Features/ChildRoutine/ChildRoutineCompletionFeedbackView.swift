@@ -112,6 +112,7 @@ struct ChildRoutineFeedbackUndoButton: View {
 }
 
 struct ChildRoutineNextPreview: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let viewModel: ChildRoutineViewModel
@@ -172,7 +173,7 @@ struct ChildRoutineNextPreview: View {
         } else if viewModel.isAllCompleted {
             Button(action: viewModel.proceedAfterCompletionFeedback) {
                 adaptivePreviewStack {
-                    Image("routine-all-done-stamp")
+                    Image(allDoneStampImageName)
                         .resizable()
                         .scaledToFit()
                         .frame(
@@ -280,6 +281,16 @@ struct ChildRoutineNextPreview: View {
             appLocale: locale.identifier,
             systemLanguages: [locale.identifier]
         )
+    }
+
+    private var allDoneStampImageName: String {
+        guard locale.language.languageCode?.identifier == "ko" else {
+            return "routine-all-done-great-job-stmap"
+        }
+
+        return colorScheme == .dark
+            ? "routine-all-done-stamp-dark"
+            : "routine-all-done-stamp"
     }
 
     @ViewBuilder

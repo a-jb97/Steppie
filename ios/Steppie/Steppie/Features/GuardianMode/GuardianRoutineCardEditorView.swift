@@ -191,10 +191,16 @@ struct GuardianRoutineCardEditorView: View {
                 }
             }
 
-            Text(hasTime ? "현재 선택: \(scheduledTime?.description ?? "")" : "현재 선택: 시간 없음")
-                .steppieTextStyle(.guardianCaption)
-                .foregroundStyle(Color.steppieTextSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if hasTime {
+                    Text("현재 선택: \(scheduledTime?.description ?? "")")
+                } else {
+                    Text("현재 선택: 시간 없음")
+                }
+            }
+            .steppieTextStyle(.guardianCaption)
+            .foregroundStyle(Color.steppieTextSecondary)
+            .fixedSize(horizontal: false, vertical: true)
 
             if hasTime {
                 DatePicker(
@@ -209,9 +215,9 @@ struct GuardianRoutineCardEditorView: View {
     }
 
     private func settingSegment(
-        title: String,
+        title: LocalizedStringKey,
         isSelected: Bool,
-        accessibilityValue: String,
+        accessibilityValue: LocalizedStringKey,
         action: @escaping () -> Void
     ) -> some View {
         Button {
@@ -236,7 +242,7 @@ struct GuardianRoutineCardEditorView: View {
         .accessibilityValue(Text(accessibilityValue))
     }
 
-    private func header(title: String, subtitle: String) -> some View {
+    private func header(title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)
@@ -253,7 +259,7 @@ struct GuardianRoutineCardEditorView: View {
     }
 
     private func labeledCard<Content: View>(
-        _ title: String,
+        _ title: LocalizedStringKey,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.extraSmall) {
@@ -272,7 +278,7 @@ struct GuardianRoutineCardEditorView: View {
         .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
     }
 
-    private func warningNote(_ text: String) -> some View {
+    private func warningNote(_ text: LocalizedStringKey) -> some View {
         HStack(spacing: SteppieSpacing.small) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(Color.steppieWarning)

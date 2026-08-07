@@ -165,7 +165,7 @@ struct GuardianRecordCalendarView: View {
             HStack(spacing: SteppieSpacing.small) {
                 Picker("연도", selection: $pickerYear) {
                     ForEach(yearRange, id: \.self) { year in
-                        Text(String(year) + "년").tag(year)
+                        Text("\(year)년").tag(year)
                     }
                 }
                 .pickerStyle(.wheel)
@@ -275,10 +275,16 @@ struct GuardianRecordCalendarView: View {
                 .foregroundStyle(Color.steppieTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
-            Text(isToday ? "오늘은 아직 루틴이 없어요." : "\(fullDate)에는 완료 기록이 없습니다.")
-                .steppieTextStyle(.guardianBody)
-                .foregroundStyle(Color.steppieTextPrimary)
-                .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if isToday {
+                    Text("오늘은 아직 루틴이 없어요.")
+                } else {
+                    Text("\(fullDate)에는 완료 기록이 없습니다.")
+                }
+            }
+            .steppieTextStyle(.guardianBody)
+            .foregroundStyle(Color.steppieTextPrimary)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
     }
@@ -316,14 +322,17 @@ struct GuardianRecordCalendarView: View {
     }
 
     private var weekdaySymbols: [String] {
-        ["일", "월", "화", "수", "목", "금", "토"]
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = Calendar(identifier: .gregorian)
+        return formatter.veryShortWeekdaySymbols
     }
 
     private var monthTitle: String {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "yyyy년 M월"
+        formatter.setLocalizedDateFormatFromTemplate("yMMMM")
         return formatter.string(from: visibleMonth)
     }
 

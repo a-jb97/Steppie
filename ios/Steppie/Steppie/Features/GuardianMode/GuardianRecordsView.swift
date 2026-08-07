@@ -171,7 +171,7 @@ struct GuardianRecordsView: View {
         .accessibilityHint(Text("날짜 기록 보기"))
     }
 
-    private func header(title: String, subtitle: String) -> some View {
+    private func header(title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)
@@ -187,7 +187,7 @@ struct GuardianRecordsView: View {
         .padding(.bottom, SteppieSpacing.small)
     }
 
-    private func messageState(title: String, message: String) -> some View {
+    private func messageState(title: LocalizedStringKey, message: LocalizedStringKey) -> some View {
         VStack(spacing: SteppieSpacing.medium) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)
@@ -252,7 +252,7 @@ struct GuardianRecordStatsView: View {
         .padding(.bottom, SteppieSpacing.small)
     }
 
-    private func statTile(title: String, value: String) -> some View {
+    private func statTile(title: LocalizedStringKey, value: String) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
             Text(title)
                 .steppieTextStyle(.guardianCaption)
@@ -336,7 +336,9 @@ struct GuardianRecordRoutineRowView: View {
     private var recordRoutineMeta: String {
         var parts = [row.statusText]
         if let completedAt = row.completedAt {
-            parts.append("\(GuardianRecordFormatting.timeText(completedAt, locale: locale)) 완료")
+            parts.append(
+                String(localized: "\(GuardianRecordFormatting.timeText(completedAt, locale: locale)) 완료")
+            )
         }
         if let availabilityText = row.availabilityText {
             parts.append(availabilityText)
@@ -350,7 +352,9 @@ struct GuardianRecordRoutineRowView: View {
             parts.append(availabilityText)
         }
         if let completedAt = row.completedAt {
-            parts.append("\(GuardianRecordFormatting.timeText(completedAt, locale: locale))에 완료")
+            parts.append(
+                String(localized: "\(GuardianRecordFormatting.timeText(completedAt, locale: locale))에 완료")
+            )
         }
         return parts.joined(separator: ", ")
     }
@@ -459,7 +463,7 @@ enum GuardianRecordFormatting {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "yyyy년 M월 d일"
+        formatter.setLocalizedDateFormatFromTemplate("yMMMMd")
         return formatter.string(from: date)
     }
 

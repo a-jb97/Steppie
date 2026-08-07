@@ -20,7 +20,7 @@ struct BuiltInRoutineTemplate: Equatable, Identifiable {
     let steps: [BuiltInRoutineTemplateStep]
 
     var routineCountText: String {
-        "\(steps.count)개 활동"
+        String(localized: "\(steps.count)개 활동")
     }
 }
 

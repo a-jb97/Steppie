@@ -199,7 +199,7 @@ final class GuardianModeViewModel {
             try routineManagementState.load()
             recordsState.refresh()
         } catch {
-            errorMessage = "정보를 불러오지 못했어요."
+            errorMessage = String(localized: "정보를 불러오지 못했어요.")
             routineManagementState.markLoadFailed()
         }
     }
@@ -249,7 +249,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "템플릿을 저장하지 못했어요."
+            errorMessage = String(localized: "템플릿을 저장하지 못했어요.")
         }
     }
 
@@ -291,7 +291,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "루틴 세트를 저장하지 못했어요."
+            errorMessage = String(localized: "루틴 세트를 저장하지 못했어요.")
         }
     }
 
@@ -313,7 +313,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "저장하지 못했어요."
+            errorMessage = String(localized: "저장하지 못했어요.")
         }
     }
 
@@ -321,7 +321,7 @@ final class GuardianModeViewModel {
         do {
             try routineManagementState.updateDraftPhoto(data: data)
         } catch {
-            errorMessage = "사진을 저장하지 못했어요."
+            errorMessage = String(localized: "사진을 저장하지 못했어요.")
         }
     }
 
@@ -333,7 +333,7 @@ final class GuardianModeViewModel {
         do {
             try routineSetCreationState.updateStepPhoto(data: data)
         } catch {
-            errorMessage = "사진을 저장하지 못했어요."
+            errorMessage = String(localized: "사진을 저장하지 못했어요.")
         }
     }
 
@@ -351,7 +351,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "삭제하지 못했어요."
+            errorMessage = String(localized: "삭제하지 못했어요.")
         }
     }
 
@@ -365,7 +365,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "순서를 바꾸지 못했어요."
+            errorMessage = String(localized: "순서를 바꾸지 못했어요.")
         }
     }
 
@@ -375,7 +375,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "순서를 바꾸지 못했어요."
+            errorMessage = String(localized: "순서를 바꾸지 못했어요.")
         }
     }
 
@@ -385,7 +385,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "순서를 바꾸지 못했어요."
+            errorMessage = String(localized: "순서를 바꾸지 못했어요.")
         }
     }
 
@@ -395,7 +395,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "순서를 바꾸지 못했어요."
+            errorMessage = String(localized: "순서를 바꾸지 못했어요.")
         }
     }
 
@@ -419,7 +419,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "오늘 루틴으로 설정하지 못했어요."
+            errorMessage = String(localized: "오늘 루틴으로 설정하지 못했어요.")
         }
     }
 
@@ -441,9 +441,9 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch GuardianRoutineManagementError.duplicateDailyStartTime {
-            errorMessage = "같은 시작 시각을 사용하는 루틴 세트가 있어요. 다른 시간을 선택해 주세요."
+            errorMessage = String(localized: "같은 시작 시각을 사용하는 루틴 세트가 있어요. 다른 시간을 선택해 주세요.")
         } catch {
-            errorMessage = "매일 루틴 시간을 저장하지 못했어요."
+            errorMessage = String(localized: "매일 루틴 시간을 저장하지 못했어요.")
         }
     }
 
@@ -453,7 +453,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "매일 루틴에서 제외하지 못했어요."
+            errorMessage = String(localized: "매일 루틴에서 제외하지 못했어요.")
         }
     }
 
@@ -473,7 +473,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "루틴 세트 이름을 저장하지 못했어요."
+            errorMessage = String(localized: "루틴 세트 이름을 저장하지 못했어요.")
         }
     }
 
@@ -487,13 +487,13 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch GuardianRoutineManagementError.scheduledRoutineSetDeletion {
-            errorMessage = "매일 사용하는 루틴 세트는 바로 삭제할 수 없어요. 먼저 매일 루틴에서 제외해 주세요."
+            errorMessage = String(localized: "매일 사용하는 루틴 세트는 바로 삭제할 수 없어요. 먼저 매일 루틴에서 제외해 주세요.")
         } catch GuardianRoutineManagementError.assignedRoutineSetDeletion {
-            errorMessage = "현재 사용 중인 루틴 세트는 삭제할 수 없어요. 먼저 다른 루틴 세트를 오늘 루틴으로 설정해 주세요."
+            errorMessage = String(localized: "현재 사용 중인 루틴 세트는 삭제할 수 없어요. 먼저 다른 루틴 세트를 오늘 루틴으로 설정해 주세요.")
         } catch GuardianRoutineManagementError.lastRoutineSetDeletion {
-            errorMessage = "마지막 루틴 세트는 삭제할 수 없어요."
+            errorMessage = String(localized: "마지막 루틴 세트는 삭제할 수 없어요.")
         } catch {
-            errorMessage = "루틴 세트를 삭제하지 못했어요."
+            errorMessage = String(localized: "루틴 세트를 삭제하지 못했어요.")
         }
     }
 
@@ -537,7 +537,7 @@ final class GuardianModeViewModel {
         do {
             try settingsState.update(transform)
         } catch {
-            errorMessage = "설정을 저장하지 못했어요."
+            errorMessage = String(localized: "설정을 저장하지 못했어요.")
         }
     }
 
@@ -546,7 +546,7 @@ final class GuardianModeViewModel {
             try backupState.createPackage()
             errorMessage = nil
         } catch {
-            errorMessage = "백업 파일을 만들지 못했어요."
+            errorMessage = String(localized: "백업 파일을 만들지 못했어요.")
         }
     }
 
@@ -569,7 +569,7 @@ final class GuardianModeViewModel {
 
     func confirmRestore() {
         guard canConfirmRestore else {
-            errorMessage = "PIN을 확인해 주세요."
+            errorMessage = String(localized: "PIN을 확인해 주세요.")
             return
         }
         do {
@@ -577,7 +577,7 @@ final class GuardianModeViewModel {
             load()
             onDataChanged()
         } catch {
-            errorMessage = "복원하지 못했어요. 기존 데이터는 유지됩니다."
+            errorMessage = String(localized: "복원하지 못했어요. 기존 데이터는 유지됩니다.")
         }
     }
 

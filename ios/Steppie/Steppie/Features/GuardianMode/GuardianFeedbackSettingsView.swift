@@ -192,7 +192,7 @@ struct GuardianFeedbackSettingsView: View {
     }
 
     private func settingsBlock<Content: View>(
-        title: String,
+        title: LocalizedStringKey,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.extraSmall) {
@@ -214,10 +214,10 @@ struct GuardianFeedbackSettingsView: View {
     }
 
     private func settingsSegmentBlock<Value: Hashable>(
-        title: String,
+        title: LocalizedStringKey,
         options: [Value],
         selected: Value,
-        label: @escaping (Value) -> String,
+        label: @escaping (Value) -> LocalizedStringKey,
         onSelect: @escaping (Value) -> Void
     ) -> some View {
         settingsBlock(title: title) {
@@ -238,7 +238,7 @@ struct GuardianFeedbackSettingsView: View {
     }
 
     private func settingsSliderBlock(
-        title: String,
+        title: LocalizedStringKey,
         valueText: String,
         value: Binding<Double>,
         range: ClosedRange<Double>
@@ -268,9 +268,9 @@ struct GuardianFeedbackSettingsView: View {
     }
 
     private func settingSegment(
-        title: String,
+        title: LocalizedStringKey,
         isSelected: Bool,
-        accessibilityValue: String,
+        accessibilityValue: LocalizedStringKey,
         action: @escaping () -> Void
     ) -> some View {
         Button {
@@ -299,7 +299,7 @@ struct GuardianFeedbackSettingsView: View {
         [.strong, .normal, .quiet, .off]
     }
 
-    private func feedbackIntensityLabel(_ intensity: FeedbackIntensity) -> String {
+    private func feedbackIntensityLabel(_ intensity: FeedbackIntensity) -> LocalizedStringKey {
         switch intensity {
         case .strong: "강함"
         case .normal: "보통"
@@ -308,7 +308,7 @@ struct GuardianFeedbackSettingsView: View {
         }
     }
 
-    private func enabledLabel(_ value: Bool) -> String {
+    private func enabledLabel(_ value: Bool) -> LocalizedStringKey {
         value ? "켜기" : "끄기"
     }
 
@@ -319,7 +319,7 @@ struct GuardianFeedbackSettingsView: View {
     private var quietHoursSummary: String {
         guard let start = settings.quietHoursStart,
               let end = settings.quietHoursEnd else {
-            return "꺼짐"
+            return String(localized: "꺼짐")
         }
         return "\(start)-\(end)"
     }

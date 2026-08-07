@@ -91,7 +91,9 @@ extension GuardianPINComponents {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text(isSystemImage ? "지우기" : "\(label)"))
+            .accessibilityLabel(
+                Text(isSystemImage ? String(localized: "지우기") : label)
+            )
         }
     }
 
