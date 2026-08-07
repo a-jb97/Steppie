@@ -119,7 +119,11 @@ struct GuardianRoutineTemplateSelectionView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(localizedText(template.name)))
-        .accessibilityValue(Text("\(template.routineCountText), \(isSelected ? "선택됨" : "선택 안 됨")"))
+        .accessibilityValue(
+            Text(
+                "\(template.routineCountText), \(isSelected ? String(localized: "선택됨") : String(localized: "선택 안 됨"))"
+            )
+        )
         .accessibilityHint(Text("템플릿 미리보기를 표시합니다"))
     }
 
@@ -138,7 +142,7 @@ struct GuardianRoutineTemplateSelectionView: View {
         if let selectedTemplate {
             VStack(alignment: .leading, spacing: SteppieSpacing.medium) {
                 header(
-                    title: localizedText(selectedTemplate.name),
+                    titleText: Text(verbatim: localizedText(selectedTemplate.name)),
                     subtitle: "\(selectedTemplate.steps.count)개 활동이 새 루틴 세트로 저장됩니다"
                 )
 
@@ -183,7 +187,7 @@ struct GuardianRoutineTemplateSelectionView: View {
                     .steppieTextStyle(.button)
                     .foregroundStyle(Color.steppieTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(step.scheduledTime?.description ?? "시간 없음")
+                Text(step.scheduledTime?.description ?? String(localized: "시간 없음"))
                     .steppieTextStyle(.guardianCaption)
                     .foregroundStyle(Color.steppieTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -202,12 +206,16 @@ struct GuardianRoutineTemplateSelectionView: View {
         .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text("\(order + 1)번째, \(localizedText(step.title))"))
-        .accessibilityValue(Text(step.scheduledTime?.description ?? "시간 없음"))
+        .accessibilityValue(Text(step.scheduledTime?.description ?? String(localized: "시간 없음")))
     }
 
-    private func header(title: String, subtitle: String) -> some View {
+    private func header(title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
+        header(titleText: Text(title), subtitle: subtitle)
+    }
+
+    private func header(titleText: Text, subtitle: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
-            Text(title)
+            titleText
                 .steppieTextStyle(.guardianTitle)
                 .foregroundStyle(Color.steppieTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -233,7 +241,7 @@ struct GuardianRoutineTemplateSelectionView: View {
         }
     }
 
-    private func messageState(title: String, message: String) -> some View {
+    private func messageState(title: LocalizedStringKey, message: LocalizedStringKey) -> some View {
         VStack(spacing: SteppieSpacing.medium) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)

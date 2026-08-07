@@ -18,8 +18,10 @@ struct GuardianRecordSummary: Equatable, Identifiable {
     var percentage: Int { Int((completionRatio * 100).rounded()) }
 
     var statusText: String {
-        guard totalCount > 0 else { return "기록 없음" }
-        return remainingCount == 0 ? "완료" : "\(remainingCount)개 남음"
+        guard totalCount > 0 else { return String(localized: "기록 없음") }
+        return remainingCount == 0
+            ? String(localized: "완료")
+            : String(localized: "\(remainingCount)개 남음")
     }
 }
 
@@ -32,11 +34,13 @@ struct GuardianRecordRoutineRow: Equatable, Identifiable {
     let isInactive: Bool
 
     var isCompleted: Bool { status == .completed }
-    var statusText: String { isCompleted ? "완료" : "미완료" }
+    var statusText: String {
+        isCompleted ? String(localized: "완료") : String(localized: "미완료")
+    }
 
     var availabilityText: String? {
-        if isDeleted { return "삭제된 활동" }
-        if isInactive { return "비활성 활동" }
+        if isDeleted { return String(localized: "삭제된 활동") }
+        if isInactive { return String(localized: "비활성 활동") }
         return nil
     }
 }
@@ -296,7 +300,11 @@ final class GuardianRecordsState {
             return localDate
         }
         let weekday = calendar.component(.weekday, from: date)
-        let symbols = ["일", "월", "화", "수", "목", "금", "토"]
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.calendar = calendar
+        let symbols = formatter.veryShortWeekdaySymbols ?? []
+        guard !symbols.isEmpty else { return localDate }
         return symbols[max(0, min(symbols.count - 1, weekday - 1))]
     }
 

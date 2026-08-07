@@ -25,7 +25,7 @@ final class GuardianBackupState {
     func createPackage() throws {
         do {
             package = try service.exportPackage()
-            statusMessage = "백업 파일을 만들었어요."
+            statusMessage = String(localized: "백업 파일을 만들었어요.")
         } catch {
             package = nil
             throw error
@@ -36,7 +36,7 @@ final class GuardianBackupState {
         do {
             validatedRestorePayload = try service.validatePackagePayload(data)
             restorePIN = ""
-            statusMessage = "백업 파일을 확인했어요. 복원하려면 보호자 PIN을 입력해 주세요."
+            statusMessage = String(localized: "백업 파일을 확인했어요. 복원하려면 보호자 PIN을 입력해 주세요.")
         } catch {
             validatedRestorePayload = nil
             restorePIN = ""
@@ -58,24 +58,24 @@ final class GuardianBackupState {
         try service.restorePayload(validatedRestorePayload)
         self.validatedRestorePayload = nil
         restorePIN = ""
-        statusMessage = "백업을 복원했어요."
+        statusMessage = String(localized: "백업을 복원했어요.")
     }
 
     func validationErrorMessage(for error: Error) -> String {
         guard let backupError = error as? BackupError else {
-            return "백업 파일을 읽지 못했어요."
+            return String(localized: "백업 파일을 읽지 못했어요.")
         }
         switch backupError {
         case .invalidChecksum:
-            return "백업 파일이 손상되었어요."
+            return String(localized: "백업 파일이 손상되었어요.")
         case .unsupportedSchemaVersion:
-            return "지원하지 않는 백업 버전이에요."
+            return String(localized: "지원하지 않는 백업 버전이에요.")
         case .unsupportedPlatform:
-            return "이 iOS 버전에서 복원할 수 없는 백업이에요."
+            return String(localized: "이 iOS 버전에서 복원할 수 없는 백업이에요.")
         case .missingFile, .invalidPackage, .invalidManifest, .invalidData:
-            return "올바른 Steppie 백업 파일이 아니에요."
+            return String(localized: "올바른 Steppie 백업 파일이 아니에요.")
         case .duplicateID, .invalidReference:
-            return "백업 데이터 관계가 올바르지 않아요."
+            return String(localized: "백업 데이터 관계가 올바르지 않아요.")
         }
     }
 }

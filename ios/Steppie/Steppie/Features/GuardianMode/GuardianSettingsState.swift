@@ -98,12 +98,12 @@ final class GuardianSettingsState {
             try repository.updateAppSettings(updated)
             settings = updated
             oneTimeRecoveryCode = recoveryCode
-            recoveryCodeStatusMessage = "복구 코드를 만들었어요. 이 코드는 한 번만 표시됩니다."
+            recoveryCodeStatusMessage = String(localized: "복구 코드를 만들었어요. 이 코드는 한 번만 표시됩니다.")
             recoveryCodeErrorMessage = nil
             onDataChanged()
             return true
         } catch {
-            recoveryCodeErrorMessage = "복구 코드를 만들지 못했어요."
+            recoveryCodeErrorMessage = String(localized: "복구 코드를 만들지 못했어요.")
             return false
         }
     }
@@ -143,7 +143,7 @@ final class GuardianSettingsState {
         if isValid {
             recoveryCodeErrorMessage = nil
         } else {
-            recoveryCodeErrorMessage = "복구 코드가 맞지 않아요. 6자리 숫자를 확인해 주세요."
+            recoveryCodeErrorMessage = String(localized: "복구 코드가 맞지 않아요. 6자리 숫자를 확인해 주세요.")
         }
         return isValid
     }
@@ -159,12 +159,12 @@ final class GuardianSettingsState {
             try repository.updateAppSettings(updated)
             settings = updated
             oneTimeRecoveryCode = recoveryCode
-            recoveryCodeStatusMessage = "새 복구 코드를 만들었어요. 이전 복구 코드는 사용할 수 없습니다."
+            recoveryCodeStatusMessage = String(localized: "새 복구 코드를 만들었어요. 이전 복구 코드는 사용할 수 없습니다.")
             recoveryCodeErrorMessage = nil
             onDataChanged()
             return true
         } catch {
-            recoveryCodeErrorMessage = "복구 코드를 다시 만들지 못했어요."
+            recoveryCodeErrorMessage = String(localized: "복구 코드를 다시 만들지 못했어요.")
             return false
         }
     }

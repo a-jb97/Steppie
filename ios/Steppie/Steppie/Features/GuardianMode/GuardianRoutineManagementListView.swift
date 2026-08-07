@@ -31,7 +31,7 @@ struct GuardianRoutineManagementListView: View {
 
             Section {
                 header(
-                    title: routineEditorTitle,
+                    titleText: Text(verbatim: routineEditorTitle),
                     subtitle: "각 루틴을 선택하면 해당 루틴을 수정할 수 있습니다."
                 )
                 .padding(.top, SteppieSpacing.large)
@@ -115,7 +115,9 @@ struct GuardianRoutineManagementListView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(routineSetTitle(routineSet)))
-            .accessibilityValue(Text(isSelected ? "선택됨" : "선택 안 됨"))
+            .accessibilityValue(
+                Text(isSelected ? String(localized: "선택됨") : String(localized: "선택 안 됨"))
+            )
             .accessibilityHint(Text("이 루틴 세트를 편집합니다"))
 
             if viewModel.isEditingRoutineSets {
@@ -201,7 +203,11 @@ struct GuardianRoutineManagementListView: View {
                 title: "루틴 관리",
                 subtitle: "여러 세트를 매일 사용할 시간과 함께 선택합니다"
             )
-            Button(viewModel.isEditingRoutineSets ? "완료" : "편집") {
+            Button(
+                viewModel.isEditingRoutineSets
+                    ? String(localized: "완료")
+                    : String(localized: "편집")
+            ) {
                 viewModel.toggleRoutineSetEditing()
                 onInteraction()
             }
@@ -213,7 +219,11 @@ struct GuardianRoutineManagementListView: View {
                 minHeight: SteppieLayout.guardianMinimumTouchTarget
             )
             .accessibilityLabel(
-                Text(viewModel.isEditingRoutineSets ? "루틴 세트 편집 완료" : "루틴 세트 편집")
+                Text(
+                    viewModel.isEditingRoutineSets
+                        ? String(localized: "루틴 세트 편집 완료")
+                        : String(localized: "루틴 세트 편집")
+                )
             )
         }
         .padding(.top, SteppieSpacing.medium)
@@ -280,7 +290,7 @@ struct GuardianRoutineManagementListView: View {
                             .steppieTextStyle(.button)
                             .foregroundStyle(Color.steppieTextPrimary)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text(routine.scheduledTime?.description ?? "시간 없음")
+                        Text(routine.scheduledTime?.description ?? String(localized: "시간 없음"))
                             .steppieTextStyle(.guardianCaption)
                             .foregroundStyle(Color.steppieTextSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -294,7 +304,9 @@ struct GuardianRoutineManagementListView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(viewModel.localizedTitle(for: routine)))
-            .accessibilityValue(Text(routine.scheduledTime?.description ?? "시간 없음"))
+            .accessibilityValue(
+                Text(routine.scheduledTime?.description ?? String(localized: "시간 없음"))
+            )
             .accessibilityHint(Text("이 루틴을 수정합니다"))
             Image(systemName: "line.3.horizontal")
                 .font(.title3.weight(.semibold))
@@ -332,9 +344,13 @@ struct GuardianRoutineManagementListView: View {
         }
     }
 
-    private func header(title: String, subtitle: String) -> some View {
+    private func header(title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
+        header(titleText: Text(title), subtitle: subtitle)
+    }
+
+    private func header(titleText: Text, subtitle: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
-            Text(title)
+            titleText
                 .steppieTextStyle(.guardianTitle)
                 .foregroundStyle(Color.steppieTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -360,7 +376,7 @@ struct GuardianRoutineManagementListView: View {
         }
     }
 
-    private func messageState(title: String, message: String) -> some View {
+    private func messageState(title: LocalizedStringKey, message: LocalizedStringKey) -> some View {
         VStack(spacing: SteppieSpacing.medium) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)
@@ -382,7 +398,7 @@ struct GuardianRoutineManagementListView: View {
 
     private var routineEditorTitle: String {
         guard let routineSet = viewModel.selectedRoutineSet else {
-            return "루틴"
+            return String(localized: "루틴")
         }
         return routineSetTitle(routineSet)
     }

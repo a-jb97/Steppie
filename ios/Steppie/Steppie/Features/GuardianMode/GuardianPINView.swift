@@ -90,7 +90,7 @@ struct GuardianPINView: View {
             if verifyPIN(enteredPIN) {
                 onSuccess()
             } else {
-                fail("PIN이 맞지 않아요. 다시 입력해 주세요.")
+                fail(String(localized: "PIN이 맞지 않아요. 다시 입력해 주세요."))
             }
         case .setup:
             submitSetupPIN()
@@ -110,10 +110,10 @@ struct GuardianPINView: View {
             guard enteredPIN == firstPIN else {
                 firstPIN = ""
                 step = .current
-                fail("PIN이 서로 달라요. 다시 설정해 주세요.")
+                fail(String(localized: "PIN이 서로 달라요. 다시 설정해 주세요."))
                 return
             }
-            savePIN(enteredPIN) ? onSuccess() : fail("4자리 숫자로 입력해 주세요.")
+            savePIN(enteredPIN) ? onSuccess() : fail(String(localized: "4자리 숫자로 입력해 주세요."))
         case .new:
             break
         }
@@ -123,7 +123,7 @@ struct GuardianPINView: View {
         switch step {
         case .current:
             guard verifyPIN(enteredPIN) else {
-                fail("현재 PIN이 맞지 않아요.")
+                fail(String(localized: "현재 PIN이 맞지 않아요."))
                 return
             }
             currentPIN = enteredPIN
@@ -139,10 +139,10 @@ struct GuardianPINView: View {
             guard enteredPIN == firstPIN else {
                 firstPIN = ""
                 step = .new
-                fail("새 PIN이 서로 달라요.")
+                fail(String(localized: "새 PIN이 서로 달라요."))
                 return
             }
-            savePIN(enteredPIN) ? onSuccess() : fail("PIN을 변경하지 못했어요.")
+            savePIN(enteredPIN) ? onSuccess() : fail(String(localized: "PIN을 변경하지 못했어요."))
         }
     }
 
@@ -159,21 +159,21 @@ struct GuardianPINView: View {
 
     private var title: String {
         switch purpose {
-        case .enter: "보호자 확인"
-        case .setup: "PIN 설정"
-        case .change: "PIN 변경"
+        case .enter: String(localized: "보호자 확인")
+        case .setup: String(localized: "PIN 설정")
+        case .change: String(localized: "PIN 변경")
         }
     }
 
     private var subtitle: String {
         switch (purpose, step) {
-        case (.enter, _): "4자리 PIN을 입력해 주세요"
-        case (.setup, .current): "새 보호자 PIN 4자리를 입력해 주세요"
-        case (.setup, .confirm): "같은 PIN을 한 번 더 입력해 주세요"
-        case (.change, .current): "현재 PIN을 입력해 주세요"
-        case (.change, .new): "새 PIN 4자리를 입력해 주세요"
-        case (.change, .confirm): "새 PIN을 한 번 더 입력해 주세요"
-        default: "4자리 PIN을 입력해 주세요"
+        case (.enter, _): String(localized: "4자리 PIN을 입력해 주세요")
+        case (.setup, .current): String(localized: "새 보호자 PIN 4자리를 입력해 주세요")
+        case (.setup, .confirm): String(localized: "같은 PIN을 한 번 더 입력해 주세요")
+        case (.change, .current): String(localized: "현재 PIN을 입력해 주세요")
+        case (.change, .new): String(localized: "새 PIN 4자리를 입력해 주세요")
+        case (.change, .confirm): String(localized: "새 PIN을 한 번 더 입력해 주세요")
+        default: String(localized: "4자리 PIN을 입력해 주세요")
         }
     }
 }

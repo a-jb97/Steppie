@@ -307,7 +307,7 @@ struct GuardianModeView: View {
         }
     }
 
-    private func header(title: String, subtitle: String) -> some View {
+    private func header(title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)
@@ -323,7 +323,7 @@ struct GuardianModeView: View {
         .padding(.bottom, SteppieSpacing.small)
     }
 
-    private func messageState(title: String, message: String) -> some View {
+    private func messageState(title: LocalizedStringKey, message: LocalizedStringKey) -> some View {
         VStack(spacing: SteppieSpacing.medium) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)
@@ -418,12 +418,12 @@ extension SteppieCardColor {
 
     var accessibilityName: String {
         switch self {
-        case .sky: "하늘색"
-        case .mint: "민트색"
-        case .lemon: "노란색"
-        case .peach: "복숭아색"
-        case .lavender: "라벤더색"
-        case .rose: "장미색"
+        case .sky: String(localized: "하늘색")
+        case .mint: String(localized: "민트색")
+        case .lemon: String(localized: "노란색")
+        case .peach: String(localized: "복숭아색")
+        case .lavender: String(localized: "라벤더색")
+        case .rose: String(localized: "장미색")
         }
     }
 }

@@ -162,7 +162,7 @@ struct GuardianRoutineSetCreatorView: View {
                     .steppieTextStyle(.button)
                     .foregroundStyle(Color.steppieTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(step.scheduledTime?.description ?? "시간 없음")
+                Text(step.scheduledTime?.description ?? String(localized: "시간 없음"))
                     .steppieTextStyle(.guardianCaption)
                     .foregroundStyle(Color.steppieTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -214,7 +214,7 @@ struct GuardianRoutineSetCreatorView: View {
         .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text(step.title))
-        .accessibilityValue(Text(step.scheduledTime?.description ?? "시간 없음"))
+        .accessibilityValue(Text(step.scheduledTime?.description ?? String(localized: "시간 없음")))
         .accessibilityHint(Text("a11y.guardian.step.editOrReorderHint"))
         .contextMenu {
             Button("수정") { viewModel.beginEditRoutineSetStep(step) }
@@ -397,10 +397,16 @@ struct GuardianRoutineSetCreatorView: View {
                 }
             }
 
-            Text(hasTime ? "현재 선택: \(scheduledTime?.description ?? "")" : "현재 선택: 시간 없음")
-                .steppieTextStyle(.guardianCaption)
-                .foregroundStyle(Color.steppieTextSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if hasTime {
+                    Text("현재 선택: \(scheduledTime?.description ?? "")")
+                } else {
+                    Text("현재 선택: 시간 없음")
+                }
+            }
+            .steppieTextStyle(.guardianCaption)
+            .foregroundStyle(Color.steppieTextSecondary)
+            .fixedSize(horizontal: false, vertical: true)
 
             if hasTime {
                 DatePicker(
@@ -415,9 +421,9 @@ struct GuardianRoutineSetCreatorView: View {
     }
 
     private func settingSegment(
-        title: String,
+        title: LocalizedStringKey,
         isSelected: Bool,
-        accessibilityValue: String,
+        accessibilityValue: LocalizedStringKey,
         action: @escaping () -> Void
     ) -> some View {
         Button {
@@ -442,7 +448,7 @@ struct GuardianRoutineSetCreatorView: View {
         .accessibilityValue(Text(accessibilityValue))
     }
 
-    private func header(title: String, subtitle: String) -> some View {
+    private func header(title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)
@@ -459,7 +465,7 @@ struct GuardianRoutineSetCreatorView: View {
     }
 
     private func labeledCard<Content: View>(
-        _ title: String,
+        _ title: LocalizedStringKey,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.extraSmall) {
@@ -478,7 +484,7 @@ struct GuardianRoutineSetCreatorView: View {
         .clipShape(.rect(cornerRadius: SteppieCornerRadius.card))
     }
 
-    private func warningNote(_ text: String) -> some View {
+    private func warningNote(_ text: LocalizedStringKey) -> some View {
         HStack(spacing: SteppieSpacing.small) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(Color.steppieWarning)
@@ -555,7 +561,7 @@ struct GuardianRoutineSetCreatorView: View {
         }
     }
 
-    private func messageState(title: String, message: String) -> some View {
+    private func messageState(title: LocalizedStringKey, message: LocalizedStringKey) -> some View {
         VStack(spacing: SteppieSpacing.medium) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)

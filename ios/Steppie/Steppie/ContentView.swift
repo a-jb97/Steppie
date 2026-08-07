@@ -271,7 +271,10 @@ private struct RecoveryCodeResetView: View {
                     if verifyRecoveryCode(recoveryCode) {
                         onVerified()
                     } else {
-                        UIAccessibility.post(notification: .announcement, argument: "복구 코드가 맞지 않아요. 6자리 숫자를 확인해 주세요.")
+                        UIAccessibility.post(
+                            notification: .announcement,
+                            argument: String(localized: "복구 코드가 맞지 않아요. 6자리 숫자를 확인해 주세요.")
+                        )
                         errorFocused = true
                     }
                 }
@@ -321,7 +324,7 @@ private struct RecoveryCodeDisplayView: View {
                         .foregroundStyle(Color.steppieTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
-                    Text(message ?? "이 코드는 한 번만 표시됩니다. 안전한 곳에 기록해 주세요.")
+                    Text(message ?? String(localized: "이 코드는 한 번만 표시됩니다. 안전한 곳에 기록해 주세요."))
                         .steppieTextStyle(.guardianCaption)
                         .foregroundStyle(Color.steppieTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -346,7 +349,10 @@ private struct RecoveryCodeDisplayView: View {
                     SteppieButton("복사", role: .secondary) {
                         UIPasteboard.general.string = code
                         isCopyAlertPresented = true
-                        UIAccessibility.post(notification: .announcement, argument: "복구 코드를 복사했어요.")
+                        UIAccessibility.post(
+                            notification: .announcement,
+                            argument: String(localized: "복구 코드를 복사했어요.")
+                        )
                     }
                     SteppieButton("확인", action: onDone)
                 }

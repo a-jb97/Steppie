@@ -41,7 +41,9 @@ struct BackupRestoreView: View {
             defaultFilename: exportFileName
         ) { result in
             if case .failure = result {
-                viewModel.reportBackupFileError("백업 파일을 저장하지 못했어요.")
+                viewModel.reportBackupFileError(
+                    String(localized: "백업 파일을 저장하지 못했어요.")
+                )
             }
             onInteraction()
         }
@@ -134,7 +136,9 @@ struct BackupRestoreView: View {
     private func handleImport(_ result: Result<[URL], Error>) {
         defer { onInteraction() }
         guard case let .success(urls) = result, let url = urls.first else {
-            viewModel.reportBackupFileError("백업 파일을 선택하지 못했어요.")
+            viewModel.reportBackupFileError(
+                String(localized: "백업 파일을 선택하지 못했어요.")
+            )
             return
         }
         let didStartAccessing = url.startAccessingSecurityScopedResource()
@@ -146,11 +150,13 @@ struct BackupRestoreView: View {
         do {
             viewModel.validateRestorePackage(try Data(contentsOf: url))
         } catch {
-            viewModel.reportBackupFileError("백업 파일을 읽지 못했어요.")
+            viewModel.reportBackupFileError(
+                String(localized: "백업 파일을 읽지 못했어요.")
+            )
         }
     }
 
-    private func header(title: String, subtitle: String) -> some View {
+    private func header(title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)
@@ -166,7 +172,7 @@ struct BackupRestoreView: View {
     }
 
     private func labeledCard<Content: View>(
-        _ title: String,
+        _ title: LocalizedStringKey,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.medium) {

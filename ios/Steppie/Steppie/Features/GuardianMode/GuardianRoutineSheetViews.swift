@@ -48,7 +48,7 @@ struct GuardianRoutineSetNameEditorView: View {
         )
     }
 
-    private func header(title: String, subtitle: String) -> some View {
+    private func header(title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)
@@ -65,7 +65,7 @@ struct GuardianRoutineSetNameEditorView: View {
     }
 
     private func labeledCard<Content: View>(
-        _ title: String,
+        _ title: LocalizedStringKey,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.extraSmall) {
@@ -147,7 +147,7 @@ struct GuardianRoutineSetScheduleEditorView: View {
         )
     }
 
-    private func header(title: String, subtitle: String) -> some View {
+    private func header(title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.twoExtraSmall) {
             Text(title)
                 .steppieTextStyle(.guardianTitle)
@@ -164,7 +164,7 @@ struct GuardianRoutineSetScheduleEditorView: View {
     }
 
     private func labeledCard<Content: View>(
-        _ title: String,
+        _ title: LocalizedStringKey,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: SteppieSpacing.extraSmall) {
@@ -250,7 +250,11 @@ struct GuardianTodayRoutineSelectionView: View {
                         .steppieTextStyle(.button)
                         .foregroundStyle(Color.steppieTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(isAssigned ? "현재 사용 중" : "오늘 루틴으로 설정")
+                    Text(
+                        isAssigned
+                            ? String(localized: "현재 사용 중")
+                            : String(localized: "오늘 루틴으로 설정")
+                    )
                         .steppieTextStyle(.guardianCaption)
                         .foregroundStyle(Color.steppieTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -270,7 +274,13 @@ struct GuardianTodayRoutineSelectionView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(routineSetTitle(routineSet)))
-        .accessibilityValue(Text(isAssigned ? "현재 사용 중" : "오늘 루틴으로 설정 가능"))
+        .accessibilityValue(
+            Text(
+                isAssigned
+                    ? String(localized: "현재 사용 중")
+                    : String(localized: "오늘 루틴으로 설정 가능")
+            )
+        )
     }
 
     @ViewBuilder
