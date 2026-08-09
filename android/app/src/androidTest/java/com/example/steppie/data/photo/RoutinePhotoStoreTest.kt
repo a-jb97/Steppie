@@ -37,6 +37,22 @@ class RoutinePhotoStoreTest {
     }
 
     @Test
+    fun encodingLargePhotoScalesLongestSideToMaximum() {
+        val source = Bitmap.createBitmap(1600, 800, Bitmap.Config.ARGB_8888)
+
+        val bytes = store.encodeImportedPhoto(source, ExifInterface.ORIENTATION_NORMAL)
+
+        assertTrue(source.isRecycled)
+        val encoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        try {
+            assertEquals(1200, encoded.width)
+            assertEquals(600, encoded.height)
+        } finally {
+            encoded.recycle()
+        }
+    }
+
+    @Test
     fun importingCameraPhotoDeletesTemporarySourceAfterCopy() = runBlocking {
         val previousFiles = store.snapshotFiles()
         val cameraDirectory = File(context.cacheDir, "camera_photos").apply {
