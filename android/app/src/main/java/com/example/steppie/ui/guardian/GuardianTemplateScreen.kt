@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -111,7 +112,11 @@ private fun TemplateSelectionRow(
     onClick: () -> Unit,
 ) {
     val templateName = template.name.resolve(null, currentPresentationLocale().toLanguageTag())
-    val stepCount = stringResource(R.string.guardian_template_step_count, template.steps.size)
+    val stepCount = pluralStringResource(
+        R.plurals.guardian_template_step_count,
+        template.steps.size,
+        template.steps.size,
+    )
     val accessibilityDescription = stringResource(R.string.a11y_template_row, templateName, stepCount)
     val selectionState = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
     val borderColor = if (selected) SteppieTheme.colors.warning else MaterialTheme.colorScheme.outline
@@ -191,7 +196,11 @@ private fun TemplatePreviewSummary(
             style = SteppieTheme.typography.guardianTitle,
         )
         Text(
-            text = stringResource(R.string.guardian_template_preview_summary, template.steps.size),
+            text = pluralStringResource(
+                R.plurals.guardian_template_preview_summary,
+                template.steps.size,
+                template.steps.size,
+            ),
             color = MaterialTheme.colorScheme.onSurface,
             style = SteppieTheme.typography.guardianBody,
         )

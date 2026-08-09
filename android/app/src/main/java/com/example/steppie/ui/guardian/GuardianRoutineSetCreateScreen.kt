@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.steppie.R
@@ -186,7 +187,9 @@ private fun RoutineSetStepList(
     onEditStep: (Int) -> Unit,
     onRemoveStep: (Int) -> Unit,
 ) {
-    GuardianPanel(title = stringResource(R.string.guardian_step_list_title, steps.size)) {
+    GuardianPanel(
+        title = pluralStringResource(R.plurals.guardian_step_list_title, steps.size, steps.size),
+    ) {
         if (steps.isEmpty()) {
             Text(
                 text = stringResource(R.string.guardian_step_list_empty),

@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -121,9 +122,21 @@ internal fun GuardianDialogHost(
                     Text(
                         text = stringResource(
                             R.string.guardian_restore_confirm_body,
-                            state.pendingRestorePreview.routineSetCount,
-                            state.pendingRestorePreview.routineCount,
-                            state.pendingRestorePreview.dailyLogCount,
+                            pluralStringResource(
+                                R.plurals.guardian_restore_routine_set_count,
+                                state.pendingRestorePreview.routineSetCount,
+                                state.pendingRestorePreview.routineSetCount,
+                            ),
+                            pluralStringResource(
+                                R.plurals.guardian_restore_routine_count,
+                                state.pendingRestorePreview.routineCount,
+                                state.pendingRestorePreview.routineCount,
+                            ),
+                            pluralStringResource(
+                                R.plurals.guardian_restore_log_count,
+                                state.pendingRestorePreview.dailyLogCount,
+                                state.pendingRestorePreview.dailyLogCount,
+                            ),
                         ),
                     )
                     Text(

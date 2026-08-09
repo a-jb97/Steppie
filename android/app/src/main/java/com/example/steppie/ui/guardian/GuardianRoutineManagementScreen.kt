@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -230,14 +231,19 @@ private fun RoutineSetRow(
     val borderColor = if (selected) SteppieTheme.colors.warning else MaterialTheme.colorScheme.outline
     val routineSetName = routineSet.name.resolve(null, locale.toLanguageTag())
     val meta = if (routineSet.isActive) {
-        stringResource(
-            R.string.guardian_routine_set_schedule_meta,
+        pluralStringResource(
+            R.plurals.guardian_routine_set_schedule_meta,
+            routineSet.routines.size,
             routineSet.startTime?.let { formatLocalizedTime(it, locale) }
                 ?: stringResource(R.string.guardian_time_none),
             routineSet.routines.size,
         )
     } else {
-        stringResource(R.string.guardian_routine_set_meta, routineSet.routines.size)
+        pluralStringResource(
+            R.plurals.guardian_routine_set_meta,
+            routineSet.routines.size,
+            routineSet.routines.size,
+        )
     }
     val selectionState = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
     val accessibilityDescription = stringResource(R.string.a11y_routine_set_row, routineSetName, meta)
@@ -363,7 +369,11 @@ internal fun DailyRoutineSelectionDialog(
                 )
                 routineSets.forEach { routineSet ->
                     val routineSetName = routineSet.name.resolve(null, locale.toLanguageTag())
-                    val meta = stringResource(R.string.guardian_routine_set_meta, routineSet.routines.size)
+                    val meta = pluralStringResource(
+                        R.plurals.guardian_routine_set_meta,
+                        routineSet.routines.size,
+                        routineSet.routines.size,
+                    )
                     val accessibilityDescription = stringResource(R.string.a11y_routine_set_row, routineSetName, meta)
                     Row(
                         modifier = Modifier

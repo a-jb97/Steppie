@@ -3,8 +3,8 @@ package com.example.steppie.data.photo
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.media.ExifInterface
 import androidx.core.content.FileProvider
+import androidx.exifinterface.media.ExifInterface
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
@@ -37,6 +37,22 @@ class RoutinePhotoStoreTest {
     }
 
     @Test
+    fun encodingLargePhotoScalesLongestSideToMaximum() {
+        val source = Bitmap.createBitmap(1600, 800, Bitmap.Config.ARGB_8888)
+
+        val bytes = store.encodeImportedPhoto(source, ExifInterface.ORIENTATION_NORMAL)
+
+        assertTrue(source.isRecycled)
+        val encoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        try {
+            assertEquals(1200, encoded.width)
+            assertEquals(600, encoded.height)
+        } finally {
+            encoded.recycle()
+        }
+    }
+
+    @Test
     fun importingCameraPhotoDeletesTemporarySourceAfterCopy() = runBlocking {
         val previousFiles = store.snapshotFiles()
         val cameraDirectory = File(context.cacheDir, "camera_photos").apply {
@@ -63,6 +79,48 @@ class RoutinePhotoStoreTest {
 
             assertFalse(source.exists())
             assertTrue(store.fileFor(imported).isFile)
+        } finally {
+            store.replaceAllFiles(previousFiles)
+            cameraDirectory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun importingExifRotatedCameraPhotoNormalizesOrientation() = runBlocking {
+        val previousFiles = store.snapshotFiles()
+        val cameraDirectory = File(context.cacheDir, "camera_photos").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val source = File(cameraDirectory, "routine-photo-rotated.jpg")
+        val bitmap = Bitmap.createBitmap(2, 3, Bitmap.Config.ARGB_8888)
+        try {
+            source.outputStream().use { output ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)
+            }
+        } finally {
+            bitmap.recycle()
+        }
+        ExifInterface(source).apply {
+            setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_ROTATE_90.toString())
+            saveAttributes()
+        }
+        val sourceUri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            source,
+        )
+
+        try {
+            val imported = store.importPhoto(sourceUri)
+            val encoded = BitmapFactory.decodeFile(store.fileFor(imported).path)
+
+            try {
+                assertEquals(3, encoded.width)
+                assertEquals(2, encoded.height)
+            } finally {
+                encoded.recycle()
+            }
         } finally {
             store.replaceAllFiles(previousFiles)
             cameraDirectory.deleteRecursively()

@@ -4,8 +4,9 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
-import android.media.ExifInterface
 import android.net.Uri
+import androidx.core.graphics.scale
+import androidx.exifinterface.media.ExifInterface
 import com.example.steppie.data.backup.BackupMaxAssetBytes
 import com.example.steppie.domain.model.IconRef
 import com.example.steppie.domain.model.newUuidV4
@@ -147,19 +148,17 @@ class RoutinePhotoStore(context: Context) {
         val initial = if (longest <= maxSide) {
             this
         } else {
-            val scale = maxSide.toFloat() / longest.toFloat()
-            Bitmap.createScaledBitmap(this, (width * scale).toInt(), (height * scale).toInt(), true)
+            val scaleFactor = maxSide.toFloat() / longest.toFloat()
+            scale((width * scaleFactor).toInt(), (height * scaleFactor).toInt())
         }
         var current = initial
         return try {
             var bytes = current.toJpegBytes()
             while (bytes.size > BackupMaxAssetBytes && maxOf(current.width, current.height) > MinPhotoSide) {
                 val previous = current
-                current = Bitmap.createScaledBitmap(
-                    previous,
+                current = previous.scale(
                     (previous.width * 0.8f).toInt().coerceAtLeast(1),
                     (previous.height * 0.8f).toInt().coerceAtLeast(1),
-                    true,
                 )
                 if (previous !== this) previous.recycle()
                 bytes = current.toJpegBytes()
