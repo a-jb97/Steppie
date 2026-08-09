@@ -37,7 +37,6 @@
     <string name="a11y_focus_routine_card">%1$s, %2$s. %3$s</string>
     <string name="a11y_routine_card">%1$s, %2$s, %3$s</string>
     <string name="a11y_pin_progress">%1$d of 4 PIN digits entered</string>
-    <string name="a11y_recovery_progress">%1$d of 6 recovery code digits entered</string>
     <string name="a11y_recovery_code_value">Recovery code %1$s</string>
     <string name="a11y_recovery_code_input">Enter 6-digit recovery code</string>
     <string name="a11y_guardian_menu_card">%1$s. %2$s</string>
@@ -156,13 +155,7 @@
     <string name="guardian_feedback_off">None</string>
     <string name="guardian_setting_tts_enabled">Voice guidance</string>
     <string name="guardian_setting_tts_rate">Voice speed</string>
-    <string name="guardian_tts_rate_slow">Slow</string>
-    <string name="guardian_tts_rate_normal">Normal</string>
-    <string name="guardian_tts_rate_fast">Fast</string>
     <string name="guardian_setting_tts_volume">Voice volume</string>
-    <string name="guardian_tts_volume_low">Low</string>
-    <string name="guardian_tts_volume_medium">Medium</string>
-    <string name="guardian_tts_volume_high">High</string>
     <string name="guardian_setting_sound_enabled">Sound effects</string>
     <string name="guardian_setting_haptic_enabled">Haptics/vibration</string>
     <string name="guardian_setting_notification_lead_times">Reminder alerts</string>
@@ -181,7 +174,6 @@
     <string name="guardian_records_title">Progress records</string>
     <string name="guardian_records_subtitle">Review daily completion counts and routine status</string>
     <string name="guardian_records_recent_title">Recent records</string>
-    <string name="guardian_records_detail_title">%1$s record</string>
     <string name="guardian_records_summary" tools:ignore="PluralsCandidate">%1$d/%2$d done · %3$d%%</string>
     <string name="guardian_records_completed_count">Done</string>
     <string name="guardian_records_total_count">Total</string>
@@ -190,7 +182,6 @@
     <string name="guardian_records_routine_status_title">Routine status</string>
     <string name="guardian_records_calendar_title">All records</string>
     <string name="guardian_records_calendar_subtitle">Select a date with records on the calendar</string>
-    <string name="guardian_records_calendar_has_records">Dates with dots have records</string>
     <string name="guardian_records_month_picker_title">Select year and month</string>
     <string name="guardian_records_previous_month">Previous</string>
     <string name="guardian_records_next_month">Next</string>
@@ -212,24 +203,10 @@
     <string name="a11y_guardian_record_routine_with_lifecycle">%1$s, %2$s, %3$s</string>
     <string name="guardian_menu_security">Security</string>
     <string name="guardian_menu_security_desc">PIN, recovery code, backup/restore</string>
-    <string name="guardian_routine_edit_title">Edit %1$s</string>
-    <string name="guardian_routine_default_title">routine</string>
     <string name="guardian_routine_edit_subtitle">Select the routine set to edit</string>
-    <plurals name="guardian_routine_set_list_title">
-        <item quantity="one">%1$d routine set</item>
-        <item quantity="other">%1$d routine sets</item>
-    </plurals>
     <plurals name="guardian_routine_set_meta">
         <item quantity="one">%1$d step</item>
         <item quantity="other">%1$d steps</item>
-    </plurals>
-    <plurals name="guardian_routine_set_active_meta">
-        <item quantity="one">Active · %1$d step</item>
-        <item quantity="other">Active · %1$d steps</item>
-    </plurals>
-    <plurals name="guardian_routine_set_today_meta">
-        <item quantity="one">Set for today · %1$d step</item>
-        <item quantity="other">Set for today · %1$d steps</item>
     </plurals>
     <string name="guardian_routine_set_set_today">Set</string>
     <string name="guardian_routine_set_enable_daily">Every day</string>
@@ -261,12 +238,7 @@
     <string name="guardian_step_order_title">%1$d. %2$s</string>
     <string name="guardian_template_action">Start from template</string>
     <string name="guardian_template_home_desc">Create a morning, school, or bedtime routine</string>
-    <string name="guardian_template_select_title">Choose template</string>
     <string name="guardian_template_select_subtitle">Choose a template and save it as a new routine set</string>
-    <string name="guardian_template_preview_title">Template preview</string>
-    <string name="guardian_template_preview_subtitle">Saving creates a new active routine set</string>
-    <string name="guardian_template_preview_hint_title">Preview</string>
-    <string name="guardian_template_preview_hint_body">Select a template on the left to review the routine list before saving.</string>
     <plurals name="guardian_template_step_count">
         <item quantity="one">%1$d step</item>
         <item quantity="other">%1$d steps</item>
@@ -275,19 +247,13 @@
         <item quantity="one">%1$d activity will be saved as a new routine set</item>
         <item quantity="other">%1$d activities will be saved as a new routine set</item>
     </plurals>
-    <string name="guardian_template_save_desc">After saving, you can edit, delete, and reorder it like any routine.</string>
     <string name="guardian_template_save_action">Save as new routine set</string>
-    <plurals name="guardian_template_steps_title">
-        <item quantity="one">%1$d step to save</item>
-        <item quantity="other">%1$d steps to save</item>
-    </plurals>
     <string name="guardian_add_routine">Add activity</string>
     <string name="guardian_tablet_edit_hint">Select an activity on the left to edit it</string>
     <string name="guardian_card_edit_title">Edit card</string>
     <string name="guardian_card_edit_subtitle">Set the name, icon, color, and time</string>
     <string name="guardian_field_title">Activity name</string>
     <string name="guardian_field_time">Scheduled time</string>
-    <string name="guardian_time_placeholder">07:40</string>
     <string name="guardian_time_set">Set time</string>
     <string name="guardian_time_none_short">No time</string>
     <string name="guardian_time_current_selection">Current selection: %1$s</string>

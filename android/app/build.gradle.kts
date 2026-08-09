@@ -46,6 +46,9 @@ android {
             enableSplit = false
         }
     }
+    lint {
+        fatal += "UnusedResources"
+    }
 }
 
 ksp {
