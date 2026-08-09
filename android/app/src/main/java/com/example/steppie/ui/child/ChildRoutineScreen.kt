@@ -54,8 +54,8 @@ fun ChildRoutineScreen(
     onCompleteRoutine: () -> Unit,
     onAdvanceFromFeedback: () -> Unit,
     onUndoRoutine: () -> Unit,
-    onRequestGuardianMode: () -> Unit = {},
     modifier: Modifier = Modifier,
+    onRequestGuardianMode: () -> Unit = {},
 ) {
     ChildRoutineLayoutHost(
         state = state,

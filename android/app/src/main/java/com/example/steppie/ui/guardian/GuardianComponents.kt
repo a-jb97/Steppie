@@ -219,8 +219,8 @@ internal fun GuardianMenuCard(
 @Composable
 internal fun GuardianPanel(
     title: String,
-    body: String? = null,
     modifier: Modifier = Modifier,
+    body: String? = null,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
     Column(
