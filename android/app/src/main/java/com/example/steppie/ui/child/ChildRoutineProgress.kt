@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -48,7 +49,7 @@ internal fun ChildHeader(
 
 @Composable
 internal fun ProgressIndicator(completed: Int, total: Int) {
-    val description = stringResource(R.string.a11y_progress, completed, total)
+    val description = pluralStringResource(R.plurals.a11y_progress, total, completed, total)
     Row(
         modifier = Modifier
             .tutorialAnchor(TutorialTarget.ChildProgress)
