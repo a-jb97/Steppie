@@ -128,7 +128,7 @@ private fun FocusRoutineCard(
     enabled: Boolean,
     background: Color,
     maxWidth: Dp,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     visual: @Composable BoxScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(SteppieCornerRadius.Card)
@@ -208,7 +208,7 @@ private fun ListRoutineCard(
     accessibilityDescription: String,
     onClick: () -> Unit,
     background: Color,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     visual: @Composable BoxScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(SteppieCornerRadius.Card)
