@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -455,8 +456,8 @@ private fun GuardianRecordsMonthPickerDialog(
     val recordYears = recordDates.map(LocalDate::getYear)
     val minYear = ((recordYears.minOrNull() ?: currentMonth.year) - 5).coerceAtLeast(1970)
     val maxYear = (recordYears.maxOrNull() ?: currentMonth.year) + 5
-    var selectedYear by remember(currentMonth) { mutableStateOf(currentMonth.year.coerceIn(minYear, maxYear)) }
-    var selectedMonth by remember(currentMonth) { mutableStateOf(currentMonth.monthValue) }
+    var selectedYear by remember(currentMonth) { mutableIntStateOf(currentMonth.year.coerceIn(minYear, maxYear)) }
+    var selectedMonth by remember(currentMonth) { mutableIntStateOf(currentMonth.monthValue) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.guardian_records_month_picker_title)) },
