@@ -299,9 +299,9 @@
     <string name="guardian_restore_confirm_title">Restore this backup?</string>
     <string name="guardian_restore_confirm_body">This imports %1$d routine sets, %2$d routines, and %3$d logs. Current data will be replaced.</string>
     <string name="guardian_restore_pin_prompt">Enter the guardian PIN to restore.</string>
-    <string name="guardian_privacy_note">v1.0 privacy principle: no ads, in-app purchases, or server account system. Core routine features work 100% offline.</string>
+    <string name="guardian_privacy_note" formatted="false">v1.0 privacy principle: no ads, in-app purchases, or server account system. Core routine features work 100% offline.</string>
     <string name="guardian_privacy_title">v1.0 privacy principle</string>
-    <string name="guardian_privacy_body">No ads, in-app purchases, or server account system. Core routine features work 100% offline.</string>
+    <string name="guardian_privacy_body" formatted="false">No ads, in-app purchases, or server account system. Core routine features work 100% offline.</string>
     <string name="guardian_delete_title">Delete this activity?</string>
     <string name="guardian_delete_body">The activity will be hidden from child mode and existing progress records will remain.</string>
     <string name="guardian_delete_routine_set_title">Delete this routine set?</string>

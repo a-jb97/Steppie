@@ -299,9 +299,9 @@
     <string name="guardian_restore_confirm_title">이 백업으로 복원할까요?</string>
     <string name="guardian_restore_confirm_body">루틴 세트 %1$d개, 루틴 %2$d개, 기록 %3$d개를 가져옵니다. 현재 데이터는 교체됩니다.</string>
     <string name="guardian_restore_pin_prompt">복원하려면 보호자 PIN을 입력해 주세요.</string>
-    <string name="guardian_privacy_note">v1.0 개인정보 원칙: 광고, 인앱결제, 서버 계정 시스템은 없습니다. 핵심 루틴 기능은 오프라인에서 100% 동작합니다.</string>
+    <string name="guardian_privacy_note" formatted="false">v1.0 개인정보 원칙: 광고, 인앱결제, 서버 계정 시스템은 없습니다. 핵심 루틴 기능은 오프라인에서 100% 동작합니다.</string>
     <string name="guardian_privacy_title">v1.0 개인정보 원칙</string>
-    <string name="guardian_privacy_body">광고, 인앱결제, 서버 계정 시스템은 없습니다. 핵심 루틴 기능은 오프라인에서 100% 동작합니다.</string>
+    <string name="guardian_privacy_body" formatted="false">광고, 인앱결제, 서버 계정 시스템은 없습니다. 핵심 루틴 기능은 오프라인에서 100% 동작합니다.</string>
     <string name="guardian_delete_title">활동을 삭제할까요?</string>
     <string name="guardian_delete_body">삭제한 활동은 아이 모드에서 숨겨지고, 기존 진행 기록은 유지됩니다.</string>
     <string name="guardian_delete_routine_set_title">루틴 세트를 삭제할까요?</string>
