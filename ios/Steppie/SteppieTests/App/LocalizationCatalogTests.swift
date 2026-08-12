@@ -71,6 +71,15 @@ struct LocalizationCatalogTests {
         }
     }
 
+    @Test("보호자 홈의 비활성 루틴 관리는 미구현이 아닌 선행 조건을 안내한다")
+    func disabledRoutineManagementCopyDescribesPrerequisite() throws {
+        let catalog = try loadCatalog()
+
+        #expect(catalog["먼저 루틴 세트를 만들어 주세요"] != nil)
+        #expect(catalog["준비 중"] == nil)
+        #expect(catalog["아직 구현되지 않았습니다"] == nil)
+    }
+
     @Test("보호자 PIN과 상태 메시지는 영어 번역을 제공한다")
     func guardianPINAndStatusKeysProvideExpectedEnglishLocalization() throws {
         let catalog = try loadCatalog()

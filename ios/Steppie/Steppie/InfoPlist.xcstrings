@@ -1,0 +1,53 @@
+{
+  "sourceLanguage" : "ko",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steppie"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "차례차례"
+          }
+        }
+      }
+    },
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Steppie"
+          }
+        }
+      }
+    },
+    "NSCameraUsageDescription" : {
+      "comment" : "카메라 권한 요청 시 시스템이 표시하는 활동 카드 사진 촬영 안내입니다.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steppie uses the camera to take photos for activity cards."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "활동 카드 사진 촬영에 카메라를 사용합니다."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
