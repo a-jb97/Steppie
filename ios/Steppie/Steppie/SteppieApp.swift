@@ -21,6 +21,7 @@ struct SteppieApp: App {
     private let notificationRouter: RoutineNotificationRouter
     private let notificationDelegate: RoutineNotificationDelegate
     private let routinePhotoStore: FileRoutinePhotoStore
+    @State private var isShowingSplash = true
 
     init() {
         SteppieFontRegistrar.registerBundledFonts()
@@ -42,7 +43,17 @@ struct SteppieApp: App {
 
     var body: some Scene {
         WindowGroup {
-            rootView
+            Group {
+                if isShowingSplash && !isPreview {
+                    SplashScreenView()
+                        .task {
+                            try? await Task.sleep(for: .seconds(1.5))
+                            isShowingSplash = false
+                        }
+                } else {
+                    rootView
+                }
+            }
                 .environment(\.routinePhotoReader, routinePhotoStore)
         }
     }
@@ -78,6 +89,18 @@ struct SteppieApp: App {
         Self.logger.fault(
             "Failed to initialize persistence: \(errorDescription, privacy: .private)"
         )
+    }
+}
+
+private struct SplashScreenView: View {
+    var body: some View {
+        Image("Steppie_LaunchScreen_Icon")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 200, height: 200)
+            .accessibilityHidden(true)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.steppieBackgroundSecondary)
     }
 }
 
