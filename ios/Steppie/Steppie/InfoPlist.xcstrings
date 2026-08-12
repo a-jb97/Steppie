@@ -1,6 +1,18 @@
 {
   "sourceLanguage" : "ko",
   "strings" : {
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Steppie"
+          }
+        }
+      }
+    },
     "NSCameraUsageDescription" : {
       "comment" : "카메라 권한 요청 시 시스템이 표시하는 활동 카드 사진 촬영 안내입니다.",
       "extractionState" : "manual",
