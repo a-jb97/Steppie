@@ -3,6 +3,15 @@ import Testing
 
 @Suite("InfoPlistLocalizationTests")
 struct InfoPlistLocalizationTests {
+    @Test("앱 표시 이름은 한국어와 영어 localization을 제공한다")
+    func providesLocalizedAppDisplayNames() throws {
+        let koreanStrings = try localizedInfoPlistStrings(for: "ko")
+        let englishStrings = try localizedInfoPlistStrings(for: "en")
+
+        #expect(koreanStrings["CFBundleDisplayName"] == "차례차례")
+        #expect(englishStrings["CFBundleDisplayName"] == "Steppie")
+    }
+
     @Test("카메라 권한 안내는 한국어와 영어 localization을 제공한다")
     func providesLocalizedCameraUsageDescriptions() throws {
         let koreanStrings = try localizedInfoPlistStrings(for: "ko")
