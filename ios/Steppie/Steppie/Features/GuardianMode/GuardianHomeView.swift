@@ -114,12 +114,6 @@ struct GuardianHomeView: View {
                 if !dynamicTypeSize.isAccessibilitySize {
                     Spacer()
                 }
-                if !isEnabled {
-                    Text("준비 중")
-                        .steppieTextStyle(.guardianCaption)
-                        .foregroundStyle(Color.steppieTextSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
             .padding(SteppieSpacing.medium)
             .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
@@ -136,7 +130,7 @@ struct GuardianHomeView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(title))
         .accessibilityValue(Text(subtitle))
-        .accessibilityHint(isEnabled ? Text("열기") : Text("아직 구현되지 않았습니다"))
+        .accessibilityHint(isEnabled ? Text("열기") : Text("먼저 루틴 세트를 만들어 주세요"))
     }
 
     @ViewBuilder
