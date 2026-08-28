@@ -177,10 +177,10 @@ private fun ensureNotificationChannel(context: Context) {
     manager.createNotificationChannel(channel)
 }
 
-const val ACTION_OPEN_ROUTINE = "com.example.steppie.action.OPEN_ROUTINE"
-const val EXTRA_ROUTINE_ID = "com.example.steppie.extra.ROUTINE_ID"
+const val ACTION_OPEN_ROUTINE = "com.jade.steppie.action.OPEN_ROUTINE"
+const val EXTRA_ROUTINE_ID = "com.jade.steppie.extra.ROUTINE_ID"
 
-private const val ACTION_ROUTINE_REMINDER = "com.example.steppie.action.ROUTINE_REMINDER"
-private const val EXTRA_ROUTINE_TITLE = "com.example.steppie.extra.ROUTINE_TITLE"
-private const val EXTRA_LEAD_MINUTES = "com.example.steppie.extra.LEAD_MINUTES"
+private const val ACTION_ROUTINE_REMINDER = "com.jade.steppie.action.ROUTINE_REMINDER"
+private const val EXTRA_ROUTINE_TITLE = "com.jade.steppie.extra.ROUTINE_TITLE"
+private const val EXTRA_LEAD_MINUTES = "com.jade.steppie.extra.LEAD_MINUTES"
 private const val ROUTINE_REMINDER_CHANNEL_ID = "routine_reminders"

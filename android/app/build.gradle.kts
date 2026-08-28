@@ -13,7 +13,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.steppie"
+        applicationId = "com.jade.steppie"
         minSdk = 28
         targetSdk = 36
         versionCode = 1
