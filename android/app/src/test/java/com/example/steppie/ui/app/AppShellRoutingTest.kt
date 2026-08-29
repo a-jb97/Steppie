@@ -1,6 +1,7 @@
 package com.example.steppie.ui.app
 
 import com.example.steppie.notifications.ACTION_OPEN_ROUTINE
+import com.example.steppie.notifications.EXTRA_ROUTINE_ID
 import com.example.steppie.ui.child.ChildSinglePane
 import com.example.steppie.ui.guardian.GuardianDestination
 import com.example.steppie.ui.guardian.GuardianPinMode
@@ -12,6 +13,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppShellRoutingTest {
+    @Test
+    fun notificationRouteUsesReleaseApplicationIdentity() {
+        assertEquals("com.jade.steppie.action.OPEN_ROUTINE", ACTION_OPEN_ROUTINE)
+        assertEquals("com.jade.steppie.extra.ROUTINE_ID", EXTRA_ROUTINE_ID)
+    }
+
     @Test
     fun `bootstrap blocks both app modes until initialization completes`() {
         assertEquals(
