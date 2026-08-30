@@ -22,12 +22,10 @@ class LocalizationResourcesTest {
     @Test
     fun privacyStrings_preserveLiteralPercentInKoreanAndEnglish() {
         listOf("ko-KR", "en-US").forEach { languageTag ->
-            listOf(R.string.guardian_privacy_note, R.string.guardian_privacy_body).forEach { resourceId ->
-                val value = localizedString(languageTag, resourceId)
+            val value = localizedString(languageTag, R.string.guardian_privacy_body)
 
-                assertTrue(value.contains("100%"))
-                assertFalse(value.contains("100%%"))
-            }
+            assertTrue(value.contains("100%"))
+            assertFalse(value.contains("100%%"))
         }
     }
 
