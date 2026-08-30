@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Steppie</string>
+    <string name="app_name">차례차례</string>
     <string name="state_loading">진행 중</string>
     <string name="routine_state_current">지금</string>
     <string name="routine_state_completed">완료했어요</string>
@@ -307,7 +307,6 @@
         <item quantity="other">기록 %1$d개</item>
     </plurals>
     <string name="guardian_restore_pin_prompt">복원하려면 보호자 PIN을 입력해 주세요.</string>
-    <string name="guardian_privacy_note" formatted="false">v1.0 개인정보 원칙: 광고, 인앱결제, 서버 계정 시스템은 없습니다. 핵심 루틴 기능은 오프라인에서 100% 동작합니다.</string>
     <string name="guardian_privacy_title">v1.0 개인정보 원칙</string>
     <string name="guardian_privacy_body" formatted="false">광고, 인앱결제, 서버 계정 시스템은 없습니다. 핵심 루틴 기능은 오프라인에서 100% 동작합니다.</string>
     <string name="guardian_delete_title">활동을 삭제할까요?</string>

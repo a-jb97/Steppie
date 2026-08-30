@@ -307,7 +307,6 @@
         <item quantity="other">%1$d logs</item>
     </plurals>
     <string name="guardian_restore_pin_prompt">Enter the guardian PIN to restore.</string>
-    <string name="guardian_privacy_note" formatted="false">v1.0 privacy principle: no ads, in-app purchases, or server account system. Core routine features work 100% offline.</string>
     <string name="guardian_privacy_title">v1.0 privacy principle</string>
     <string name="guardian_privacy_body" formatted="false">No ads, in-app purchases, or server account system. Core routine features work 100% offline.</string>
     <string name="guardian_delete_title">Delete this activity?</string>
