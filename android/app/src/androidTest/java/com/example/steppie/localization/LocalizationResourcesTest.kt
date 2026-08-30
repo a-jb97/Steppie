@@ -20,6 +20,12 @@ class LocalizationResourcesTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Test
+    fun appName_matchesKoreanAndEnglishLocalizationContract() {
+        assertEquals("차례차례", localizedString("ko-KR", R.string.app_name))
+        assertEquals("Steppie", localizedString("en-US", R.string.app_name))
+    }
+
+    @Test
     fun privacyStrings_preserveLiteralPercentInKoreanAndEnglish() {
         listOf("ko-KR", "en-US").forEach { languageTag ->
             val value = localizedString(languageTag, R.string.guardian_privacy_body)

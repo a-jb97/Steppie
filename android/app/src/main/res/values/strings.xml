@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Steppie</string>
+    <string name="app_name">차례차례</string>
     <string name="state_loading">진행 중</string>
     <string name="routine_state_current">지금</string>
     <string name="routine_state_completed">완료했어요</string>
