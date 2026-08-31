@@ -3,6 +3,7 @@ import SwiftUI
 struct GuardianPINView: View {
     let purpose: GuardianPINPurpose
     let showsRecoveryReset: Bool
+    let allowsCancellation: Bool
     let verifyPIN: (String) -> Bool
     let savePIN: (String) -> Bool
     let onSuccess: () -> Void
@@ -63,8 +64,10 @@ struct GuardianPINView: View {
         }
         .background(Color.steppieBackgroundSecondary)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("취소", action: onCancel)
+            if allowsCancellation {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("취소", action: onCancel)
+                }
             }
         }
     }

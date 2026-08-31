@@ -173,6 +173,7 @@ struct ContentView: View {
                 GuardianPINView(
                     purpose: pinPurpose,
                     showsRecoveryReset: pinFlow == .guardianEntry && pinPurpose == .enter,
+                    allowsCancellation: sheet.allowsDismissal,
                     verifyPIN: guardianViewModel.verifyPIN,
                     savePIN: savePINHandler(for: pinPurpose),
                     onSuccess: {
@@ -190,6 +191,7 @@ struct ContentView: View {
                 .tutorialOverlay(coordinator: tutorialCoordinator, screen: .guardianPIN)
             }
             .presentationDetents([.large])
+            .interactiveDismissDisabled(!sheet.allowsDismissal)
         case .recoveryCodeReset:
             NavigationStack {
                 RecoveryCodeResetView(

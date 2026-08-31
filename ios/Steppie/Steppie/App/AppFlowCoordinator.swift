@@ -9,6 +9,13 @@ final class AppFlowCoordinator {
         self.state = state
     }
 
+    func beginInitialPINSetup() {
+        state = .presenting(
+            base: .child,
+            sheet: .pin(purpose: .setup, flow: .initialSetup)
+        )
+    }
+
     func beginGuardianEntry(hasGuardianPIN: Bool) {
         state = .presenting(
             base: .child,
@@ -69,6 +76,7 @@ final class AppFlowCoordinator {
     }
 
     func dismissSheet() {
+        guard state.sheet?.allowsDismissal != false else { return }
         state.dismissSheet()
     }
 
