@@ -4,6 +4,7 @@ nonisolated enum SteppieAppMode: Equatable {
 }
 
 nonisolated enum GuardianPINFlow: Equatable {
+    case initialSetup
     case guardianEntry
     case pinChange
     case recoveryRegeneration
@@ -14,6 +15,11 @@ nonisolated enum GuardianSheetDestination: Equatable {
     case pin(purpose: GuardianPINPurpose, flow: GuardianPINFlow)
     case recoveryCodeReset
     case recoveryCodeDisplay
+
+    var allowsDismissal: Bool {
+        guard case let .pin(_, flow) = self else { return true }
+        return flow != .initialSetup
+    }
 }
 
 nonisolated enum AppFlowState: Equatable {

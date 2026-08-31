@@ -3,6 +3,24 @@ import Testing
 
 @MainActor
 struct AppFlowCoordinatorTests {
+    @Test("최초 PIN 설정은 아이 모드 위에 닫을 수 없는 설정 화면을 표시한다")
+    func beginsNonDismissibleInitialPINSetup() {
+        let coordinator = AppFlowCoordinator()
+
+        coordinator.beginInitialPINSetup()
+
+        #expect(
+            coordinator.state
+                == .presenting(
+                    base: .child,
+                    sheet: .pin(purpose: .setup, flow: .initialSetup)
+                )
+        )
+        coordinator.dismissSheet()
+        #expect(coordinator.state.sheet?.allowsDismissal == false)
+        #expect(coordinator.state.mode == .child)
+    }
+
     @Test("보호자 진입은 PIN 존재 여부에 맞는 확인 화면을 표시한다")
     func beginsGuardianEntryWithExpectedPINPurpose() {
         let setupCoordinator = AppFlowCoordinator()
@@ -25,6 +43,11 @@ struct AppFlowCoordinatorTests {
                     sheet: .pin(purpose: .enter, flow: .guardianEntry)
                 )
         )
+
+        setupCoordinator.dismissSheet()
+        entryCoordinator.dismissSheet()
+        #expect(setupCoordinator.state == .child)
+        #expect(entryCoordinator.state == .child)
     }
 
     @Test("PIN 설정 완료는 복구 코드 표시 여부에 맞게 보호자 흐름을 이어간다")

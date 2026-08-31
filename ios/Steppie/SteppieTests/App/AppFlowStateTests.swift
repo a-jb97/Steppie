@@ -30,4 +30,21 @@ nonisolated struct AppFlowStateTests {
         #expect(childState == .child)
         #expect(guardianState == .guardian)
     }
+
+    @Test("최초 PIN 설정만 사용자에 의한 시트 닫기를 허용하지 않는다")
+    func initialPINSetupIsTheOnlyNonDismissibleSheet() {
+        let initialSetup = GuardianSheetDestination.pin(
+            purpose: .setup,
+            flow: .initialSetup
+        )
+        let guardianEntry = GuardianSheetDestination.pin(
+            purpose: .setup,
+            flow: .guardianEntry
+        )
+
+        #expect(!initialSetup.allowsDismissal)
+        #expect(guardianEntry.allowsDismissal)
+        #expect(GuardianSheetDestination.recoveryCodeReset.allowsDismissal)
+        #expect(GuardianSheetDestination.recoveryCodeDisplay.allowsDismissal)
+    }
 }
