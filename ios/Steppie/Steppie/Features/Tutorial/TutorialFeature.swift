@@ -28,6 +28,11 @@ struct TutorialStep: Identifiable, Equatable, Sendable {
     let messageKey: String
 }
 
+struct TutorialCompletion: Equatable, Sendable {
+    let id = UUID()
+    let screen: TutorialScreen
+}
+
 protocol TutorialProgressStoring: AnyObject {
     func contains(_ token: String) -> Bool
     func insert(_ token: String)
@@ -62,6 +67,7 @@ final class UserDefaultsTutorialProgressStore: TutorialProgressStoring {
 final class TutorialCoordinator {
     private(set) var activeScreen: TutorialScreen?
     private(set) var stepIndex = 0
+    private(set) var completion: TutorialCompletion?
     private let store: any TutorialProgressStoring
 
     convenience init() {
@@ -112,6 +118,7 @@ final class TutorialCoordinator {
     private func finish() {
         guard let activeScreen else { return }
         store.insert(Self.token(for: activeScreen))
+        completion = TutorialCompletion(screen: activeScreen)
         self.activeScreen = nil
         stepIndex = 0
     }

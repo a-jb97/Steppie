@@ -65,6 +65,19 @@ final class FirstLaunchSetupCoordinator {
         updateProgress(.completed)
     }
 
+    @discardableResult
+    func handleMainTutorialCompletion(
+        hasNoRoutines: Bool,
+        hasGuardianPIN: Bool
+    ) -> Bool {
+        guard progress == .notStarted else { return false }
+        guard hasNoRoutines, !hasGuardianPIN else {
+            updateProgress(.completed)
+            return false
+        }
+        return beginPINSetup()
+    }
+
     func reconcile(hasGuardianPIN: Bool) {
         guard hasGuardianPIN, progress == .pinSetupPending else { return }
         updateProgress(.completed)

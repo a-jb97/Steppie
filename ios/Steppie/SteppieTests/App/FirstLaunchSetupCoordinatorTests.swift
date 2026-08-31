@@ -36,6 +36,43 @@ struct FirstLaunchSetupCoordinatorTests {
         #expect(completedCoordinator.progress == .completed)
     }
 
+    @Test("메인 튜토리얼 완료 시 루틴과 PIN이 모두 없을 때만 PIN 설정을 시작한다")
+    func beginsPINSetupOnlyForEmptyFirstLaunch() {
+        let emptyCoordinator = FirstLaunchSetupCoordinator(
+            store: InMemoryFirstLaunchSetupProgressStore()
+        )
+        let routineCoordinator = FirstLaunchSetupCoordinator(
+            store: InMemoryFirstLaunchSetupProgressStore()
+        )
+        let pinCoordinator = FirstLaunchSetupCoordinator(
+            store: InMemoryFirstLaunchSetupProgressStore()
+        )
+
+        #expect(
+            emptyCoordinator.handleMainTutorialCompletion(
+                hasNoRoutines: true,
+                hasGuardianPIN: false
+            )
+        )
+        #expect(emptyCoordinator.progress == .pinSetupPending)
+
+        #expect(
+            !routineCoordinator.handleMainTutorialCompletion(
+                hasNoRoutines: false,
+                hasGuardianPIN: false
+            )
+        )
+        #expect(routineCoordinator.progress == .completed)
+
+        #expect(
+            !pinCoordinator.handleMainTutorialCompletion(
+                hasNoRoutines: true,
+                hasGuardianPIN: true
+            )
+        )
+        #expect(pinCoordinator.progress == .completed)
+    }
+
     @Test("대기 중 이미 PIN이 있으면 최초 설정을 완료 상태로 정리한다")
     func reconcilesPendingProgressWhenPINExists() {
         let store = InMemoryFirstLaunchSetupProgressStore(progress: .pinSetupPending)

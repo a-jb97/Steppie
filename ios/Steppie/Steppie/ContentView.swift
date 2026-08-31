@@ -6,6 +6,8 @@ struct ContentView: View {
     @State private var guardianViewModel: GuardianModeViewModel
     @State private var tutorialCoordinator = TutorialCoordinator()
     @State private var flowCoordinator = AppFlowCoordinator()
+    @State private var firstLaunchSetupCoordinator = FirstLaunchSetupCoordinator()
+    @State private var didCompleteInitialChildTutorial = false
     @State private var inactivityToken = UUID()
     private let notificationRouter: RoutineNotificationRouter?
 
@@ -67,6 +69,14 @@ struct ContentView: View {
             .onChange(of: notificationRouter?.pendingRoute) { _, _ in
                 consumePendingNotificationRoute()
             }
+            .onChange(of: tutorialCoordinator.completion) { _, completion in
+                guard completion?.screen == .childFocus else { return }
+                didCompleteInitialChildTutorial = true
+                evaluateInitialPINSetup()
+            }
+            .onChange(of: childViewModel.loadState) { _, _ in
+                evaluateInitialPINSetup()
+            }
             .sheet(isPresented: guardianSheetBinding, onDismiss: handleGuardianSheetDismiss) {
                 if let guardianSheet = flowCoordinator.state.sheet {
                     guardianSheetContent(guardianSheet)
@@ -77,6 +87,9 @@ struct ContentView: View {
                 try? await Task.sleep(for: .seconds(180))
                 guard !Task.isCancelled, flowCoordinator.state.mode == .guardian else { return }
                 exitGuardianMode()
+            }
+            .task {
+                resumeInitialPINSetupIfNeeded()
             }
     }
 
@@ -91,6 +104,48 @@ struct ContentView: View {
         flowCoordinator.beginGuardianEntry(
             hasGuardianPIN: guardianViewModel.hasGuardianPIN()
         )
+    }
+
+    private func evaluateInitialPINSetup() {
+        if firstLaunchSetupCoordinator.requiresPINSetup {
+            resumeInitialPINSetupIfNeeded()
+            return
+        }
+
+        guard didCompleteInitialChildTutorial else { return }
+
+        let hasNoRoutines: Bool
+        switch childViewModel.loadState {
+        case .empty:
+            hasNoRoutines = true
+        case .loaded:
+            hasNoRoutines = false
+        case .idle, .failed:
+            return
+        }
+
+        let shouldPresentPINSetup = firstLaunchSetupCoordinator.handleMainTutorialCompletion(
+            hasNoRoutines: hasNoRoutines,
+            hasGuardianPIN: guardianViewModel.hasGuardianPIN()
+        )
+        guard shouldPresentPINSetup else { return }
+        presentInitialPINSetup()
+    }
+
+    private func resumeInitialPINSetupIfNeeded() {
+        firstLaunchSetupCoordinator.reconcile(
+            hasGuardianPIN: guardianViewModel.hasGuardianPIN()
+        )
+        guard firstLaunchSetupCoordinator.requiresPINSetup else { return }
+        presentInitialPINSetup()
+    }
+
+    private func presentInitialPINSetup() {
+        guard flowCoordinator.state.mode == .child,
+              flowCoordinator.state.sheet == nil else { return }
+        childViewModel.setRoutineSpeechActive(false)
+        guardianViewModel.load()
+        flowCoordinator.beginInitialPINSetup()
     }
 
     private func handlePINSuccess(
@@ -114,6 +169,9 @@ struct ContentView: View {
         case .setup:
             guardianViewModel.selectedDestination = nil
             guardianViewModel.load()
+            if flow == .initialSetup {
+                firstLaunchSetupCoordinator.completePINSetup()
+            }
             flowCoordinator.completePIN(
                 purpose: purpose,
                 shouldDisplayRecoveryCode: guardianViewModel.oneTimeRecoveryCode != nil
