@@ -121,6 +121,9 @@ class GuardianModeViewModel(
                         endDate = snapshot.recordsEndDate,
                         routineSets = snapshot.recordRoutineSets,
                         dailyLogs = snapshot.dailyLogs,
+                        routineSetsForToday = snapshot.visibleRoutineSets
+                            .filter(RoutineSet::isAvailableToChild),
+                        today = snapshot.today,
                         localeTag = localeProvider.languageTag(),
                         zoneId = clockProvider.zoneId,
                     )
@@ -235,6 +238,9 @@ class GuardianModeViewModel(
             endDate = recordsEndDate.value,
             routineSets = recordRoutineSetsCache,
             dailyLogs = dailyLogsCache,
+            routineSetsForToday = current.routineSets
+                .filter(RoutineSet::isAvailableToChild),
+            today = currentDate.value,
             localeTag = localeProvider.languageTag(),
             zoneId = clockProvider.zoneId,
         )
@@ -1005,6 +1011,8 @@ private fun buildGuardianRecords(
     endDate: LocalDate,
     routineSets: List<RoutineSet>,
     dailyLogs: List<DailyLog>,
+    routineSetsForToday: List<RoutineSet>,
+    today: LocalDate,
     localeTag: String,
     zoneId: ZoneId,
 ): GuardianRecordsResult {
@@ -1023,6 +1031,9 @@ private fun buildGuardianRecords(
             logs = logsByDate[date].orEmpty(),
             routineSetsById = routineSetsById,
             routinesById = routinesById,
+            fallbackRoutineSets = routineSetsForToday
+                .takeIf { date == today }
+                .orEmpty(),
             localeTag = localeTag,
             zoneId = zoneId,
         )
@@ -1088,29 +1099,15 @@ private fun buildGuardianRecordRoutines(
     localeTag: String,
     zoneId: ZoneId,
 ): List<GuardianRecordRoutine> {
-    if (logs.isEmpty()) {
-        return fallbackRoutineSets
-            .sortedWith(
-                compareBy<RoutineSet> { it.startTime != null }
-                    .thenBy { it.startTime }
-                    .thenBy { it.createdAt },
-            )
-            .flatMap(RoutineSet::routines)
-            .filter { it.existedOn(date, zoneId) && it.isAvailableToChild }
-            .sortedWith(compareBy<Routine> { it.order }.thenBy { it.createdAt }.thenBy { it.id })
-            .map { routine ->
-                GuardianRecordRoutine(
-                    routineId = routine.id,
-                    title = routine.title.resolve(null, localeTag),
-                    isCompleted = false,
-                    completedAt = null,
-                    isDeleted = false,
-                    isInactive = false,
-                    isMissing = false,
-                )
-            }
-    }
     val logsByRoutineId = logs.associateBy(DailyLog::routineId)
+    val fallbackRoutines = fallbackRoutineSets
+        .sortedWith(
+            compareBy<RoutineSet> { it.startTime != null }
+                .thenBy { it.startTime }
+                .thenBy { it.createdAt },
+        )
+        .flatMap(RoutineSet::routines)
+        .filter { it.existedOn(date, zoneId) && it.isAvailableToChild }
     val loggedRoutineSetRoutines = logs
         .mapNotNull { routineSetsById[it.routineSetId] }
         .flatMap(RoutineSet::routines)
@@ -1129,7 +1126,7 @@ private fun buildGuardianRecordRoutines(
                 isMissing = true,
             )
         }
-    val routineRows = (loggedRoutineSetRoutines + loggedRoutines)
+    val routineRows = (fallbackRoutines + loggedRoutineSetRoutines + loggedRoutines)
         .distinctBy(Routine::id)
         .sortedWith(compareBy<Routine> { it.order }.thenBy { it.createdAt }.thenBy { it.id })
         .map { routine ->

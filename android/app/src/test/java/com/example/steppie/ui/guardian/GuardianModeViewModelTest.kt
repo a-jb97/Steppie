@@ -6,6 +6,7 @@ import com.example.steppie.data.sample.RoutineSampleData
 import com.example.steppie.domain.model.AppSettings
 import com.example.steppie.domain.model.FeedbackIntensity
 import com.example.steppie.domain.model.IconRef
+import com.example.steppie.domain.model.RoutineSet
 import com.example.steppie.domain.repository.AppSettingsRepository
 import com.example.steppie.testing.MainDispatcherRule
 import com.example.steppie.testing.TestClockProvider
@@ -517,6 +518,61 @@ class GuardianModeViewModelTest {
         }
     }
 
+    @Test
+    fun `records show today's active routines before any completion and keep past empty days empty`() = runTest {
+        val fixture = guardianFixture()
+        val viewModel = fixture.viewModel
+
+        try {
+            runCurrent()
+            viewModel.openRecords()
+            runCurrent()
+
+            val todayState = viewModel.uiState.value
+            assertEquals(6, todayState.selectedRecordSummary.totalCount)
+            assertEquals(0, todayState.selectedRecordSummary.completedCount)
+            assertEquals(6, todayState.selectedRecordRoutines.size)
+            assertTrue(todayState.selectedRecordRoutines.none(GuardianRecordRoutine::isCompleted))
+
+            viewModel.selectRecordsDate(TestDate.minusDays(1))
+
+            val pastState = viewModel.uiState.value
+            assertEquals(0, pastState.selectedRecordSummary.totalCount)
+            assertTrue(pastState.selectedRecordRoutines.isEmpty())
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
+    @Test
+    fun `recent and calendar records include all active routines with matching completion state`() = runTest {
+        val morning = RoutineSampleData.morning.copy(isActive = true, startTime = null)
+        val school = RoutineSampleData.school.copy(isActive = true, startTime = null)
+        val fixture = guardianFixture(initialData = listOf(morning, school))
+        val viewModel = fixture.viewModel
+        val completedRoutine = morning.routines.first()
+
+        try {
+            fixture.routineRepository.completeRoutine(completedRoutine.id, TestDate, TestInstant)
+            runCurrent()
+            viewModel.openRecords()
+            runCurrent()
+
+            val recentState = viewModel.uiState.value
+            assertEquals(10, recentState.selectedRecordSummary.totalCount)
+            assertEquals(1, recentState.selectedRecordSummary.completedCount)
+            assertEquals(10, recentState.selectedRecordRoutines.size)
+
+            viewModel.openRecordsCalendar()
+
+            val calendarState = viewModel.uiState.value
+            assertEquals(recentState.selectedRecordSummary, calendarState.selectedCalendarRecordSummary)
+            assertEquals(recentState.selectedRecordRoutines, calendarState.selectedCalendarRecordRoutines)
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
+    }
+
     private suspend fun authenticatedGuardianFixture(): GuardianFixture {
         val fixture = guardianFixture(
             settings = configuredSettings(),
@@ -530,9 +586,12 @@ class GuardianModeViewModelTest {
     private fun guardianFixture(
         settings: AppSettings = AppSettings(),
         currentPin: String? = null,
+        initialData: List<RoutineSet> = listOf(
+            RoutineSampleData.morning.copy(isActive = true, startTime = null),
+        ),
     ): GuardianFixture {
         val routineRepository = InMemoryRoutineRepository(
-            initialData = listOf(RoutineSampleData.morning.copy(isActive = true, startTime = null)),
+            initialData = initialData,
         )
         val settingsRepository = FakeGuardianSettingsRepository(settings, currentPin)
         return GuardianFixture(
@@ -553,6 +612,7 @@ class GuardianModeViewModelTest {
 }
 
 private val TestInstant = Instant.parse("2026-01-02T08:00:00Z")
+private val TestDate = TestInstant.atZone(ZoneOffset.UTC).toLocalDate()
 
 private data class GuardianFixture(
     val viewModel: GuardianModeViewModel,
