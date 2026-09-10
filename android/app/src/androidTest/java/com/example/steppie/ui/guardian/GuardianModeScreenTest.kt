@@ -1,6 +1,7 @@
 package com.example.steppie.ui.guardian
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
@@ -12,7 +13,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTextInput
 import com.example.steppie.R
 import com.example.steppie.data.sample.RoutineSampleData
 import com.example.steppie.testing.testString
@@ -197,9 +197,9 @@ class GuardianModeScreenTest {
     }
 
     @Test
-    fun recoveryCodeInputRoutesTextChangesThroughSingleCallback() {
-        var recoveryCode = ""
-
+    fun recoveryCodeKeypadPreservesLeadingZeroLimitsLengthAndDeletes() {
+        val recoveryCode = mutableStateOf("")
+        var confirmations = 0
         composeRule.setContent {
             SteppieTheme {
                 TestGuardianModeScreen(
@@ -208,20 +208,32 @@ class GuardianModeScreenTest {
                         isAuthenticated = true,
                         destination = GuardianDestination.RecoveryCode,
                         recoveryStep = GuardianRecoveryStep.EnterCodeForPinReset,
+                        recoveryDigits = recoveryCode.value,
                     ),
                     securityActions = GuardianSecurityActionCallbacks(
-                        onRecoveryCodeChange = { recoveryCode = it },
+                        onRecoveryCodeChange = { recoveryCode.value = it },
+                        onConfirmRecoveryCode = { confirmations++ },
                     ),
                 )
             }
         }
-
-        composeRule.onNodeWithContentDescription(testString(R.string.a11y_recovery_code_input))
-            .performTextInput("12345")
-
-        composeRule.runOnIdle {
-            assertEquals("12345", recoveryCode)
+        val confirm = composeRule.onNodeWithText(testString(R.string.guardian_recovery_set_new_pin))
+        confirm.performScrollTo().assertIsNotEnabled()
+        "0123456".forEach { digit ->
+            composeRule.onNodeWithContentDescription(digit.toString()).performScrollTo().performClick()
         }
+        composeRule.runOnIdle {
+            assertEquals("012345", recoveryCode.value)
+            assertEquals(0, confirmations)
+        }
+        confirm.performScrollTo().performClick()
+        composeRule.runOnIdle { assertEquals(1, confirmations) }
+        val delete = composeRule.onNodeWithContentDescription(testString(R.string.a11y_recovery_code_delete))
+        delete.performScrollTo().performClick()
+        composeRule.runOnIdle { assertEquals("01234", recoveryCode.value) }
+        confirm.performScrollTo().assertIsNotEnabled()
+        repeat(6) { delete.performScrollTo().performClick() }
+        composeRule.runOnIdle { assertEquals("", recoveryCode.value) }
     }
 
     @Test
