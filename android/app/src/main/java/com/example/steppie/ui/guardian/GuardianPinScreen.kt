@@ -8,14 +8,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,14 +24,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick as semanticOnClick
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.steppie.R
-import com.example.steppie.ui.theme.SteppieCornerRadius
 import com.example.steppie.ui.theme.SteppieLayout
 import com.example.steppie.ui.theme.SteppieSpacing
 import com.example.steppie.ui.theme.SteppieTheme
@@ -105,7 +99,11 @@ internal fun GuardianPinScreen(
         }
         Spacer(Modifier.height(SteppieSpacing.Large))
         Box(Modifier.tutorialAnchor(TutorialTarget.GuardianMain)) {
-            PinKeypad(onDigit = onDigit, onDelete = onDeletePinDigit)
+            GuardianNumberKeypad(
+                onDigit = onDigit,
+                onDelete = onDeletePinDigit,
+                hapticEnabled = state.appSettings.hapticEnabled,
+            )
         }
         if (state.pinError != null) {
             Spacer(Modifier.height(28.dp))
@@ -122,97 +120,6 @@ internal fun GuardianPinScreen(
                 color = MaterialTheme.colorScheme.primary,
                 style = SteppieTheme.typography.button,
             )
-        }
-    }
-}
-
-@Composable
-private fun PinKeypad(onDigit: (Int) -> Unit, onDelete: () -> Unit) {
-    val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("", "0", "⌫"))
-    val deleteDescription = stringResource(R.string.a11y_pin_delete)
-    Column(
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                row.forEach { label ->
-                    if (label.isBlank()) {
-                        Spacer(Modifier.size(width = 90.dp, height = SteppieLayout.ChildMinimumTouchTarget))
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(width = 90.dp, height = SteppieLayout.ChildMinimumTouchTarget)
-                                .clip(RoundedCornerShape(SteppieCornerRadius.Card))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clearAndSetSemantics {
-                                    contentDescription = if (label == "⌫") deleteDescription else label
-                                    role = Role.Button
-                                    semanticOnClick {
-                                        if (label == "⌫") onDelete() else onDigit(label.toInt())
-                                        true
-                                    }
-                                }
-                                .clickable(role = Role.Button) {
-                                    if (label == "⌫") onDelete() else onDigit(label.toInt())
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = label,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                style = SteppieTheme.typography.childCardTitle,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun CompactPinKeypad(onDigit: (Int) -> Unit, onDelete: () -> Unit) {
-    val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("", "0", "⌫"))
-    val deleteDescription = stringResource(R.string.a11y_pin_delete)
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(SteppieSpacing.ExtraSmall)) {
-                row.forEach { label ->
-                    if (label.isBlank()) {
-                        Spacer(Modifier.size(width = 64.dp, height = 56.dp))
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(width = 64.dp, height = 56.dp)
-                                .clip(RoundedCornerShape(SteppieCornerRadius.Control))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clearAndSetSemantics {
-                                    contentDescription = if (label == "⌫") deleteDescription else label
-                                    role = Role.Button
-                                    semanticOnClick {
-                                        if (label == "⌫") onDelete() else onDigit(label.toInt())
-                                        true
-                                    }
-                                }
-                                .clickable(role = Role.Button) {
-                                    if (label == "⌫") onDelete() else onDigit(label.toInt())
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = label,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                style = SteppieTheme.typography.guardianSection,
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }
