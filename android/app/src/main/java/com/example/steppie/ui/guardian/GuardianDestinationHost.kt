@@ -185,6 +185,7 @@ internal fun BoxScope.GuardianDestinationHost(
     if (state.recoveryStep == GuardianRecoveryStep.EnterCodeForPinReset) {
         GuardianRecoveryCodeInputSheet(
             recoveryDigits = state.recoveryDigits,
+            hapticEnabled = state.appSettings.hapticEnabled,
             recoveryError = state.recoveryError,
             onRecoveryCodeChange = securityActions.onRecoveryCodeChange,
             onConfirmRecoveryCode = securityActions.onConfirmRecoveryCode,

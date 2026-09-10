@@ -38,6 +38,7 @@
     <string name="a11y_routine_card">%1$s, %2$s, %3$s</string>
     <string name="a11y_pin_progress">PIN 4자리 중 %1$d자리 입력됨</string>
     <string name="a11y_recovery_code_value">복구 코드 %1$s</string>
+    <string name="a11y_recovery_code_delete">복구 코드 한 자리 지우기</string>
     <string name="a11y_recovery_code_input">6자리 복구 코드 입력</string>
     <string name="a11y_guardian_menu_card">%1$s. %2$s</string>
     <string name="a11y_routine_set_row">%1$s, %2$s</string>

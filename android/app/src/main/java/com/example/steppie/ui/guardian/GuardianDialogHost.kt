@@ -5,8 +5,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -18,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.example.steppie.R
 import com.example.steppie.ui.components.SteppieButton
 import com.example.steppie.ui.components.SteppieButtonStyle
@@ -116,9 +122,14 @@ internal fun GuardianDialogHost(
     if (state.pendingRestorePreview != null) {
         AlertDialog(
             onDismissRequest = onCancelRestore,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier = Modifier.padding(horizontal = SteppieSpacing.ExtraSmall).widthIn(max = 560.dp).fillMaxWidth(),
             title = { Text(stringResource(R.string.guardian_restore_confirm_title)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(SteppieSpacing.Small),
+                ) {
                     Text(
                         text = stringResource(
                             R.string.guardian_restore_confirm_body,
@@ -168,7 +179,11 @@ internal fun GuardianDialogHost(
                             )
                         }
                     }
-                    CompactPinKeypad(onDigit = onRestorePinDigit, onDelete = onDeleteRestorePinDigit)
+                    GuardianNumberKeypad(
+                        onDigit = onRestorePinDigit,
+                        onDelete = onDeleteRestorePinDigit,
+                        hapticEnabled = state.appSettings.hapticEnabled,
+                    )
                     state.backupError?.let { ErrorMessage(it) }
                 }
             },

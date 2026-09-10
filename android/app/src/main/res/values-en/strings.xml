@@ -38,6 +38,7 @@
     <string name="a11y_routine_card">%1$s, %2$s, %3$s</string>
     <string name="a11y_pin_progress">%1$d of 4 PIN digits entered</string>
     <string name="a11y_recovery_code_value">Recovery code %1$s</string>
+    <string name="a11y_recovery_code_delete">Delete one recovery code digit</string>
     <string name="a11y_recovery_code_input">Enter 6-digit recovery code</string>
     <string name="a11y_guardian_menu_card">%1$s. %2$s</string>
     <string name="a11y_routine_set_row">%1$s, %2$s</string>

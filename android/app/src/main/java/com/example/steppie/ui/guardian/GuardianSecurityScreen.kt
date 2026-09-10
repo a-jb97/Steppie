@@ -14,11 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,7 +34,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.steppie.R
@@ -92,6 +89,7 @@ internal fun GuardianRecoveryCodeScreen(
 @Composable
 internal fun BoxScope.GuardianRecoveryCodeInputSheet(
     recoveryDigits: String,
+    hapticEnabled: Boolean,
     recoveryError: GuardianRecoveryError?,
     onRecoveryCodeChange: (String) -> Unit,
     onConfirmRecoveryCode: () -> Unit,
@@ -108,7 +106,7 @@ internal fun BoxScope.GuardianRecoveryCodeInputSheet(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .heightIn(max = 560.dp)
+            .heightIn(max = 800.dp)
             .clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
             .background(MaterialTheme.colorScheme.surface)
             .verticalScroll(rememberScrollState())
@@ -139,27 +137,31 @@ internal fun BoxScope.GuardianRecoveryCodeInputSheet(
                 style = SteppieTheme.typography.guardianBody,
             )
         }
-        OutlinedTextField(
-            value = recoveryDigits,
-            onValueChange = onRecoveryCodeChange,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 92.dp)
-                .semantics {
+                .border(SteppieStroke.Divider, MaterialTheme.colorScheme.outline, RoundedCornerShape(SteppieCornerRadius.Control))
+                .semantics(mergeDescendants = true) {
                     contentDescription = inputDescription
-                },
-            placeholder = {
-                Text(
-                    text = stringResource(R.string.guardian_recovery_code_placeholder),
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center,
-                    style = SteppieTheme.typography.childCardTitle,
-                )
+                    liveRegion = LiveRegionMode.Polite
+                }
+                .padding(SteppieSpacing.Small),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = recoveryDigits.ifEmpty { stringResource(R.string.guardian_recovery_code_placeholder) },
+                style = SteppieTheme.typography.childCardTitle,
+                textAlign = TextAlign.Center,
+            )
+        }
+        GuardianNumberKeypad(
+            onDigit = { digit ->
+                if (recoveryDigits.length < 6) onRecoveryCodeChange(recoveryDigits + digit)
             },
-            singleLine = true,
-            textStyle = SteppieTheme.typography.childCardTitle.copy(textAlign = TextAlign.Center),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-            isError = recoveryError != null,
+            onDelete = { onRecoveryCodeChange(recoveryDigits.dropLast(1)) },
+            hapticEnabled = hapticEnabled,
+            deleteDescription = stringResource(R.string.a11y_recovery_code_delete),
         )
         recoveryErrorMessage?.let { ErrorMessage(it) }
         SteppieButton(
