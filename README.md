@@ -4,7 +4,7 @@
   <p><strong>지금 할 일을 하나씩, 하루의 순서를 눈에 보이게.</strong></p>
   <p>그림과 색상, 짧은 문구로 하루 일과를 따라갈 수 있도록 돕는 루틴 시각화 앱</p>
   <p>
-    <a href="https://apps.apple.com/kr/app/id6799095495"><img src="https://img.shields.io/badge/Download_on_the-App_Store-000000?style=for-the-badge&logo=apple&logoColor=white" alt="App Store에서 다운로드"></a>
+    <a href="https://apps.apple.com/kr/app/id6799095495"><img src="https://img.shields.io/badge/App_Store-다운로드-0D96F6?style=for-the-badge&logo=appstore&logoColor=white" alt="App Store에서 다운로드">
   </p>
   <p>
     <img src="https://img.shields.io/badge/iOS_18.6%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 18.6 이상">
@@ -57,14 +57,14 @@
   </tbody>
 </table>
 
-같은 아침 루틴 템플릿의 6개 활동을 구성한 실제 앱 화면입니다. Android 루틴 관리는 활동 목록까지 스크롤한 화면입니다.
+같은 아침 루틴 템플릿의 6개 활동을 구성한 실제 앱 화면. Android 루틴 관리는 활동 목록까지 스크롤한 상태.
 
 ## 주요 기능
 
 | 기능 | 사용자 경험 |
 |---|---|
 | 지금 할 일과 오늘의 순서 | 현재 활동은 큰 카드로, 전체 순서는 목록으로 확인 |
-| 완료와 되돌리기 | 포커스 카드 탭으로 완료하고, 완료 피드백에서 실수로 누른 활동을 되돌리기 |
+| 완료와 되돌리기 | 포커스 카드 탭으로 완료, 완료 피드백에서 실수로 누른 활동 되돌리기 |
 | 맞춤 루틴 구성 | 템플릿 또는 직접 만든 루틴에 아이콘·사진·색상·예정 시각을 설정 |
 | 날짜별 진행 기록 | 날짜를 선택해 루틴별 완료 현황 확인 |
 | 보호자 모드 | 숨은 진입 영역과 PIN으로 루틴 편집·설정 화면을 분리 |
@@ -75,54 +75,54 @@
 
 ### 1. 같은 제품 경험을 두 네이티브 구현으로 유지하기
 
-플랫폼마다 화면과 저장 방식을 따로 구현하면 활동 순서, 완료 상태, 백업 데이터의 의미가 달라질 수 있습니다. 이를 줄이기 위해 [제품 명세](docs/product-spec.md), [데이터 계약](docs/data-contract.md), [디자인 토큰](docs/design-tokens.md), [현지화 계약](docs/localization-contract.md)을 공통 기준으로 두었습니다.
+플랫폼마다 화면과 저장 방식을 따로 구현하면 활동 순서, 완료 상태, 백업 데이터의 의미가 달라질 수 있는 문제. 이를 줄이기 위해 [제품 명세](docs/product-spec.md), [데이터 계약](docs/data-contract.md), [디자인 토큰](docs/design-tokens.md), [현지화 계약](docs/localization-contract.md)을 공통 기준으로 적용.
 
 | iOS / iPadOS | Android |
 |---|---|
 | SwiftUI 화면과 `@Observable` 상태 관리, 도메인 모델을 SwiftData 영속 모델로 변환 | Compose 화면과 AAC ViewModel·StateFlow, 도메인 모델을 Room 엔티티로 변환 |
 | `RoutineRepository` 프로토콜로 저장소 경계 정의 | `RoutineRepository`와 `AppSettingsRepository` 인터페이스로 루틴·설정 저장소 경계 정의 |
 
-공유하는 것은 제품 계약이며, 실행 코드는 각 플랫폼의 UI·수명주기·저장 API에 맞춰 구성했습니다. 변경 사항을 검토할 때도 [공통 테스트 시나리오](docs/test-scenarios.md)를 기준으로 두 구현을 비교할 수 있습니다.
+제품 계약은 공유하고, 실행 코드는 각 플랫폼의 UI·수명주기·저장 API에 맞춰 구성. 변경 사항 검토 시 [공통 테스트 시나리오](docs/test-scenarios.md)를 기준으로 두 구현 비교.
 
 구현: [iOS 저장소와 매핑](ios/Steppie/Steppie/Data/Routine) · [Android 저장소](android/app/src/main/java/com/example/steppie/data/repository)
 
 ### 2. 완료 피드백과 실제 진행 상태를 함께 관리하기
 
-완료 직후에는 방금 끝낸 활동을 보여주면서, 되돌리기와 다음 활동으로의 이동도 처리해야 합니다. 화면에 선택된 활동, 완료된 활동, 피드백 중인 활동을 별도 상태로 관리해 이 흐름을 표현했습니다.
+완료 직후 방금 끝낸 활동 표시, 되돌리기와 다음 활동 이동 처리. 선택된 활동·완료된 활동·피드백 중인 활동을 별도 상태로 관리.
 
 | iOS / iPadOS | Android |
 |---|---|
 | `ChildRoutineViewModel`이 완료·되돌리기 상태를 관리하고, `ChildRoutinePolicy`가 현재 활동과 다음 루틴을 계산 | `combine`으로 설정·해당 날짜의 루틴·완료 기록·현재 시각을 결합해 화면 상태를 계산 |
 | 예약 전환과 피드백 전환의 `Task`를 취소·재생성하며, 앱 활성화 시 진행 상태를 다시 확인 | `StateFlow`의 화면 상태와 `SharedFlow`의 음성·진동 이벤트를 분리하고, 저장 실패 시 낙관적으로 바꾼 완료 상태를 복구 |
 
-진행 기록은 로컬 날짜를 기준으로 조회합니다. 루틴 삭제는 삭제 시각을 남기는 방식으로 처리해 기록이 참조하는 루틴 정보를 유지합니다.
+진행 기록은 로컬 날짜 기준 조회. 루틴 삭제 시 삭제 시각을 남겨 기록이 참조하는 루틴 정보 유지.
 
 구현: [iOS 진행 상태](ios/Steppie/Steppie/Features/ChildRoutine/ChildRoutineViewModel.swift) · [Android 진행 상태](android/app/src/main/java/com/example/steppie/ui/child/ChildRoutineViewModel.kt)
 
 ### 3. 데이터와 사진을 함께 검증하고 복원하기
 
-사진이 포함된 백업은 데이터베이스만 복원해서는 충분하지 않습니다. [백업 계약](docs/backup-contract.md)에 따라 `manifest.json`, `data.json`, 사진 에셋을 ZIP으로 묶고, 데이터의 SHA-256 체크섬과 참조 관계를 검증한 뒤 현재 데이터를 교체합니다.
+사진이 포함된 백업은 데이터베이스만으로 복원할 수 없는 구조. [백업 계약](docs/backup-contract.md)에 따라 `manifest.json`, `data.json`, 사진 에셋을 ZIP으로 묶고, 데이터의 SHA-256 체크섬과 참조 관계를 검증한 뒤 현재 데이터 교체.
 
 | iOS / iPadOS | Android |
 |---|---|
 | SwiftUI `fileExporter`·`fileImporter`로 백업 파일 저장·선택 | `CreateDocument`·`OpenDocument`로 백업 파일 저장·선택 |
 | SwiftData 저장 실패 시 `ModelContext.rollback()`을 호출하고, 사진 변경 실패를 포함한 복원 오류에서는 기존 사진을 되돌리는 처리 수행 | Room·DataStore·사진 저장소를 복원 단계로 구성하고, 실패하면 적용한 단계를 역순으로 복구 |
 
-현재 제공하는 백업 UI는 사용자가 파일을 내보내고 선택하는 방식이며, 복원은 기존 데이터를 교체하는 **Replace 방식**입니다. 백업 검증과 저장소별 복구 처리를 분리해 손상된 파일과 복원 도중의 저장 오류에 대응합니다.
+백업 UI는 파일 내보내기·선택 방식이며, 복원은 기존 데이터를 교체하는 **Replace 방식**. 백업 검증과 저장소별 복구 처리를 분리해 손상된 파일과 복원 중 저장 오류에 대응.
 
 구현: [iOS 백업 서비스](ios/Steppie/Steppie/Data/Backup/BackupService.swift) · [Android 복원 데이터 소스](android/app/src/main/java/com/example/steppie/data/backup/BackupDataSource.kt) · [Android 복구 순서](android/app/src/main/java/com/example/steppie/data/backup/BackupRestoreTransaction.kt)
 
 ### 4. 감각 피드백과 화면 구성을 사용자에게 맞추기
 
-같은 완료 효과도 사용자마다 부담이 다를 수 있어 음성 안내·효과음·진동과 피드백 강도를 조절할 수 있도록 구성했습니다. iOS는 `AVSpeechSynthesizer`, Android는 `TextToSpeech`를 사용하며 음성 속도와 볼륨 설정을 전달합니다. 장식성 애니메이션은 iOS의 `accessibilityReduceMotion`, Android의 애니메이터 배율 설정을 확인해 표시 여부나 강도를 조절합니다.
+사용자별 부담을 고려한 음성 안내·효과음·진동·피드백 강도 조절. iOS는 `AVSpeechSynthesizer`, Android는 `TextToSpeech`를 사용하고 음성 속도와 볼륨 설정을 전달. 장식성 애니메이션은 iOS의 `accessibilityReduceMotion`, Android의 애니메이터 배율 설정에 따라 표시 여부와 강도 조절.
 
-아이 모드의 주요 조작에는 80pt/dp 터치 영역 토큰을 사용합니다. 스마트폰에서는 현재 활동에 집중하고, 충분히 넓은 화면에서는 목록과 포커스 카드를 함께 보여줍니다. iOS는 가용 너비, Android는 가용 너비와 가로 배치 조건으로 분할 화면을 결정합니다.
+아이 모드의 주요 조작에 80pt/dp 터치 영역 토큰 적용. 스마트폰에서는 현재 활동에 집중하고, 넓은 화면에서는 목록과 포커스 카드를 함께 표시. iOS는 가용 너비, Android는 가용 너비와 가로 배치 조건으로 분할 화면 결정.
 
 구현: [iOS 피드백](ios/Steppie/Steppie/Features/ChildRoutine/RoutineFeedbackServices.swift) · [Android 피드백](android/app/src/main/java/com/example/steppie/ui/app/AndroidFeedbackController.kt) · [iOS 레이아웃](ios/Steppie/Steppie/Features/ChildRoutine/ChildRoutineLayoutView.swift) · [Android 레이아웃](android/app/src/main/java/com/example/steppie/ui/child/ChildRoutineLayoutHost.kt)
 
 ## 아키텍처와 기술 스택
 
-두 플랫폼 모두 MVVM을 기반으로 화면 상태와 저장소를 분리합니다. 아래는 핵심 루틴·설정 데이터 흐름이며, 공통 계약 문서는 개발과 검증의 기준입니다.
+두 플랫폼 모두 MVVM을 기반으로 화면 상태와 저장소 분리. 아래는 핵심 루틴·설정 데이터 흐름이며, 공통 계약 문서는 개발과 검증의 기준.
 
 ```mermaid
 flowchart TB
@@ -171,4 +171,4 @@ flowchart TB
 | Android DB 변경·실제 저장소 복원 | [Room 마이그레이션 테스트](android/app/src/androidTest/java/com/example/steppie/data/SteppieDatabaseMigrationTest.kt) · [BackupDataSourceTest](android/app/src/androidTest/java/com/example/steppie/data/backup/BackupDataSourceTest.kt) |
 | 공통 기능·접근성·출시 기준 | [테스트 시나리오](docs/test-scenarios.md) · [접근성 체크리스트](docs/accessibility-checklist.md) · [출시 체크리스트](docs/release-checklist.md) |
 
-테스트 링크는 저장소에 구현된 검증 항목을 안내합니다. 공통 체크리스트는 검증 기준이며, 전체 항목의 통과 결과를 뜻하지 않습니다.
+테스트 링크는 저장소에 구현된 검증 항목 안내. 공통 체크리스트는 검증 기준이며, 전체 항목의 통과 결과를 의미하지 않음.
