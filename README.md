@@ -3,7 +3,19 @@
   <h1>차례차례 · Steppie</h1>
   <p><strong>지금 할 일을 하나씩, 하루의 순서를 눈에 보이게.</strong></p>
   <p>그림과 색상, 짧은 문구로 하루 일과를 따라갈 수 있도록 돕는 루틴 시각화 앱</p>
-  <p><a href="https://apps.apple.com/kr/app/id6799095495">App Store에서 보기</a></p>
+  <p>
+    <a href="https://apps.apple.com/kr/app/id6799095495"><img src="https://img.shields.io/badge/Download_on_the-App_Store-000000?style=for-the-badge&logo=apple&logoColor=white" alt="App Store에서 다운로드"></a>
+  </p>
+  <p>
+    <img src="https://img.shields.io/badge/iOS_18.6%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 18.6 이상">
+    <img src="https://img.shields.io/badge/Swift_5-F05138?style=flat-square&logo=swift&logoColor=white" alt="Swift 5">
+    <img src="https://img.shields.io/badge/SwiftUI-0D96F6?style=flat-square&logo=swift&logoColor=white" alt="SwiftUI">
+    <img src="https://img.shields.io/badge/SwiftData-555555?style=flat-square&logo=apple&logoColor=white" alt="SwiftData">
+    <img src="https://img.shields.io/badge/MVVM-555555?style=flat-square" alt="MVVM">
+    <img src="https://img.shields.io/badge/Android_API_28%2B-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android API 28 이상">
+    <img src="https://img.shields.io/badge/Kotlin-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin">
+    <img src="https://img.shields.io/badge/Jetpack_Compose-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose">
+  </p>
 </div>
 
 발달장애·자폐 스펙트럼 사용자가 다음 활동을 예측하고, 한 번의 탭으로 완료를 표현할 수 있도록 만들었습니다. 보호자·교사·치료사는 보호자 모드에서 활동과 순서를 구성하고 진행 기록을 확인할 수 있습니다.
