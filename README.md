@@ -4,7 +4,8 @@
   <p><strong>지금 할 일을 하나씩, 하루의 순서를 눈에 보이게.</strong></p>
   <p>그림과 색상, 짧은 문구로 하루 일과를 따라갈 수 있도록 돕는 루틴 시각화 앱</p>
   <p>
-    <a href="https://apps.apple.com/kr/app/id6799095495"><img src="https://img.shields.io/badge/App_Store-다운로드-0D96F6?style=for-the-badge&logo=appstore&logoColor=white" alt="App Store에서 다운로드">
+    <a href="https://apps.apple.com/kr/app/id6799095495"><img src="https://img.shields.io/badge/App_Store-다운로드-0D96F6?style=for-the-badge&logo=appstore&logoColor=white" alt="App Store에서 다운로드"></a>
+    <a href="https://play.google.com/store/apps/details?id=com.jade.steppie&pcampaignid=web_share"><img src="https://img.shields.io/badge/Play_Store-다운로드-3DDC84?style=for-the-badge&logo=googleplay&logoColor=white" alt="Google Play에서 다운로드"></a>
   </p>
   <p>
     <img src="https://img.shields.io/badge/iOS_18.6%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 18.6 이상">
